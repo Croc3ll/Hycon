@@ -1,0 +1,235 @@
+# Hycon guide: setup and use
+
+Contents: [1. Install](#1-install) · [2. First login](#2-first-login) · [3. Using the panel](#3-using-the-panel) ·
+[4. Staff accounts](#4-staff-accounts) · [5. Settings (hycon.json)](#5-settings-hyconjson) ·
+[6. Opening the panel from another computer](#6-opening-the-panel-from-another-computer) ·
+[7. Files Hycon keeps](#7-files-hycon-keeps) · [8. Troubleshooting](#8-troubleshooting) ·
+[9. Building from source](#9-building-from-source)
+
+---
+
+## 1. Install
+
+You need a Hytale server on version 0.7.2 or newer (below 0.8.0).
+
+1. Download `Hycon-<version>.jar` (or build it, see [section 9](#9-building-from-source)).
+2. Stop the server and put the jar in the server's `mods` folder.
+3. Start the server. In the server log you should see:
+
+   ```
+   [Hycon] Hycon: created panel account 'owner'. Its password is in ...\FIRST-LOGIN.txt
+   [Hycon] Hycon panel: http://127.0.0.1:8096/
+   ```
+
+Hycon has now made its data folder inside `mods` (named after the plugin, e.g. `mods/Hycon_Hycon/`)
+with `hycon.json` and `FIRST-LOGIN.txt` in it.
+
+## 2. First login
+
+1. On **the same computer as the server**, open `http://127.0.0.1:8096/` in a browser.
+2. Open `FIRST-LOGIN.txt` from Hycon's data folder. It holds the account name (`owner`) and a
+   random password.
+3. Log in with those. The panel asks you to **choose your own password** (at least 10 characters,
+   not containing the account name) before anything else works.
+4. Once saved, Hycon deletes `FIRST-LOGIN.txt`.
+
+The password never appears in the server log, because the log is visible inside the panel.
+
+**Running the server on a rented host / VPS?** The panel only listens on that machine by default.
+Either reach it through an SSH tunnel (quick and safe):
+
+```bash
+ssh -L 8096:127.0.0.1:8096 you@your-server
+```
+
+and then open `http://127.0.0.1:8096/` on your own PC, or set up HTTPS access as in
+[section 6](#6-opening-the-panel-from-another-computer).
+
+## 3. Using the panel
+
+The tabs you see depend on your account level (see [section 4](#4-staff-accounts)).
+
+### Players
+Everyone online, with their world and UUID. Refreshes every 5 seconds.
+
+- **Kick**: enter an optional reason; the player sees it when disconnected.
+- **Ban**: enter a reason and pick how long: 30 minutes up to 30 days, or **Permanent**.
+- **Ban someone who is offline**: the box below the list takes an exact player name of someone who
+  has been online since Hycon was installed, or a UUID.
+
+Names must match exactly (any upper/lower case). Hycon never guesses a "closest" name, so a typo
+can't ban the wrong player.
+
+### Bans
+Every active ban: player, reason, who banned them, when, and when it ends. **Unban** lifts it.
+
+Hycon uses the server's own ban list (`bans.json`), so bans made with `/ban` in game show up here
+and the other way round. Temporary bans end on their own. Bans from the panel show
+`Hycon:<account>` as "by".
+
+### Console
+The live server log, updated every 1.5 seconds. Warnings are yellow, errors red, panel commands blue.
+Scroll up to read back; it keeps scrolling with new lines while you're at the bottom.
+
+ADMIN and OWNER accounts also get a command box. Type a command without the `/`
+(e.g. `who`, `say Restart in 5 minutes`) and press Enter. Arrow up/down go through what you typed.
+Commands run with **full console rights**, as the sender `Hycon:<your account>`. The reply shows in
+the log. If a command takes longer than 5 seconds, the panel stops waiting but the command keeps running.
+
+### Server, and dashboards from other plugins
+**Server** shows players online, uptime, memory, CPU cores and the Java version. Other plugins
+can add their own tabs here (PrisonCore's analytics, for example). The 1h…30d buttons pick how
+far back their charts go.
+
+### Audit log (ADMIN and up)
+The newest 200 actions: logins (and failed ones), kicks, bans, unbans, commands and account changes,
+with the account and the address they came from. Failed or refused actions are marked ✗.
+The full history is in `audit.log` ([section 7](#7-files-hycon-keeps)).
+
+### Your account
+Top right: **Password** changes your own password (this logs out your other browsers),
+**Log out** ends the session. Sessions also end by themselves after 30 idle minutes
+or 12 hours, whichever comes first (both can be changed in `hycon.json`).
+
+## 4. Staff accounts
+
+Each staff member should have their own account, so the audit log shows who did what.
+
+| Level     | Can                                                                         |
+|-----------|-----------------------------------------------------------------------------|
+| VIEWER    | See players, bans and dashboards                                            |
+| MODERATOR | Also kick, ban, unban, and watch the live console                           |
+| ADMIN     | Also run console commands (full console rights) and read the audit log      |
+| OWNER     | Also create, change and remove panel accounts                               |
+
+Give out ADMIN carefully: it is the same as access to the server console.
+
+**Add an account** (OWNER): Accounts tab → enter a name (3-32 letters, digits, `_ . -`), pick a
+level, **Create**. A temporary password is shown **once**; send it to the person privately.
+They must pick their own password at first login.
+
+**Change a level**: use the dropdown in the list. The person is logged out so their page reloads
+with the new level.
+
+**Forgotten password**: **Reset password** gives a new temporary one (shown once) and logs them out.
+
+**Remove**: **Remove** deletes the account and ends its sessions. The last OWNER can't be removed
+or demoted, so you can't lock everyone out by accident.
+
+**Locked out completely?** In the server console (not in game):
+
+```
+/hycon resetpassword owner
+```
+
+writes a new password for `owner` to `FIRST-LOGIN.txt`. With a name that doesn't exist, it creates
+that account as OWNER. `/hycon info` prints the panel's address.
+
+## 5. Settings (hycon.json)
+
+`hycon.json` is in Hycon's data folder and explains every option in its own comments.
+Changes need a **server restart**.
+
+| Option               | Default       | What it does                                                                                      |
+|----------------------|---------------|---------------------------------------------------------------------------------------------------|
+| `Enabled`            | `true`        | `false` turns the panel off completely.                                                           |
+| `BindAddress`        | `"127.0.0.1"` | Network address to listen on. `127.0.0.1` = this machine only. See section 6 before changing it. |
+| `Port`               | `8096`        | Port of the panel. Change it if 8096 is taken.                                                    |
+| `AllowedHosts`       | `[]`          | Extra host names the panel may be opened under, e.g. `["admin.example.com"]`.                     |
+| `SecureCookie`       | `false`       | Set `true` when the panel is only reached over HTTPS.                                             |
+| `TrustProxy`         | `false`       | Set `true` only behind your own reverse proxy, so real client addresses are logged and limited.   |
+| `SessionIdleMinutes` | `30`          | Log out after this long without activity.                                                         |
+| `SessionMaxHours`    | `12`          | Log out at the latest this long after logging in.                                                 |
+| `LoginAttempts`      | `5`           | Failed logins allowed per address and per account name...                                         |
+| `LoginWindowMinutes` | `10`          | ...within this many minutes. After that, logins wait until the window has passed.                 |
+| `BlockedCommands`    | `[]`          | Commands the panel refuses even for ADMIN, e.g. `["stop", "op"]`.                                 |
+| `LogLines`           | `2000`        | How many recent log lines the Console tab keeps.                                                  |
+
+## 6. Opening the panel from another computer
+
+The panel can ban players and run commands, so think of it like your server's console password.
+
+**Simplest and safest: an SSH tunnel** (see [section 2](#2-first-login)). Nothing to configure.
+
+**Permanent web address: HTTPS reverse proxy.** Keep `BindAddress` at `127.0.0.1` and put a web
+server with HTTPS in front of Hycon on the same machine. Example with [Caddy](https://caddyserver.com),
+which gets a certificate by itself:
+
+```
+admin.example.com {
+    reverse_proxy 127.0.0.1:8096
+}
+```
+
+or nginx:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name admin.example.com;
+    # ssl_certificate / ssl_certificate_key ...
+    location / {
+        proxy_pass http://127.0.0.1:8096;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+}
+```
+
+Then in `hycon.json`:
+
+```json
+"AllowedHosts": ["admin.example.com"],
+"SecureCookie": true,
+"TrustProxy": true,
+```
+
+and restart. Open `https://admin.example.com/`.
+
+**Don't** set `BindAddress` to `0.0.0.0` and open the port to the internet without HTTPS:
+passwords and session cookies would travel unencrypted. Hycon warns in the log if it listens
+beyond the local machine.
+
+## 7. Files Hycon keeps
+
+All in Hycon's data folder:
+
+| File              | What                                                                                             |
+|-------------------|--------------------------------------------------------------------------------------------------|
+| `hycon.json`      | Settings (yours to edit; Hycon never rewrites it).                                               |
+| `admins.json`     | Panel accounts with **hashed** passwords. Managed by Hycon; change accounts in the panel. Keep it private anyway. |
+| `audit.log`       | Every panel action, one JSON line each, only ever added to. Rotate or archive it yourself if it grows. |
+| `players.json`    | Names of players seen online, so offline players can be banned by name.                          |
+| `FIRST-LOGIN.txt` | Only while an account still has a password Hycon made up.                                         |
+
+Back up `admins.json` and `audit.log` with the rest of your server.
+
+## 8. Troubleshooting
+
+| Problem                                                     | Fix                                                                                                         |
+|-------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| Log says `could not start the panel on 127.0.0.1:8096`      | Another program uses the port. Change `Port` in `hycon.json` and restart.                                   |
+| Browser shows "Unknown host name"                           | You opened the panel under a name Hycon doesn't know. Use `127.0.0.1`, or add the name to `AllowedHosts`.   |
+| "Too many failed logins"                                    | Wait the number of minutes shown (default up to 10), or restart the server to clear it.                     |
+| "Bad or missing CSRF token; reload the page"                | Your session ended (restart or timeout). Reload the page and log in again.                                  |
+| "Choose a new password first"                               | The account still has a temporary password; the panel shows the change form after login.                    |
+| Can't find the password                                     | `FIRST-LOGIN.txt` in Hycon's data folder, or run `/hycon resetpassword owner` in the server console.        |
+| "Unknown player" when banning someone offline               | Use their UUID, or the exact name of someone who has been online since Hycon was installed.                 |
+| A command is refused as blocked                             | It's listed in `BlockedCommands` in `hycon.json`.                                                           |
+| Panel doesn't appear at all                                 | Check the log for `Hycon`. `Enabled` may be `false`, or `admins.json` may be damaged (the log says so).      |
+
+## 9. Building from source
+
+Needs JDK 25.
+
+```bash
+git clone https://github.com/Croc3ll/Hycon.git
+cd Hycon
+gradlew build
+```
+
+The jar is in `build/libs/`. `test-server.bat` (or `gradlew runServer`) builds it and starts a
+local test server in `run/` with Hycon loaded; the panel's data folder then links to
+`src/main/resources` (those runtime files are git-ignored).
+
+For adding your own dashboard tab from another plugin, see the README and `docs/PRISONCORE-HOOK.md`.

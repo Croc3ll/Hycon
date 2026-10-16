@@ -4,6 +4,9 @@ A web admin panel (RCON-style) for Hytale servers, running as a server plugin. O
 on the same machine: see who's online, kick, ban and unban (temporary or permanent, with a reason),
 run console commands, watch the live log, and view dashboards other plugins add.
 
+**Full setup and usage guide: [docs/GUIDE.md](docs/GUIDE.md)** (install, first login, every tab,
+staff accounts, all settings, remote access over HTTPS, troubleshooting).
+
 ## Install
 
 Put `Hycon-x.y.z.jar` in the server's `mods` folder and start the server. Hycon then:
