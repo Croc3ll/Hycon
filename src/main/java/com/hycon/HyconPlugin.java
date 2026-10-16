@@ -79,11 +79,11 @@ public final class HyconPlugin extends JavaPlugin {
             return;
         }
         try {
-            Path firstLogin = admins.load();
+            boolean created = admins.load();
             audit.open();
-            if (firstLogin != null) {
-                // Only the file's location goes in the log; the log is visible in the panel itself.
-                log.at(Level.WARNING).log("Hycon: created panel account 'owner'. Its password is in %s", firstLogin.toAbsolutePath());
+            if (created) {
+                log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
+                        address(), AdminStore.DEFAULT_NAME, AdminStore.DEFAULT_PASSWORD);
             }
         } catch (IOException | IllegalArgumentException e) {
             ((HytaleLogger.Api) log.at(Level.SEVERE).withCause(e)).log("Hycon could not read admins.json; panel not started");

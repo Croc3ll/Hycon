@@ -17,23 +17,24 @@ You need a Hytale server on version 0.7.2 or newer (below 0.8.0).
 3. Start the server. In the server log you should see:
 
    ```
-   [Hycon] Hycon: created panel account 'owner'. Its password is in ...\FIRST-LOGIN.txt
+   [Hycon] Hycon first start: log in at http://127.0.0.1:8096/ as 'root' with password 'hycon' ...
    [Hycon] Hycon panel: http://127.0.0.1:8096/
    ```
 
 Hycon has now made its data folder inside `mods` (named after the plugin, e.g. `mods/Hycon_Hycon/`)
-with `hycon.json` and `FIRST-LOGIN.txt` in it.
+with `hycon.json` and `admins.json` in it.
 
 ## 2. First login
 
 1. On **the same computer as the server**, open `http://127.0.0.1:8096/` in a browser.
-2. Open `FIRST-LOGIN.txt` from Hycon's data folder. It holds the account name (`owner`) and a
-   random password.
-3. Log in with those. The panel asks you to **choose your own password** (at least 10 characters,
-   not containing the account name) before anything else works.
-4. Once saved, Hycon deletes `FIRST-LOGIN.txt`.
+   The login page shows the default account while it is still unchanged.
+2. Log in as **`root`** with password **`hycon`**.
+3. The panel asks you to **choose your own password** (at least 10 characters, not containing the
+   account name). Nothing else works until you do.
 
-The password never appears in the server log, because the log is visible inside the panel.
+The default password is public, so Hycon only accepts it from the server machine itself
+(a request from another address is refused and written to the audit log). Behind a reverse proxy,
+set `TrustProxy` so Hycon can tell the real client address apart.
 
 **Running the server on a rented host / VPS?** The panel only listens on that machine by default.
 Either reach it through an SSH tunnel (quick and safe):
@@ -119,10 +120,11 @@ or demoted, so you can't lock everyone out by accident.
 **Locked out completely?** In the server console (not in game):
 
 ```
-/hycon resetpassword owner
+/hycon resetpassword root
 ```
 
-writes a new password for `owner` to `FIRST-LOGIN.txt`. With a name that doesn't exist, it creates
+writes a new password for `root` to `FIRST-LOGIN.txt` in Hycon's data folder (not to the log,
+which is visible in the panel). With a name that doesn't exist, it creates
 that account as OWNER. `/hycon info` prints the panel's address.
 
 ## 5. Settings (hycon.json)
@@ -200,7 +202,7 @@ All in Hycon's data folder:
 | `admins.json`     | Panel accounts with **hashed** passwords. Managed by Hycon; change accounts in the panel. Keep it private anyway. |
 | `audit.log`       | Every panel action, one JSON line each, only ever added to. Rotate or archive it yourself if it grows. |
 | `players.json`    | Names of players seen online, so offline players can be banned by name.                          |
-| `FIRST-LOGIN.txt` | Only while an account still has a password Hycon made up.                                         |
+| `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 
 Back up `admins.json` and `audit.log` with the rest of your server.
 
@@ -213,7 +215,8 @@ Back up `admins.json` and `audit.log` with the rest of your server.
 | "Too many failed logins"                                    | Wait the number of minutes shown (default up to 10), or restart the server to clear it.                     |
 | "Bad or missing CSRF token; reload the page"                | Your session ended (restart or timeout). Reload the page and log in again.                                  |
 | "Choose a new password first"                               | The account still has a temporary password; the panel shows the change form after login.                    |
-| Can't find the password                                     | `FIRST-LOGIN.txt` in Hycon's data folder, or run `/hycon resetpassword owner` in the server console.        |
+| Can't log in the first time                                 | Use `root` / `hycon` from the server machine. Changed and forgotten? Run `/hycon resetpassword root` in the server console and read `FIRST-LOGIN.txt`. |
+| "Log in from the server machine itself..."                  | The default password only works locally. Log in on the server machine (or through an SSH tunnel) first. |
 | "Unknown player" when banning someone offline               | Use their UUID, or the exact name of someone who has been online since Hycon was installed.                 |
 | A command is refused as blocked                             | It's listed in `BlockedCommands` in `hycon.json`.                                                           |
 | Panel doesn't appear at all                                 | Check the log for `Hycon`. `Enabled` may be `false`, or `admins.json` may be damaged (the log says so).      |

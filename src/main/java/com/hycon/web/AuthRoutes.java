@@ -40,6 +40,10 @@ public final class AuthRoutes {
 
     private void session(Req r) throws IOException {
         Json j = new Json().beginObject().field("csrf", r.session.csrf).field("loggedIn", r.admin != null);
+        if (r.admin == null && admins.setupPending()) {
+            // First start: the login page tells the person at the server what to type.
+            j.field("setupName", AdminStore.DEFAULT_NAME).field("setupPassword", AdminStore.DEFAULT_PASSWORD);
+        }
         if (r.admin != null) {
             j.field("name", r.admin.name()).field("level", r.admin.level().name()).field("rank", r.admin.level().rank)
                     .field("mustChange", r.admin.mustChange());
@@ -66,6 +70,12 @@ public final class AuthRoutes {
             limiter.fail(r.ip, name);
             audit.record(name, r.ip, "login", null, "wrong name or password", false);
             r.error(401, "Wrong name or password");
+            return;
+        }
+        if (a.defaultPassword() && !loopback(r.ip)) {
+            // The default password is published, so it only works from the server machine itself.
+            audit.record(a.name(), r.ip, "login", null, "default password used from another machine", false);
+            r.error(403, "Log in from the server machine itself until the default password is changed");
             return;
         }
         // New session id at login, so an id an attacker planted or saw beforehand is useless.
@@ -174,6 +184,10 @@ public final class AuthRoutes {
         }
     }
 
+    private static boolean loopback(String ip) {
+        return ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || ip.equals("::1");
+    }
+
     /** Null when acceptable, else what's wrong. Length matters far more than character rules. */
     private static String weak(String pw, String name) {
         if (pw == null || pw.length() < Passwords.MIN_LENGTH) {
@@ -182,7 +196,7 @@ public final class AuthRoutes {
         if (pw.length() > 256) {
             return "That password is too long";
         }
-        if (pw.toLowerCase().contains(name.toLowerCase())) {
+        if (pw.equalsIgnoreCase(AdminStore.DEFAULT_PASSWORD) || pw.toLowerCase().contains(name.toLowerCase())) {
             return "The password must not contain the account name";
         }
         return null;

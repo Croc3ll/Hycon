@@ -48,6 +48,7 @@ async function boot() {
   const s = await (await fetch('/api/session', { credentials: 'same-origin' })).json();
   S.csrf = s.csrf;
   S.me = s.loggedIn ? s : null;
+  S.setup = s.setupName ? [s.setupName, s.setupPassword] : null;
   if (!S.me) return showLogin();
   if (S.me.mustChange) return showPassword(true);
   try { S.panels = (await api('GET', '/api/panels')).panels; } catch (e) { S.panels = []; }
@@ -71,7 +72,10 @@ function showLogin() {
       S.csrf = r.csrf;
       await boot();
     } catch (err) { msg.textContent = err.message; pw.value = ''; }
-  } } }, el('h2', {}, 'Log in'), el('label', {}, 'Account'), name, el('label', {}, 'Password'), pw,
+  } } }, el('h2', {}, 'Log in'),
+    S.setup ? el('p', { class: 'secret' }, 'First start: log in as ', el('b', {}, S.setup[0]), ' with password ', el('b', { class: 'mono' }, S.setup[1]),
+      ' from the server machine, then choose your own password.') : null,
+    el('label', {}, 'Account'), name, el('label', {}, 'Password'), pw,
     el('p', {}, el('button', { class: 'primary', type: 'submit' }, 'Log in')), msg);
   $('view').replaceChildren(form);
   name.focus();

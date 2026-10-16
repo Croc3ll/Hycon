@@ -3,10 +3,10 @@
 //  A web admin panel for this server: online players, kick, ban,
 //  console commands, the live log and dashboards from other plugins.
 //
-//  First start: Hycon creates the account "owner" and writes its
-//  password to FIRST-LOGIN.txt next to this file. Log in, pick a new
-//  password, and the file is deleted.
-//      http://127.0.0.1:8096/
+//  First start: open http://127.0.0.1:8096/ on the server machine and
+//  log in as  root  with password  hycon . You must choose a new
+//  password before anything else works. Until then the default only
+//  works from the server machine itself.
 //
 //  Changes in this file need a server RESTART.
 // =====================================================================

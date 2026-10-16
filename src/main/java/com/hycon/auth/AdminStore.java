@@ -21,18 +21,28 @@ import java.util.regex.Pattern;
  * Panel accounts, kept in {@code admins.json} (only hashes, never passwords). Hycon writes this
  * file itself; edit accounts in the panel's Accounts tab instead of by hand.
  *
- * <p>Passwords Hycon makes up (first start, console reset) go to {@code FIRST-LOGIN.txt} rather than
- * the log, because the log is visible in the panel and may be shared. That file is deleted once the
- * account has picked its own password.
+ * <p>First start: with no accounts at all, Hycon creates {@code root} with the default password
+ * {@link #DEFAULT_PASSWORD}. That account can do nothing until its password is changed, and while it
+ * still has the default it can only log in from the server machine itself (see AuthRoutes), so a
+ * panel opened to the network is never guessable with a published password.
+ *
+ * <p>Passwords made up by the console reset go to {@code FIRST-LOGIN.txt} rather than the log,
+ * because the log is visible in the panel and may be shared.
  */
 public final class AdminStore {
 
-    public record Admin(String name, Level level, String hash, boolean mustChange) {
+    /**
+     * @param defaultPassword still has {@link #DEFAULT_PASSWORD}: only usable from the server machine
+     */
+    public record Admin(String name, Level level, String hash, boolean mustChange, boolean defaultPassword) {
         /** Stable id used as "banned by" in Hytale's ban list, so bans can be traced back to an account. */
         public UUID uuid() {
             return uuidFor(name);
         }
     }
+
+    public static final String DEFAULT_NAME = "root";
+    public static final String DEFAULT_PASSWORD = "hycon";
 
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_.-]{3,32}");
 
@@ -53,8 +63,8 @@ public final class AdminStore {
         return name != null && NAME.matcher(name).matches();
     }
 
-    /** Loads the file; with no accounts at all, creates "owner" and returns its password file. */
-    public synchronized Path load() throws IOException {
+    /** Loads the file; with no accounts at all, creates {@code root} and returns true. */
+    public synchronized boolean load() throws IOException {
         admins.clear();
         if (Files.exists(file)) {
             Object list = JsonReader.object(Files.readString(file, StandardCharsets.UTF_8)).get("admins");
@@ -62,19 +72,23 @@ public final class AdminStore {
                 for (Object o : l) {
                     if (o instanceof Map<?, ?> m && m.get("name") instanceof String n && m.get("hash") instanceof String h) {
                         Level level = Level.parse(m.get("level") instanceof String s ? s : null);
-                        admins.put(key(n), new Admin(n, level == null ? Level.VIEWER : level, h, Boolean.TRUE.equals(m.get("mustChange"))));
+                        admins.put(key(n), new Admin(n, level == null ? Level.VIEWER : level, h,
+                                Boolean.TRUE.equals(m.get("mustChange")), Boolean.TRUE.equals(m.get("defaultPassword"))));
                     }
                 }
             }
         }
         if (admins.isEmpty()) {
-            String pw = Passwords.generate();
-            admins.put("owner", new Admin("owner", Level.OWNER, Passwords.hash(pw), true));
+            admins.put(DEFAULT_NAME, new Admin(DEFAULT_NAME, Level.OWNER, Passwords.hash(DEFAULT_PASSWORD), true, true));
             save();
-            writeLoginFile("owner", pw);
-            return loginFile;
+            return true;
         }
-        return null;
+        return false;
+    }
+
+    /** True while some account still has the default password (the login page then shows it). */
+    public boolean setupPending() {
+        return admins.values().stream().anyMatch(Admin::defaultPassword);
     }
 
     public Admin get(String name) {
@@ -96,14 +110,14 @@ public final class AdminStore {
             throw new IllegalArgumentException("That account already exists");
         }
         String pw = Passwords.generate();
-        admins.put(key(name), new Admin(name, level, Passwords.hash(pw), true));
+        admins.put(key(name), new Admin(name, level, Passwords.hash(pw), true, false));
         save();
         return pw;
     }
 
     public synchronized void setPassword(String name, String password) throws IOException {
         Admin a = require(name);
-        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(password), false));
+        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(password), false, false));
         save();
         // The made-up password is no longer valid, so its file only causes confusion.
         if (Files.exists(loginFile) && Files.readString(loginFile).contains("Account:  " + a.name() + "\n")) {
@@ -115,7 +129,7 @@ public final class AdminStore {
     public synchronized String resetPassword(String name) throws IOException {
         Admin a = require(name);
         String pw = Passwords.generate();
-        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(pw), true));
+        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(pw), true, false));
         save();
         return pw;
     }
@@ -139,7 +153,7 @@ public final class AdminStore {
         if (a.level() == Level.OWNER && level != Level.OWNER && owners() == 1) {
             throw new IllegalArgumentException("The last OWNER can't be demoted");
         }
-        admins.put(key(name), new Admin(a.name(), level, a.hash(), a.mustChange()));
+        admins.put(key(name), new Admin(a.name(), level, a.hash(), a.mustChange(), a.defaultPassword()));
         save();
     }
 
@@ -177,7 +191,7 @@ public final class AdminStore {
         Json j = new Json().beginObject().name("admins").beginArray();
         for (Admin a : all()) {
             j.beginObject().field("name", a.name()).field("level", a.level().name()).field("hash", a.hash())
-                    .field("mustChange", a.mustChange()).endObject();
+                    .field("mustChange", a.mustChange()).field("defaultPassword", a.defaultPassword()).endObject();
         }
         j.endArray().endObject();
         Files.createDirectories(file.getParent());

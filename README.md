@@ -9,15 +9,16 @@ staff accounts, all settings, remote access over HTTPS, troubleshooting).
 
 ## Install
 
-Put `Hycon-x.y.z.jar` in the server's `mods` folder and start the server. Hycon then:
+Put `Hycon-x.y.z.jar` in the server's `mods` folder and start the server. Hycon creates
+`hycon.json` (commented settings) and the default account:
 
-- creates `hycon.json` (commented settings) in its data folder,
-- creates the panel account **owner** and writes its password to `FIRST-LOGIN.txt` next to it
-  (the password never goes into the log),
-- prints the address, by default `http://127.0.0.1:8096/`.
+| Account | Password |
+|---------|----------|
+| `root`  | `hycon`  |
 
-Log in as `owner`, choose a new password (the file is then deleted), and add accounts for your
-staff in the **Accounts** tab.
+Open `http://127.0.0.1:8096/` **on the server machine**, log in with those, and choose a new
+password; the panel allows nothing else until you do. Until it's changed, the default password
+only works from the server machine itself. Then add accounts for your staff in the **Accounts** tab.
 
 Locked out? In the server console: `/hycon resetpassword <name>` writes a new password to
 `FIRST-LOGIN.txt` (and creates the account as OWNER if it doesn't exist).
