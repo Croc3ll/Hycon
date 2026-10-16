@@ -1,0 +1,25 @@
+{
+    "Group": "Hycon",
+    "Name": "Hycon",
+    "Version": "0.1.0",
+    "Description": "Web admin panel: players, kick, ban, console and plugin dashboards.",
+    "Authors": [
+        {
+            "Name": "Croc3ll"
+        }
+    ],
+    "Website": "https://github.com/Croc3ll/Hycon",
+    "ServerVersion": ">=0.7.2 <0.8.0",
+    "Dependencies": {
+        "Hytale:AssetModule": "*"
+    },
+    "OptionalDependencies": {
+        
+    },
+    "DisabledByDefault": false,
+    "Main": "com.hycon.HyconPlugin",
+    "IncludesAssetPack": false,
+    "UpdateChecker": {
+        "CurseForge": ""
+    }
+}

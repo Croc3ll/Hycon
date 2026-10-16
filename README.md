@@ -1,0 +1,72 @@
+# Hycon
+
+A web admin panel (RCON-style) for Hytale servers, running as a server plugin. Open it in a browser
+on the same machine: see who's online, kick, ban and unban (temporary or permanent, with a reason),
+run console commands, watch the live log, and view dashboards other plugins add.
+
+## Install
+
+Put `Hycon-x.y.z.jar` in the server's `mods` folder and start the server. Hycon then:
+
+- creates `hycon.json` (commented settings) in its data folder,
+- creates the panel account **owner** and writes its password to `FIRST-LOGIN.txt` next to it
+  (the password never goes into the log),
+- prints the address, by default `http://127.0.0.1:8096/`.
+
+Log in as `owner`, choose a new password (the file is then deleted), and add accounts for your
+staff in the **Accounts** tab.
+
+Locked out? In the server console: `/hycon resetpassword <name>` writes a new password to
+`FIRST-LOGIN.txt` (and creates the account as OWNER if it doesn't exist).
+
+## Account levels
+
+| Level     | Can                                                            |
+|-----------|----------------------------------------------------------------|
+| VIEWER    | see players, bans, plugin dashboards                           |
+| MODERATOR | + kick, ban, unban, read the live console                      |
+| ADMIN     | + run console commands (full console rights), read audit log   |
+| OWNER     | + create, change and remove panel accounts                     |
+
+## Security
+
+The panel can ban players and run commands, so:
+
+- It listens on **127.0.0.1 only** by default. To reach it from elsewhere, put an HTTPS reverse
+  proxy in front, set `SecureCookie`, `AllowedHosts` and (only behind your own proxy) `TrustProxy`.
+- Passwords are stored as PBKDF2-SHA256 hashes (600,000 rounds) in `admins.json`.
+- Sessions use an HttpOnly, SameSite=Strict cookie; they expire when idle and after a maximum time.
+  Logging in, and changing a password, issue a new session id.
+- Every POST (login included) needs the session's CSRF token, JSON content and a same-origin
+  `Origin`. Unknown `Host` headers are refused (DNS rebinding).
+- Failed logins are limited per address and per account name (`LoginAttempts` per `LoginWindowMinutes`).
+- A strict Content-Security-Policy; all text is put on the page as text, never as HTML.
+- Every login, failed login, kick, ban, unban, command and account change goes to `audit.log`
+  (append-only, one JSON object per line).
+- `BlockedCommands` in `hycon.json` lists commands the panel refuses even for ADMIN.
+
+Bans use Hytale's own ban list (`bans.json`, same as `/ban`), so the server enforces them and
+temporary bans expire by themselves. "Banned by" shows `Hycon:<account>`.
+
+## For plugin developers: adding a dashboard
+
+```java
+public final class MyPanel implements HyconPanel {
+    public String id() { return "myplugin"; }
+    public String title() { return "My plugin"; }
+    public void render(PanelData out) {
+        out.stat("Things", "42");
+        out.series("Things over time", "count").point(System.currentTimeMillis(), 42);
+        out.table("Top", "Player", "Score").row("Alice", 10);
+    }
+}
+// start():    HyconApi.register(new MyPanel());
+// shutdown(): HyconApi.unregister("myplugin");
+```
+
+List `Hycon:Hycon` as an optional dependency and keep Hycon imports in one class you only use when
+Hycon is installed. See `docs/PRISONCORE-HOOK.md` for a full example plan.
+
+## Develop
+
+`test-server.bat` (or `gradlew runServer`) builds the plugin and starts a local server in `run/`.

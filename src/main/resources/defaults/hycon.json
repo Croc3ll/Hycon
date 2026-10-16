@@ -1,0 +1,56 @@
+// =====================================================================
+//  Hycon - hycon.json
+//  A web admin panel for this server: online players, kick, ban,
+//  console commands, the live log and dashboards from other plugins.
+//
+//  First start: Hycon creates the account "owner" and writes its
+//  password to FIRST-LOGIN.txt next to this file. Log in, pick a new
+//  password, and the file is deleted.
+//      http://127.0.0.1:8096/
+//
+//  Changes in this file need a server RESTART.
+// =====================================================================
+{
+  // false = no web server at all.
+  "Enabled": true,
+
+  // Which network address to listen on.
+  //   "127.0.0.1" = only this machine can open the panel (safest, default).
+  //   "0.0.0.0"   = every network card. The panel can ban players and run
+  //                 commands, so only do this behind HTTPS (a reverse proxy)
+  //                 and a firewall, and set "SecureCookie" and "AllowedHosts".
+  "BindAddress": "127.0.0.1",
+
+  // Port of the panel. Pick a free one if 8096 is taken.
+  "Port": 8096,
+
+  // Extra host names the panel may be opened under, e.g. "admin.example.com".
+  // Requests for any other host are refused, which blocks "DNS rebinding"
+  // attacks from web pages you visit. 127.0.0.1 and localhost always work.
+  "AllowedHosts": [],
+
+  // true when the panel is reached over HTTPS (through a proxy). The login
+  // cookie is then never sent over plain HTTP.
+  "SecureCookie": false,
+
+  // true only behind a reverse proxy you control: then the client address
+  // is read from X-Forwarded-For (for the login limit and the audit log).
+  "TrustProxy": false,
+
+  // Logged-in sessions end after this many idle minutes...
+  "SessionIdleMinutes": 30,
+  // ...and at the latest this many hours after logging in.
+  "SessionMaxHours": 12,
+
+  // Failed logins allowed per address AND per account name in the window
+  // below; more are refused until the window has passed.
+  "LoginAttempts": 5,
+  "LoginWindowMinutes": 10,
+
+  // Console commands the panel refuses to run, even for ADMIN accounts
+  // (first word, without "/"). Example: ["stop", "op"]
+  "BlockedCommands": [],
+
+  // How many recent log lines the live console keeps in memory.
+  "LogLines": 2000
+}

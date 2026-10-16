@@ -1,0 +1,15 @@
+.gradle/
+build/
+out/
+run/
+.idea/
+*.iml
+.vscode
+
+# Runtime data written by the dev server (run/mods/Hycon_Hycon links to src/main/resources)
+src/main/resources/hycon.json
+src/main/resources/admins.json
+src/main/resources/audit.log
+src/main/resources/players.json
+src/main/resources/FIRST-LOGIN.txt
+src/main/resources/*.tmp
