@@ -68,7 +68,7 @@ function showLogin() {
     e.preventDefault();
     msg.textContent = '';
     try {
-      const r = await api('POST', '/api/login', { name: name.value, password: pw.value });
+      const r = await api('POST', '/api/login', { name: name.value.trim(), password: pw.value });
       S.csrf = r.csrf;
       await boot();
     } catch (err) { msg.textContent = err.message; pw.value = ''; }

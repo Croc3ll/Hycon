@@ -52,7 +52,8 @@ public final class AuthRoutes {
     }
 
     private void login(Req r) throws IOException {
-        String name = r.str("name");
+        // Spaces around the name come from copy-paste or autofill; names never contain them.
+        String name = r.str("name") == null ? null : r.str("name").strip();
         String pw = r.str("password");
         if (name == null || pw == null || name.length() > 64 || pw.length() > 256) {
             r.error(400, "Name and password needed");
