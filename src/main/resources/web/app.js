@@ -221,7 +221,7 @@ function modDialog(action, player, shownAs) {
     } catch (e) { msg.textContent = e.message; go.disabled = false; }
   } } }, label);
   dlg.append(el('h2', {}, label + ' ' + (shownAs || player)), el('label', {}, 'Reason'), reason,
-    action === 'ban' ? [el('label', {}, 'How long'), dur] : null,
+    ...(action === 'ban' ? [el('label', {}, 'How long'), dur] : []), // the browser's own append() would print null
     el('p', { class: 'row' }, go, el('button', { on: { click: () => dlg.close() } }, 'Cancel')), msg);
   dlg.addEventListener('close', () => dlg.remove());
   document.body.append(dlg);
