@@ -181,12 +181,18 @@ function directory() {
       info.textContent = '(' + d.total + ' known' + (d.players.length < d.total ? ', showing ' + d.players.length : '') + ')';
       body.replaceChildren(...d.players.map((p) => el('tr', {},
         el('td', {}, nameLink(p.name, p.uuid)),
-        el('td', { class: p.online ? 'good' : 'muted', title: p.last ? fmtTime(p.last) : '' }, p.online ? 'Online' : 'Last seen ' + ago(p.last)),
+        el('td', { class: p.banned ? 'bad' : p.online ? 'good' : 'muted', title: p.last ? fmtTime(p.last) : '' },
+          p.banned ? 'Banned' + (p.banEnds ? ' · ' + left(p.banEnds) + ' left' : ' · permanent') : p.online ? 'Online' : 'Last seen ' + ago(p.last)),
         el('td', { class: 'mono' }, p.uuid),
         el('td', { class: 'muted' }, p.first ? fmtTime(p.first) : ''),
         el('td', { class: 'actions' }, can('MODERATOR') ? [
-          p.online ? el('button', { on: { click: () => modDialog('kick', p.name) } }, 'Kick') : null,
-          el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid) } }, 'Ban')] : null))));
+          el('button', { on: { click: () => modDialog('warn', p.uuid, p.name) } }, 'Warn'),
+          p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
+          p.banned ? el('button', { on: { click: async () => {
+            if (!confirm('Unban ' + p.name + '?')) return;
+            try { toast((await api('POST', '/api/unban', { player: p.uuid })).message); render(); } catch (e) { toast(e.message, true); }
+          } } }, 'Unban')
+            : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')] : null))));
       if (!d.players.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 5, class: 'muted' }, 'No player matches.')));
     } catch (e) { info.textContent = e.message; }
   }
@@ -223,28 +229,72 @@ function modDialog(action, player, shownAs) {
   reason.focus();
 }
 
+// Time left until a ban ends, e.g. "2d 4h", "35 min".
+function left(ms) {
+  const m = Math.max(0, Math.round((ms - Date.now()) / 60000));
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  return h < 48 ? h + 'h ' + (m % 60) + 'm' : Math.floor(h / 24) + 'd ' + (h % 24) + 'h';
+}
+
 function bans(view) {
+  let filter = 'all';
   const body = el('tbody');
-  view.append(el('div', { class: 'card' }, el('h2', {}, 'Bans'),
-    el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Player'), el('th', {}, 'Reason'), el('th', {}, 'By'), el('th', {}, 'Since'), el('th', {}, 'Ends'), el('th', {}))), body)));
-  (async () => {
-    try {
-      const d = await api('GET', '/api/bans');
-      body.replaceChildren(...d.bans.map((b) => el('tr', {}, el('td', {}, b.name || el('span', { class: 'mono' }, b.uuid)), el('td', {}, b.reason || ''),
-        el('td', {}, b.by), el('td', {}, fmtTime(b.since)), el('td', {}, b.expires ? fmtTime(b.expires) : 'never'),
-        el('td', { class: 'actions' }, can('MODERATOR') ? el('button', { on: { click: async () => {
-          if (!confirm('Unban ' + (b.name || b.uuid) + '?')) return;
-          try { toast((await api('POST', '/api/unban', { player: b.uuid })).message); render(); } catch (e) { toast(e.message, true); }
-        } } }, 'Unban') : null))));
-      if (!d.bans.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'muted' }, 'No active bans.')));
-    } catch (e) { toast(e.message, true); }
-  })();
+  const seg = el('div', { class: 'seg' });
+  const counts = el('span', { class: 'muted' });
+  let data = [];
+  const draw = () => {
+    seg.replaceChildren(...[['all', 'All'], ['temp', 'Temporary'], ['perm', 'Permanent']].map(([k, t]) =>
+      el('button', { class: k === filter ? 'on' : '', on: { click: () => { filter = k; draw(); } } }, t)));
+    const temp = data.filter((b) => b.expires).length;
+    counts.textContent = data.length + ' active · ' + temp + ' temporary · ' + (data.length - temp) + ' permanent';
+    const rows = data.filter((b) => filter === 'all' || (filter === 'temp') === !!b.expires);
+    body.replaceChildren(...rows.map((b) => el('tr', {},
+      el('td', {}, nameLink(b.name || b.uuid, b.uuid)),
+      el('td', {}, el('span', { class: b.expires ? 'badge' : 'badge red' }, b.expires ? 'Temporary' : 'Permanent')),
+      el('td', { class: 'mono', title: b.expires ? fmtTime(b.expires) : '' }, b.expires ? left(b.expires) : '—'),
+      el('td', {}, b.reason || ''), el('td', {}, b.by), el('td', {}, fmtTime(b.since)),
+      el('td', { class: 'actions' }, can('MODERATOR') ? el('button', { on: { click: async () => {
+        if (!confirm('Unban ' + (b.name || b.uuid) + '?')) return;
+        try { toast((await api('POST', '/api/unban', { player: b.uuid })).message); render(); } catch (e) { toast(e.message, true); }
+      } } }, 'Unban') : null))));
+    if (!rows.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 7, class: 'muted' }, 'No bans here.')));
+  };
+  const who = el('input', { placeholder: 'Exact name or UUID (online or offline)' });
+  view.append(
+    can('MODERATOR') ? el('div', { class: 'card' }, el('h3', {}, 'Ban a player'),
+      el('div', { class: 'row' }, who, el('button', { class: 'danger', on: { click: () => who.value.trim() && modDialog('ban', who.value.trim()) } }, 'Ban…'))) : null,
+    el('div', { class: 'card' }, el('div', { class: 'spread' }, el('div', {}, el('h2', {}, 'Bans'), counts), seg),
+      el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Player'), el('th', {}, 'Type'), el('th', {}, 'Time left'),
+        el('th', {}, 'Reason'), el('th', {}, 'By'), el('th', {}, 'Since'), el('th', {}))), body))));
+  // Refreshing every 30 s keeps "time left" counting down and drops bans that just ended.
+  every(30000, async () => {
+    try { data = (await api('GET', '/api/bans')).bans; draw(); } catch (e) { toast(e.message, true); }
+  });
 }
 
 // ---------- Player profile ("dossier") ----------
 
 function nameLink(name, uuid) {
-  return el('a', { href: '#', on: { click: (e) => { e.preventDefault(); S.tab = 'profile:' + uuid; render(); } } }, name);
+  return el('a', { href: '#', class: 'who', on: { click: (e) => { e.preventDefault(); S.tab = 'profile:' + uuid; render(); } } },
+    avatar(name, uuid, 22), name);
+}
+
+// A player's emblem: their initial in a gold-rimmed diamond, coloured from their UUID, so each
+// player always gets the same look. (Hytale has no public image of a player's character.)
+function avatar(name, uuid, size) {
+  const NS = 'http://www.w3.org/2000/svg';
+  let h = 0;
+  for (const c of uuid || name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 40 40'); svg.setAttribute('width', size); svg.setAttribute('height', size); svg.setAttribute('class', 'avatar');
+  const mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text) e.textContent = text; svg.append(e); return e; };
+  mk('path', { d: 'M20 1 L39 20 L20 39 L1 20 Z', fill: '#e2b54b' });
+  mk('path', { d: 'M20 4 L36 20 L20 36 L4 20 Z', fill: `hsl(${h % 360} 45% 28%)` });
+  mk('path', { d: 'M20 4 L36 20 L20 20 Z', fill: 'rgba(255,255,255,.08)' });
+  mk('text', { x: 20, y: 25.5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: '#f3e6c4', 'font-family': 'Georgia, serif' },
+    (name || '?').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase() || '?');
+  return svg;
 }
 
 function profile(view, uuid) {
@@ -260,7 +310,7 @@ function profile(view, uuid) {
     };
     out.replaceChildren(
       el('div', { class: 'card' },
-        el('div', { class: 'row' }, el('h2', {}, p.name),
+        el('div', { class: 'row' }, avatar(p.name, p.uuid, 56), el('h2', { class: 'big' }, p.name),
           el('span', { class: p.online ? 'good' : 'muted' }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline')),
         el('table', {}, el('tbody', {},
           el('tr', {}, el('th', {}, 'UUID'), el('td', { class: 'mono' }, p.uuid)),
@@ -384,62 +434,62 @@ function accounts(view) {
 function sharing(view) {
   const out = el('div');
   view.append(el('h2', { class: 'big' }, 'Ban sharing'),
-    el('p', { class: 'muted' }, 'Share this server\'s bans with other servers running Hycon, and follow theirs. '
-      + 'For one global ban list, give every server a key to every other (or let them all follow one main server).'), out);
+    el('p', { class: 'muted' }, 'Share bans with other servers running Hycon. You swap one share code each way; '
+      + 'nobody needs your panel address. For a global ban list, every server follows every other (or all follow one main server).'), out);
   const secret = el('div');
+  const showCode = (forName, code) => secret.replaceChildren(el('div', { class: 'secret' }, 'Share code for ', el('b', {}, forName), ':',
+    el('div', { class: 'mono code' }, code),
+    el('p', { class: 'row' }, el('button', { on: { click: () => navigator.clipboard.writeText(code).then(() => toast('Copied')) } }, 'Copy'),
+      el('span', { class: 'muted' }, 'Send it privately. They paste it under "Follow a server".'))));
   async function load() {
     const d = await api('GET', '/api/sharing');
-    const feedUrl = location.origin + d.feedPath;
-    const keyName = el('input', { placeholder: 'Who gets this key, e.g. "Server 2"' });
-    const subName = el('input', { placeholder: 'Name, e.g. "Server 1"' });
-    const subUrl = el('input', { placeholder: 'Feed address, e.g. https://panel.server1.com' + d.feedPath });
-    const subKey = el('input', { placeholder: 'Key they gave you (hyk_...)', class: 'mono' });
     const act = async (path, body, okMsg) => {
       try { const r = await api('POST', path, body); toast(r.message || okMsg); await load(); return r; } catch (e) { toast(e.message, true); return null; }
     };
+    const addr = el('input', { value: d.publicAddress || '', placeholder: 'e.g. play.example.com or 203.0.113.7 (same as players use)' });
+    const keyName = el('input', { placeholder: 'Which server gets it, e.g. "Server 2"' });
+    const subName = el('input', { placeholder: 'Name, e.g. "Server 1"' });
+    const subCode = el('input', { placeholder: 'Their share code (hycon1_...)', class: 'mono' });
     out.replaceChildren(
       el('div', { class: 'card' },
-        el('h3', {}, 'Following other servers'),
-        el('p', { class: 'muted' }, 'Their bans are added here and lifted when they lift them. Checked every ' + d.intervalMinutes
+        el('h3', {}, 'Follow a server'),
+        el('p', { class: 'muted' }, 'Their bans are added here and lifted when they lift them, checked every ' + d.intervalMinutes
           + ' minutes. Bans made on this server are never changed. Unbanning a shared player here keeps them unbanned here.'),
-        el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Address'),
-          el('th', {}, 'Status'), el('th', { class: 'num' }, 'Bans'), el('th', {}))),
+        el('div', { class: 'row' }, subName, subCode, el('button', { class: 'primary', on: { click: async () => {
+          if (await act('/api/sharing/sub/add', { name: subName.value.trim(), code: subCode.value.trim() }, 'Following')) { subName.value = subCode.value = ''; }
+        } } }, 'Follow')),
+        el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Server'), el('th', {}, 'Status'),
+          el('th', { class: 'num' }, 'Bans here'), el('th', {}))),
           el('tbody', {}, d.subscriptions.length ? d.subscriptions.map((x) => el('tr', {},
-            el('td', {}, x.name), el('td', { class: 'mono' }, x.url),
+            el('td', {}, x.name),
             el('td', { class: x.error ? 'bad' : x.enabled ? 'good' : 'muted' },
-              !x.enabled ? 'Paused' : x.error ? x.error : x.lastSync ? 'Synced ' + fmtTime(x.lastSync) : 'Waiting for first sync'),
-            el('td', { class: 'num' }, x.imported === undefined ? '' : x.imported + ' / ' + x.feedBans),
+              !x.enabled ? 'Paused' : x.error ? x.error : x.lastSync ? 'Synced ' + fmtTime(x.lastSync) : 'Waiting for first check'),
+            el('td', { class: 'num' }, x.imported === undefined ? '' : String(x.imported)),
             el('td', { class: 'actions' },
               el('button', { on: { click: () => act('/api/sharing/sub/enable', { name: x.name, enabled: !x.enabled }, x.enabled ? 'Paused' : 'Resumed') } }, x.enabled ? 'Pause' : 'Resume'),
               el('button', { class: 'danger', on: { click: () => confirm('Stop following ' + x.name + '? Every ban that came from it is lifted here.')
                 && act('/api/sharing/sub/remove', { name: x.name }, 'Removed') } }, 'Remove'))))
-            : el('tr', {}, el('td', { colspan: 5, class: 'muted' }, 'Not following any server yet.'))))),
-        el('h3', {}, 'Follow a server'),
-        el('div', { class: 'row' }, subName, subUrl), el('p', { class: 'row' }, subKey,
-          el('button', { class: 'primary', on: { click: async () => {
-            if (await act('/api/sharing/sub/add', { name: subName.value.trim(), url: subUrl.value.trim(), token: subKey.value.trim() }, 'Added; first sync running')) {
-              subName.value = subUrl.value = subKey.value = '';
-            }
-          } } }, 'Follow')),
-        el('p', {}, el('button', { on: { click: () => act('/api/sharing/sync', {}, 'Syncing') } }, 'Sync now'))),
+            : el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Not following any server yet.'))))),
+        el('p', {}, el('button', { on: { click: () => act('/api/sharing/sync', {}, 'Checking') } }, 'Check now'))),
       el('div', { class: 'card' },
-        el('h3', {}, 'Sharing this server\'s bans'),
-        el('p', { class: 'muted' }, 'Give another server a key and this address: ', el('span', { class: 'mono' }, feedUrl),
-          '. The other server must be able to reach this panel over the network (use HTTPS, see the guide).'),
-        el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Key for'), el('th', {}, 'Created'), el('th', {}))),
+        el('h3', {}, 'Share this server\'s bans'),
+        el('label', {}, 'This server\'s address (how other servers reach it)'),
+        el('div', { class: 'row' }, addr, el('button', { on: { click: () => act('/api/sharing/address', { address: addr.value }, 'Saved') } }, 'Save')),
+        el('p', { class: d.shareError ? 'bad' : 'muted' }, d.shareError ? d.shareError
+          : d.shareRunning ? 'Share port ' + d.sharePort + ' is open. Other servers must be able to reach this address on that port (open it in your firewall/router if needed).'
+          : 'The share port (' + d.sharePort + ') opens when you create the first code.'),
+        el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Code for'), el('th', {}, 'Created'), el('th', {}))),
           el('tbody', {}, d.keys.length ? d.keys.map((k) => el('tr', {}, el('td', {}, k.name), el('td', {}, fmtTime(k.created)),
-            el('td', { class: 'actions' }, el('button', { class: 'danger', on: { click: () => confirm('Revoke the key for ' + k.name + '? They stop receiving your bans.')
-              && act('/api/sharing/key/revoke', { name: k.name }, 'Key revoked') } }, 'Revoke'))))
-            : el('tr', {}, el('td', { colspan: 3, class: 'muted' }, 'No keys yet.'))))),
-        el('h3', {}, 'New key'),
+            el('td', { class: 'actions' },
+              el('button', { on: { click: async () => { const r = await act('/api/sharing/key/code', { name: k.name }); if (r) showCode(k.name, r.code); } } }, 'Show code'),
+              el('button', { class: 'danger', on: { click: () => confirm('Revoke the code for ' + k.name + '? They stop receiving your bans.')
+                && act('/api/sharing/key/revoke', { name: k.name }, 'Revoked') } }, 'Revoke'))))
+            : el('tr', {}, el('td', { colspan: 3, class: 'muted' }, 'No codes yet.'))))),
+        el('h3', {}, 'New share code'),
         el('div', { class: 'row' }, keyName, el('button', { class: 'primary', on: { click: async () => {
-          const r = await act('/api/sharing/key/create', { name: keyName.value.trim() }, 'Key created');
-          if (r) {
-            secret.replaceChildren(el('div', { class: 'secret' }, 'Key for ', el('b', {}, keyName.value.trim()), ': ', el('span', { class: 'mono' }, r.token),
-              el('div', { class: 'muted' }, 'Shown once. Send it privately, with the address ' + feedUrl + '.')));
-            keyName.value = '';
-          }
-        } } }, 'Create key')), secret));
+          const r = await act('/api/sharing/key/create', { name: keyName.value.trim() }, 'Code created');
+          if (r) { showCode(keyName.value.trim(), r.code); keyName.value = ''; }
+        } } }, 'Create code')), secret));
   }
   load().catch((e) => out.replaceChildren(el('p', { class: 'bad' }, e.message)));
 }

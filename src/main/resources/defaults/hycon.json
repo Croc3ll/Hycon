@@ -52,5 +52,13 @@
   "BlockedCommands": [],
 
   // How many recent log lines the live console keeps in memory.
-  "LogLines": 2000
+  "LogLines": 2000,
+
+  // Ban sharing (Ban sharing tab). Other servers fetch your bans on this
+  // port. It only opens once you create a share key, and it answers only
+  // signed requests for the ban list; the panel itself stays private.
+  // Players reach your game port, other Hycon servers reach this one, so
+  // open it in your firewall / router if you share with servers elsewhere.
+  "SharePort": 8097,
+  "ShareBindAddress": "0.0.0.0"
 }

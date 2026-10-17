@@ -32,12 +32,26 @@ import java.util.regex.Pattern;
  */
 public final class KnownPlayers {
 
-    /** {@code playtimeMs} and {@code sessions} count only time Hycon was installed. */
-    public record Info(UUID uuid, String name, long firstSeen, long lastSeen, String world, long playtimeMs, int sessions) {
-        Info with(String name, long first, long last, String world, long playtime, int sessions) {
-            return new Info(uuid, name, first, last, world, playtime, sessions);
+    /**
+     * {@code playtimeMs}, {@code sessions} and {@code days} count only time Hycon was installed.
+     * {@code days}: the last {@link #KEEP_DAYS} days (epoch day numbers, oldest first) the player was on,
+     * which is what "who comes back" in Analytics is built from.
+     */
+    public record Info(UUID uuid, String name, long firstSeen, long lastSeen, String world, long playtimeMs, int sessions, int[] days) {
+        /** Days played on or after {@code fromDay}. */
+        public int daysSince(long fromDay) {
+            int n = 0;
+            for (int d : days) {
+                if (d >= fromDay) {
+                    n++;
+                }
+            }
+            return n;
         }
     }
+
+    public static final int KEEP_DAYS = 60;
+    private static final int[] NO_DAYS = new int[0];
 
     /** A player file holds the whole inventory; the fields we need are near the start or in small blocks. */
     private static final int MAX_IMPORT_BYTES = 4 * 1024 * 1024;
@@ -61,10 +75,10 @@ public final class KnownPlayers {
                 for (Map.Entry<String, Object> e : JsonReader.object(Files.readString(file, StandardCharsets.UTF_8)).entrySet()) {
                     UUID uuid = UUID.fromString(e.getKey());
                     if (e.getValue() instanceof String n) {
-                        put(new Info(uuid, n, 0, 0, "", 0, 0)); // file from Hycon 0.1.0: names only
+                        put(new Info(uuid, n, 0, 0, "", 0, 0, NO_DAYS)); // file from Hycon 0.1.0: names only
                     } else if (e.getValue() instanceof Map<?, ?> m && m.get("name") instanceof String n) {
                         put(new Info(uuid, n, num(m.get("first")), num(m.get("last")), m.get("world") instanceof String w ? w : "",
-                                num(m.get("play")), (int) num(m.get("sessions"))));
+                                num(m.get("play")), (int) num(m.get("sessions")), days(m.get("days"))));
                     }
                 }
             }
@@ -98,7 +112,7 @@ public final class KnownPlayers {
                 Matcher name = NAMEPLATE.matcher(text);
                 Matcher world = WORLD.matcher(text);
                 long last = Files.getLastModifiedTime(f).toMillis();
-                put(new Info(uuid, name.find() ? name.group(1) : uuid.toString(), 0, last, world.find() ? world.group(1) : "", 0, 0));
+                put(new Info(uuid, name.find() ? name.group(1) : uuid.toString(), 0, last, world.find() ? world.group(1) : "", 0, 0, NO_DAYS));
                 dirty = true;
             }
         } catch (IOException ignored) {
@@ -152,7 +166,7 @@ public final class KnownPlayers {
         String w = world == null || world.isEmpty() ? (old == null ? "" : old.world()) : world;
         long play = (old == null ? 0 : old.playtimeMs()) + addPlay;
         int sessions = (old == null ? 0 : old.sessions()) + addSessions;
-        put(new Info(uuid, name, first, now, w, play, sessions));
+        put(new Info(uuid, name, first, now, w, play, sessions, addDay(old == null ? NO_DAYS : old.days(), (int) (now / 86_400_000L))));
         dirty = true;
     }
 
@@ -195,8 +209,15 @@ public final class KnownPlayers {
         }
         dirty = false;
         Json j = new Json().beginObject();
-        players.forEach((u, i) -> j.name(u.toString()).beginObject().field("name", i.name()).field("first", i.firstSeen())
-                .field("last", i.lastSeen()).field("world", i.world()).field("play", i.playtimeMs()).field("sessions", i.sessions()).endObject());
+        players.forEach((u, i) -> {
+            j.name(u.toString()).beginObject().field("name", i.name()).field("first", i.firstSeen())
+                    .field("last", i.lastSeen()).field("world", i.world()).field("play", i.playtimeMs()).field("sessions", i.sessions())
+                    .name("days").beginArray();
+            for (int d : i.days()) {
+                j.value(d);
+            }
+            j.endArray().endObject();
+        });
         j.endObject();
         try {
             Path tmp = file.resolveSibling("players.json.tmp");
@@ -220,6 +241,34 @@ public final class KnownPlayers {
         try (InputStream in = Files.newInputStream(f)) {
             return new String(in.readNBytes(MAX_IMPORT_BYTES), StandardCharsets.UTF_8);
         }
+    }
+
+    /** Adds {@code today} (if new) and keeps only the last {@link #KEEP_DAYS} days. */
+    private static int[] addDay(int[] days, int today) {
+        if (days.length > 0 && days[days.length - 1] == today) {
+            return days;
+        }
+        int start = 0;
+        while (start < days.length && days[start] <= today - KEEP_DAYS) {
+            start++;
+        }
+        int[] out = java.util.Arrays.copyOfRange(days, start, days.length + 1);
+        out[out.length - 1] = today;
+        return out;
+    }
+
+    private static int[] days(Object o) {
+        if (!(o instanceof List<?> l)) {
+            return NO_DAYS;
+        }
+        int[] out = new int[l.size()];
+        int n = 0;
+        for (Object x : l) {
+            if (x instanceof Double d) {
+                out[n++] = d.intValue();
+            }
+        }
+        return java.util.Arrays.copyOf(out, n);
     }
 
     private static long num(Object o) {

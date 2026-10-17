@@ -43,10 +43,7 @@ public final class WebServer {
     }
 
     /** {@code min == null}: allowed without logging in. */
-    private record Route(String method, Level min, boolean duringPasswordChange, Handler handler, boolean noSession) {
-        Route(String method, Level min, boolean duringPasswordChange, Handler handler) {
-            this(method, min, duringPasswordChange, handler, false);
-        }
+    private record Route(String method, Level min, boolean duringPasswordChange, Handler handler) {
     }
 
     private static final String COOKIE = "hycon_sid";
@@ -86,14 +83,6 @@ public final class WebServer {
 
     public void post(String path, Level min, Handler h) {
         routes.put("POST " + path, new Route("POST", min, false, h));
-    }
-
-    /**
-     * A GET for other programs rather than browsers (the ban feed): no cookie, session or CSRF,
-     * the handler authenticates the request itself.
-     */
-    public void machineGet(String path, Handler h) {
-        routes.put("GET " + path, new Route("GET", null, false, h, true));
     }
 
     /** A route that still works while the account must pick a new password (session, password, logout). */
@@ -159,10 +148,6 @@ public final class WebServer {
             return;
         }
 
-        if (route.noSession) {
-            route.handler.handle(r);
-            return;
-        }
         r.session = sessions.get(cookie(ex));
         if (r.session == null) {
             // Only the bootstrap call may start a session; anything else means the old one expired.

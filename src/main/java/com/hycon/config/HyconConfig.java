@@ -29,7 +29,9 @@ public record HyconConfig(
         int loginAttempts,
         long loginWindowMs,
         Set<String> blockedCommands,
-        int logLines) {
+        int logLines,
+        int sharePort,
+        String shareBindAddress) {
 
     public static HyconConfig load(Path dataDir) throws IOException {
         Path file = dataDir.resolve("hycon.json");
@@ -60,7 +62,9 @@ public record HyconConfig(
                 (int) Math.max(1, num(m, "LoginAttempts", 5)),
                 (long) (Math.max(1, num(m, "LoginWindowMinutes", 10)) * 60_000),
                 lowerSet(m, "BlockedCommands"),
-                (int) Math.max(100, Math.min(50_000, num(m, "LogLines", 2000))));
+                (int) Math.max(100, Math.min(50_000, num(m, "LogLines", 2000))),
+                (int) num(m, "SharePort", 8097),
+                str(m, "ShareBindAddress", "0.0.0.0"));
     }
 
     /** True when only this machine can reach the panel. */

@@ -10,6 +10,7 @@ import com.hycon.game.KnownPlayers;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -79,6 +80,8 @@ public final class AnalyticsPanel implements HyconPanel {
                 .stat("Uptime", String.format("%.1f%%", uptime), "running " + duration((System.nanoTime() - HytaleServer.get().getBootStart()) / 1_000_000)) // boot time is System.nanoTime()
                 .stat("Memory", usedMb + " MB", "of " + (rt.maxMemory() >> 20) + " MB");
 
+        retention(out, now, since, onlineIds);
+
         long bucket = bucketFor(range);
         PanelData.Series players = out.series("Players online", "players").area()
                 .subtitle("average per " + duration(bucket) + " · red bands are outages").line("Players");
@@ -136,7 +139,64 @@ public final class AnalyticsPanel implements HyconPanel {
                     i.firstSeen() == 0 ? "" : PanelData.time(i.firstSeen()),
                     onlineIds.contains(i.uuid()) ? "online now" : i.lastSeen() == 0 ? "" : PanelData.time(i.lastSeen()));
         }
+        regulars(out, now, onlineIds);
     }
+
+    /**
+     * Who comes back: new versus returning players in the range, and how many first-time players
+     * returned on a later day.
+     */
+    private void retention(PanelData out, long now, long since, Set<UUID> onlineIds) {
+        long today = now / DAY_MS;
+        int fresh = 0, returning = 0, firstTimers = 0, cameBack = 0;
+        for (KnownPlayers.Info i : known.all()) {
+            boolean seen = i.lastSeen() >= since || onlineIds.contains(i.uuid());
+            if (seen && i.firstSeen() >= since) {
+                fresh++;
+            } else if (seen && i.firstSeen() > 0) {
+                returning++;
+            }
+            // Among players whose first recorded day is over, how many played on another day too.
+            if (i.days().length > 0 && i.days()[0] < today) {
+                firstTimers++;
+                if (i.days().length >= 2) {
+                    cameBack++;
+                }
+            }
+        }
+        out.stat("New players", String.valueOf(fresh), "first time in this period")
+                .stat("Returning", String.valueOf(returning), "played here before")
+                .stat("Came back", firstTimers == 0 ? "-" : Math.round(cameBack * 100.0 / firstTimers) + "%",
+                        "played again on a later day (last " + KnownPlayers.KEEP_DAYS + " days)");
+    }
+
+    /** Regulars: at least a week of history, so a 24 h view still shows who sticks around. */
+    private void regulars(PanelData out, long now, Set<UUID> onlineIds) {
+        long today = now / DAY_MS;
+        // Regulars: at least a week of history, so a 24 h view still shows who sticks around.
+        long window = Math.max(out.rangeMillis(), TimeUnit.DAYS.toMillis(7));
+        long fromDay = (now - window) / DAY_MS + 1;
+        int windowDays = (int) (today - fromDay + 1);
+        List<KnownPlayers.Info> regulars = new ArrayList<>();
+        for (KnownPlayers.Info i : known.all()) {
+            if (i.daysSince(fromDay) >= 2) {
+                regulars.add(i);
+            }
+        }
+        regulars.sort(Comparator.<KnownPlayers.Info>comparingInt(i -> i.daysSince(fromDay)).reversed()
+                .thenComparing(Comparator.comparingLong(known::playtimeNow).reversed()));
+        PanelData.Table t = out.table("Players who stick around (last " + windowDays + " days)",
+                "Player", "Days played", "Sessions", "Playtime", "Avg session", "First seen", "Last seen");
+        for (KnownPlayers.Info i : regulars.subList(0, Math.min(25, regulars.size()))) {
+            long play = known.playtimeNow(i);
+            t.row(i.name(), i.daysSince(fromDay) + " of " + windowDays, i.sessions(), duration(play),
+                    i.sessions() == 0 ? "" : duration(play / i.sessions()),
+                    i.firstSeen() == 0 ? "" : PanelData.time(i.firstSeen()),
+                    onlineIds.contains(i.uuid()) ? "online now" : PanelData.time(i.lastSeen()));
+        }
+    }
+
+    private static final long DAY_MS = TimeUnit.DAYS.toMillis(1);
 
     /** Chart bucket per range: about 300 points whatever the range. */
     private static long bucketFor(long range) {

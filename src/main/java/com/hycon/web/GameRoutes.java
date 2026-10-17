@@ -78,10 +78,22 @@ public final class GameRoutes {
             q = q.substring(0, 64);
         }
         java.util.Set<UUID> online = moderation.onlineIds();
+        java.util.Map<UUID, Moderation.BanInfo> banned = new java.util.HashMap<>();
+        for (Moderation.BanInfo b : moderation.bans()) {
+            banned.put(b.target(), b);
+        }
         Json j = new Json().beginObject().field("total", known.size()).name("players").beginArray();
         for (KnownPlayers.Info i : known.search(q, online::contains, 100)) {
             j.beginObject().field("uuid", i.uuid().toString()).field("name", i.name()).field("online", online.contains(i.uuid()))
-                    .field("first", i.firstSeen()).field("last", i.lastSeen()).field("world", i.world()).endObject();
+                    .field("first", i.firstSeen()).field("last", i.lastSeen()).field("world", i.world());
+            Moderation.BanInfo b = banned.get(i.uuid());
+            if (b != null) {
+                j.field("banned", true);
+                if (b.expires() != null) {
+                    j.field("banEnds", b.expires().toEpochMilli());
+                }
+            }
+            j.endObject();
         }
         r.ok(j.endArray().endObject());
     }

@@ -127,14 +127,14 @@ public final class BanSync {
 
     private void sync(SharingStore.Subscription s) throws Exception {
         HttpRequest req = HttpRequest.newBuilder(URI.create(s.url())).timeout(Duration.ofSeconds(20))
-                .header("Authorization", "Bearer " + s.token()).header("Accept", "application/json").GET().build();
+                .header("Authorization", SharingStore.authorization(s.keyId(), s.secret(), URI.create(s.url()).getPath())).header("Accept", "application/json").GET().build();
         HttpResponse<InputStream> res = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
         byte[] body;
         try (InputStream in = res.body()) {
             body = in.readNBytes(MAX_FEED_BYTES + 1);
         }
         if (res.statusCode() == 401) {
-            throw new IllegalStateException("The other server refused the key (revoked or mistyped)");
+            throw new IllegalStateException("The other server refused the code (revoked, or clocks more than 5 minutes apart)");
         }
         if (res.statusCode() != 200) {
             throw new IllegalStateException("The other server answered HTTP " + res.statusCode());
@@ -143,7 +143,7 @@ public final class BanSync {
             throw new IllegalStateException("Feed too large");
         }
         if (!(JsonReader.object(new String(body, StandardCharsets.UTF_8)).get("bans") instanceof List<?> list)) {
-            throw new IllegalStateException("Not a Hycon ban feed (check the address)");
+            throw new IllegalStateException("Not a Hycon ban feed");
         }
 
         Map<UUID, Ban> wanted = new HashMap<>();

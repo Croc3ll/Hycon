@@ -55,6 +55,7 @@ Everyone online, with their world and UUID. Refreshes every 5 seconds.
 
 - **Kick**: enter an optional reason; the player sees it when disconnected.
 - **Ban**: enter a reason and pick how long: 30 minutes up to 30 days, or **Permanent**.
+- **Banned players** show "Banned · 2d 4h left" (or "permanent") in red, with an **Unban** button.
 - **All players**: below the online list is everyone who has ever joined, online or offline,
   with their status ("Online" or "Last seen 3 h ago"), UUID and first-seen date. Type in the search
   box to find someone by part of their name or the start of their UUID, then **Ban** (or **Kick** if
@@ -67,7 +68,8 @@ Everyone online, with their world and UUID. Refreshes every 5 seconds.
   saved to their record only. Every warning is counted.
 
 ### Player profile
-Click any player's name to open their profile (their record):
+Click any player's name to open their profile (their record). Each player gets an emblem in
+the colour of their UUID (Hytale offers no picture of a player's character to show instead).
 
 - UUID, first and last seen, last world, and whether they're online,
 - a count of warnings, kicks and bans, and their current ban if any,
@@ -84,7 +86,9 @@ Names must match exactly (any upper/lower case). Hycon never guesses a "closest"
 can't ban the wrong player.
 
 ### Bans
-Every active ban: player, reason, who banned them, when, and when it ends. **Unban** lifts it.
+Every active ban, with a **Temporary** or **Permanent** badge and, for temporary bans, the
+**time left** (counts down; hover for the exact end). Filter with All / Temporary / Permanent,
+ban someone by name or UUID from the box at the top, and **Unban** to lift a ban.
 
 Hycon uses the server's own ban list (`bans.json`), so bans made with `/ban` in game show up here
 and the other way round. Temporary bans end on their own. Bans from the panel show
@@ -108,6 +112,10 @@ memory, for the last 24 hours, 7 days or 30 days (buttons at the top right). Bel
 - **Memory used** over time.
 - **Average players by hour** of the day, and **Most playtime**.
 - **Most active players**: playtime, sessions, first and last seen.
+- **New players**, **Returning** players (here before this period) and **Came back**: the share
+  of players who played again on a later day.
+- **Players who stick around**: most days played in the last 7 days (or the chosen range), with
+  sessions, playtime and average session length.
 
 Hycon samples every 30 seconds and keeps 31 days (`samples.log`). Playtime counts from when Hycon
 was installed. Other plugins can add their own tabs next to Analytics.
@@ -159,35 +167,43 @@ that account as OWNER. `/hycon info` prints the panel's address.
 
 ## 4b. Sharing bans between servers
 
-OWNER accounts get a **Ban sharing** tab. It lets servers that all run Hycon share their ban
-lists, for example one global ban list for a network.
+OWNER accounts get a **Ban sharing** tab. Servers that run Hycon can share their ban lists, for
+example one global ban list for a network. Owners swap a single **share code**; nobody has to give
+out their panel address, and the panel itself stays private on 127.0.0.1.
 
-**How it works**
+**Set up (on the server that shares its bans)**
 
-- A server makes a **key** for each server that may read its bans, and sends that key plus its
-  feed address (`https://<its panel>/share/bans`) to the other owner.
-- The other server **follows** it: Ban sharing → Follow a server → name, address, key.
-- Every 2 minutes each server checks the servers it follows. New bans are added (shown as
-  "Shared: <name>" in the Bans list), and bans lifted or expired there are lifted here.
-- Only bans a server made itself are shared on (bans it got from others are not passed along),
-  so servers following each other never bounce bans back and forth.
+1. Ban sharing → *This server's address*: the address other servers reach it at, usually the same
+   one players use (`play.example.com` or an IP). Save.
+2. *New share code*: type which server it's for (e.g. "Server 2") and **Create code**. Copy the
+   `hycon1_...` code and send it to that server's owner privately. **Show code** shows it again later.
 
-**A global ban list**: either every server follows every other server, or all servers follow one
-main server whose staff do the banning.
+**Follow (on the other server)**: Ban sharing → *Follow a server* → a name and the code → **Follow**.
+
+From then on, every 2 minutes, new bans from that server are added here (shown as
+"Shared: <name>" in Bans), and bans lifted or expired there are lifted here. Only bans a server
+made itself are passed on, so servers that follow each other never bounce bans back and forth.
+
+**A global ban list**: every server follows every other server, or all servers follow one main
+server whose staff do the banning.
 
 **What stays local**
 
 - Bans made on your own server are never changed by sharing.
-- If you unban a shared ban here, it stays unbanned here, until that server bans the player again.
+- Unbanning a shared ban here keeps it unbanned here, until that server bans the player again.
 - **Pause** stops checking but keeps the shared bans. **Remove** stops following and lifts every
-  ban that came from that server.
-- **Revoke** a key and that server stops receiving your bans at its next check.
+  ban that came from that server. **Revoke** a code and that server stops receiving your bans.
 
-**Network**: the server being followed must be reachable from the others. Put its panel behind
-HTTPS as in [section 6](#6-opening-the-panel-from-another-computer) and add its domain to
-`AllowedHosts`. The feed only answers with a valid key; wrong keys are limited like failed
-logins and written to the audit log. Keys can't be read back later: if one is lost, revoke it and
-make a new one.
+**Network and security**
+
+- Bans are served on a separate **share port** (`SharePort`, default 8097). It only opens once you
+  create your first code, closes when you revoke the last one, and answers nothing but the ban list.
+  If you share with servers on other machines, open that port in your firewall/router, like the game port.
+- The secret in a code never travels over the network: each request is signed with it and only
+  valid for 5 minutes, so it can't be stolen or replayed even without HTTPS. Server clocks must be
+  within 5 minutes of each other. The ban list itself (names, reasons) is not encrypted.
+- Wrong signatures are limited like failed logins and written to the audit log.
+- `sharing.json` holds the secrets of your codes and of the servers you follow: keep it private.
 
 ## 5. Settings (hycon.json)
 
@@ -265,7 +281,7 @@ All in Hycon's data folder:
 | `audit.log`       | Every panel action, one JSON line each, only ever added to. Rotate or archive it yourself if it grows. |
 | `moderation.log`  | Every player's history: warnings, kicks, bans, unbans and staff notes, one JSON line each.     |
 | `samples.log`     | Players online and memory every 30 s, kept 31 days, for the Analytics charts.                    |
-| `sharing.json`    | Share keys (stored hashed), followed servers (with their keys: keep it private), local exceptions. |
+| `sharing.json`    | Your share codes, followed servers and local exceptions. Holds secrets: keep it private.        |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 

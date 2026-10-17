@@ -124,3 +124,9 @@ dialog::backdrop { background: rgba(0, 0, 0, .65); }
   header { height: auto; padding: 10px 16px; } nav button { padding: 8px 10px; }
   main { padding: 16px; } th:nth-child(3), td:nth-child(3) { display: none; }
 }
+.avatar { flex: none; vertical-align: middle; }
+a.who { display: inline-flex; align-items: center; gap: 8px; }
+.badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px;
+  border-radius: 3px; color: var(--gold); border: 1px solid var(--gold-dim); background: var(--gold-bg); }
+.badge.red { color: #ffb3ae; border-color: rgba(229, 83, 75, .5); background: var(--danger-bg); }
+.code { word-break: break-all; background: #0a0b0d; border: 1px solid var(--line); padding: 8px 10px; border-radius: 4px; margin: 8px 0; }

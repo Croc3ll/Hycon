@@ -25,6 +25,7 @@ import com.hycon.web.AuthRoutes;
 import com.hycon.web.GameRoutes;
 import com.hycon.web.SyncRoutes;
 import com.hycon.sync.BanSync;
+import com.hycon.sync.ShareServer;
 import com.hycon.sync.SharingStore;
 import com.hycon.web.WebServer;
 
@@ -52,6 +53,7 @@ public final class HyconPlugin extends JavaPlugin {
     private Samples samples;
     private SharingStore sharing;
     private BanSync banSync;
+    private ShareServer shareServer;
     private ScheduledFuture<?> sampler;
     private LogTap logTap;
     private Sessions sessions;
@@ -122,7 +124,9 @@ public final class HyconPlugin extends JavaPlugin {
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
             new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing).register();
             banSync = new BanSync(sharing, known, audit);
-            new SyncRoutes(web, sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs())).register();
+            shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
+                    config.shareBindAddress(), config.sharePort());
+            new SyncRoutes(web, sharing, banSync, shareServer, audit).register();
             web.start();
         } catch (IOException e) {
             ((HytaleLogger.Api) log.at(Level.SEVERE).withCause(e)).log("Hycon could not start the panel on %s:%d (see hycon.json)",
@@ -132,6 +136,10 @@ public final class HyconPlugin extends JavaPlugin {
         }
         HyconApi.register(new AnalyticsPanel(samples, known));
         banSync.start();
+        shareServer.update(); // opens the share port only if share keys exist
+        if (shareServer.error() != null) {
+            log.at(Level.WARNING).log("Hycon: %s", shareServer.error());
+        }
         sampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             Runtime rt = Runtime.getRuntime();
             samples.add(Universe.get().getPlayers().size(), (int) ((rt.totalMemory() - rt.freeMemory()) >> 20));
@@ -155,6 +163,9 @@ public final class HyconPlugin extends JavaPlugin {
     protected void shutdown() {
         if (banSync != null) {
             banSync.stop();
+        }
+        if (shareServer != null) {
+            shareServer.stop();
         }
         if (sampler != null) {
             sampler.cancel(false);

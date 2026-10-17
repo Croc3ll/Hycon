@@ -25,9 +25,10 @@ Locked out? In the server console: `/hycon resetpassword <name>` writes a new pa
 
 ## Ban sharing
 
-Owners can share ban lists between servers running Hycon (for example a network-wide ban list):
-each server gives the others a key to its ban feed, and every 2 minutes they import new bans and
-lift ones that were lifted at the source. Bans made locally are never touched. See
+Owners can share ban lists between servers running Hycon (for example a network-wide ban list).
+Each server makes a share code for the others; following a code imports that server's bans every
+2 minutes and lifts them when they're lifted there. Bans made locally are never touched, the panel
+stays private, and codes are never sent over the network (requests are signed). See
 [docs/GUIDE.md](docs/GUIDE.md#4b-sharing-bans-between-servers).
 
 ## Account levels
