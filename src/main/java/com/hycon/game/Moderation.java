@@ -43,10 +43,11 @@ public final class Moderation {
         Collection<PlayerRef> refs = Universe.get().getPlayers();
         List<OnlinePlayer> list = new ArrayList<>(refs.size());
         for (PlayerRef p : refs) {
-            known.seen(p.getUuid(), p.getUsername());
             UUID worldId = p.getWorldUuid();
             World w = worldId == null ? null : Universe.get().getWorld(worldId);
-            list.add(new OnlinePlayer(p.getUuid(), p.getUsername(), w == null ? "" : w.getName()));
+            String world = w == null ? "" : w.getName();
+            known.seen(p.getUuid(), p.getUsername(), world);
+            list.add(new OnlinePlayer(p.getUuid(), p.getUsername(), world));
         }
         list.sort(Comparator.comparing(o -> o.name().toLowerCase()));
         return list;
@@ -80,6 +81,15 @@ public final class Moderation {
         }
         String name = known.name(uuid);
         return new Target(uuid, name == null ? uuid.toString() : name, null);
+    }
+
+    /** UUIDs of everyone online right now. */
+    public java.util.Set<UUID> onlineIds() {
+        java.util.Set<UUID> ids = new java.util.HashSet<>();
+        for (PlayerRef p : Universe.get().getPlayers()) {
+            ids.add(p.getUuid());
+        }
+        return ids;
     }
 
     /** Disconnects the player; returns false if they weren't online. */

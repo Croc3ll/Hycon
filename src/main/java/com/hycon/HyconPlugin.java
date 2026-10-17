@@ -2,7 +2,9 @@ package com.hycon;
 
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hycon.api.HyconApi;
@@ -68,7 +70,12 @@ public final class HyconPlugin extends JavaPlugin {
         known = new KnownPlayers(dir);
         known.load();
         getCommandRegistry().registerCommand(new HyconCommand());
-        getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.seen(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername()));
+        // Joins and leaves keep the player directory's "last seen" current.
+        getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
+            known.seen(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
+            return e;
+        }));
+        getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.seen(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), null));
     }
 
     @Override
@@ -106,6 +113,9 @@ public final class HyconPlugin extends JavaPlugin {
             return;
         }
         HyconApi.register(new ServerPanel());
+        // Players saved before Hycon was installed, so they can be searched too.
+        Path playersDir = Universe.get().getPath().resolve("players");
+        Thread.ofVirtual().name("Hycon-PlayerImport").start(() -> known.importSaved(playersDir));
         housekeeping = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             sessions.sweep();
             known.saveIfChanged();

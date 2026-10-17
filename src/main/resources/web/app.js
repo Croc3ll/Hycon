@@ -148,7 +148,7 @@ function players(view) {
   const count = el('span', { class: 'muted' });
   view.append(el('div', { class: 'card' }, el('div', { class: 'row' }, el('h2', {}, 'Online players '), count),
     el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'World'), el('th', {}, 'UUID'), el('th', {}))), body)));
-  if (can('MODERATOR')) view.append(banForm());
+  view.append(directory());
   every(5000, async () => {
     try {
       const d = await api('GET', '/api/players');
@@ -162,10 +162,34 @@ function players(view) {
   });
 }
 
-function banForm() {
-  const who = el('input', { placeholder: 'Exact name or UUID (can be offline)' });
-  return el('div', { class: 'card' }, el('h3', {}, 'Ban someone who is offline'),
-    el('div', { class: 'row' }, who, el('button', { class: 'danger', on: { click: () => who.value.trim() && modDialog('ban', who.value.trim()) } }, 'Ban…')));
+// Everyone who has been on the server, online or offline, searchable by name or UUID.
+function directory() {
+  const q = el('input', { placeholder: 'Search by name or UUID', autocomplete: 'off' });
+  const body = el('tbody');
+  const info = el('span', { class: 'muted' });
+  let t = null;
+  const ago = (ms) => { if (!ms) return 'unknown'; const m = Math.round((Date.now() - ms) / 60000);
+    return m < 60 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+  async function load() {
+    try {
+      const d = await api('GET', '/api/directory?q=' + encodeURIComponent(q.value.trim()));
+      info.textContent = '(' + d.total + ' known' + (d.players.length < d.total ? ', showing ' + d.players.length : '') + ')';
+      body.replaceChildren(...d.players.map((p) => el('tr', {},
+        el('td', {}, p.name),
+        el('td', { class: p.online ? 'good' : 'muted', title: p.last ? fmtTime(p.last) : '' }, p.online ? 'Online' : 'Last seen ' + ago(p.last)),
+        el('td', { class: 'mono' }, p.uuid),
+        el('td', { class: 'muted' }, p.first ? fmtTime(p.first) : ''),
+        el('td', { class: 'actions' }, can('MODERATOR') ? [
+          p.online ? el('button', { on: { click: () => modDialog('kick', p.name) } }, 'Kick') : null,
+          el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid) } }, 'Ban')] : null))));
+      if (!d.players.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 5, class: 'muted' }, 'No player matches.')));
+    } catch (e) { info.textContent = e.message; }
+  }
+  q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(load, 250); });
+  load();
+  return el('div', { class: 'card' }, el('div', { class: 'row' }, el('h2', {}, 'All players '), info), q,
+    el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Status'), el('th', {}, 'UUID'), el('th', {}, 'First seen'), el('th', {}))), body),
+    el('p', { class: 'muted' }, 'Everyone who has joined, including players saved by the server before Hycon was installed. The UUID is the permanent ID of the account; it stays the same if the player changes their name.'));
 }
 
 function modDialog(action, player) {

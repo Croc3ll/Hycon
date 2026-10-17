@@ -43,6 +43,7 @@ public final class GameRoutes {
     public void register() {
         web.get("/api/players", Level.VIEWER, this::players);
         web.get("/api/bans", Level.VIEWER, this::bans);
+        web.get("/api/directory", Level.VIEWER, this::directory);
         web.post("/api/kick", Level.MODERATOR, this::kick);
         web.post("/api/ban", Level.MODERATOR, this::ban);
         web.post("/api/unban", Level.MODERATOR, this::unban);
@@ -57,6 +58,21 @@ public final class GameRoutes {
         Json j = new Json().beginObject().name("players").beginArray();
         for (Moderation.OnlinePlayer p : moderation.online()) {
             j.beginObject().field("uuid", p.uuid().toString()).field("name", p.name()).field("world", p.world()).endObject();
+        }
+        r.ok(j.endArray().endObject());
+    }
+
+    /** Search every player who has been on the server, online or not. */
+    private void directory(Req r) throws IOException {
+        String q = r.query("q");
+        if (q != null && q.length() > 64) {
+            q = q.substring(0, 64);
+        }
+        java.util.Set<UUID> online = moderation.onlineIds();
+        Json j = new Json().beginObject().field("total", known.size()).name("players").beginArray();
+        for (KnownPlayers.Info i : known.search(q, online::contains, 100)) {
+            j.beginObject().field("uuid", i.uuid().toString()).field("name", i.name()).field("online", online.contains(i.uuid()))
+                    .field("first", i.firstSeen()).field("last", i.lastSeen()).field("world", i.world()).endObject();
         }
         r.ok(j.endArray().endObject());
     }

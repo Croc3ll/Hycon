@@ -55,8 +55,14 @@ Everyone online, with their world and UUID. Refreshes every 5 seconds.
 
 - **Kick**: enter an optional reason; the player sees it when disconnected.
 - **Ban**: enter a reason and pick how long: 30 minutes up to 30 days, or **Permanent**.
-- **Ban someone who is offline**: the box below the list takes an exact player name of someone who
-  has been online since Hycon was installed, or a UUID.
+- **All players**: below the online list is everyone who has ever joined, online or offline,
+  with their status ("Online" or "Last seen 3 h ago"), UUID and first-seen date. Type in the search
+  box to find someone by part of their name or the start of their UUID, then **Ban** (or **Kick** if
+  they're online). On first start Hycon also reads the players the server saved before Hycon was
+  installed (`universe/players`), so they can be found too.
+
+The **UUID** is Hytale's permanent ID for an account. It never changes, even if the player changes
+their name, so bans are always stored by UUID.
 
 Names must match exactly (any upper/lower case). Hycon never guesses a "closest" name, so a typo
 can't ban the wrong player.
@@ -201,7 +207,7 @@ All in Hycon's data folder:
 | `hycon.json`      | Settings (yours to edit; Hycon never rewrites it).                                               |
 | `admins.json`     | Panel accounts with **hashed** passwords. Managed by Hycon; change accounts in the panel. Keep it private anyway. |
 | `audit.log`       | Every panel action, one JSON line each, only ever added to. Rotate or archive it yourself if it grows. |
-| `players.json`    | Names of players seen online, so offline players can be banned by name.                          |
+| `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 
 Back up `admins.json` and `audit.log` with the rest of your server.
