@@ -1,0 +1,162 @@
+package com.hycon.analytics;
+
+import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hycon.api.HyconPanel;
+import com.hycon.api.PanelData;
+import com.hycon.game.KnownPlayers;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Hycon's own "Analytics" tab: players online over time with outages, unique players, peak,
+ * average, uptime, players by hour of day, memory, and the most active players. Built through the
+ * same {@link HyconPanel} API other plugins use.
+ */
+public final class AnalyticsPanel implements HyconPanel {
+
+    private final Samples samples;
+    private final KnownPlayers known;
+
+    public AnalyticsPanel(Samples samples, KnownPlayers known) {
+        this.samples = samples;
+        this.known = known;
+    }
+
+    @Override
+    public String id() {
+        return "analytics";
+    }
+
+    @Override
+    public String title() {
+        return "Analytics";
+    }
+
+    @Override
+    public void render(PanelData out) {
+        long now = System.currentTimeMillis();
+        long range = out.rangeMillis();
+        long since = now - range;
+        List<Samples.Sample> list = samples.since(since);
+
+        int peak = 0;
+        long sum = 0;
+        for (Samples.Sample s : list) {
+            peak = Math.max(peak, s.online());
+            sum += s.online();
+        }
+        int online = Universe.get().getPlayers().size();
+        Set<UUID> onlineIds = new HashSet<>();
+        for (PlayerRef p : Universe.get().getPlayers()) {
+            onlineIds.add(p.getUuid());
+        }
+        int unique = 0;
+        for (KnownPlayers.Info i : known.all()) {
+            if (i.lastSeen() >= since || onlineIds.contains(i.uuid())) {
+                unique++;
+            }
+        }
+        // Uptime: share of the range (since the first sample, if later) that has samples.
+        long covered = list.isEmpty() ? 0 : Math.min(range, now - list.get(0).time());
+        double uptime = covered <= 0 ? 100 : Math.min(100, list.size() * Samples.INTERVAL_MS * 100.0 / covered);
+        Runtime rt = Runtime.getRuntime();
+        long usedMb = (rt.totalMemory() - rt.freeMemory()) >> 20;
+
+        out.stat("Online now", String.valueOf(online))
+                .stat("Unique players", String.valueOf(unique))
+                .stat("Peak", String.valueOf(Math.max(peak, online)))
+                .stat("Average", list.isEmpty() ? "-" : String.format("%.1f", sum / (double) list.size()))
+                .stat("Uptime", String.format("%.1f%%", uptime), "running " + duration((System.nanoTime() - HytaleServer.get().getBootStart()) / 1_000_000)) // boot time is System.nanoTime()
+                .stat("Memory", usedMb + " MB", "of " + (rt.maxMemory() >> 20) + " MB");
+
+        long bucket = bucketFor(range);
+        PanelData.Series players = out.series("Players online", "players").area()
+                .subtitle("average per " + duration(bucket) + " · red bands are outages").line("Players");
+        PanelData.Series memory = out.series("Memory used", "MB").subtitle("average per " + duration(bucket)).line("Memory");
+        long start = -1, last = -1, n = 0, sumOn = 0, sumMem = 0;
+        for (Samples.Sample s : list) {
+            if (last >= 0 && s.time() - last > 3 * Samples.INTERVAL_MS) {
+                players.gap(last, s.time()); // no samples for a while: the server was off
+            }
+            long b = s.time() / bucket * bucket;
+            if (b != start && n > 0) {
+                players.point(start + bucket / 2, sumOn / (double) n);
+                memory.point(start + bucket / 2, sumMem / (double) n);
+                n = sumOn = sumMem = 0;
+            }
+            start = b;
+            n++;
+            sumOn += s.online();
+            sumMem += s.memoryMb();
+            last = s.time();
+        }
+        if (n > 0) {
+            players.point(start + bucket / 2, sumOn / (double) n);
+            memory.point(start + bucket / 2, sumMem / (double) n);
+        }
+
+        // Average players per hour of the day, in the server's time zone.
+        double[] hourSum = new double[24];
+        int[] hourCount = new int[24];
+        ZoneId zone = ZoneId.systemDefault();
+        for (Samples.Sample s : list) {
+            int h = Instant.ofEpochMilli(s.time()).atZone(zone).getHour();
+            hourSum[h] += s.online();
+            hourCount[h]++;
+        }
+        PanelData.Columns hours = out.columns("Average players by hour (" + zone.getId() + ")");
+        for (int h = 0; h < 24; h++) {
+            hours.column(String.format("%02d", h), hourCount[h] == 0 ? 0 : hourSum[h] / hourCount[h]);
+        }
+
+        // Top playtime as bars next to the hour chart, then the full table below.
+        List<KnownPlayers.Info> active = known.all();
+        active.sort(Comparator.comparingLong(known::playtimeNow).reversed());
+        PanelData.Bars top = out.bars("Most playtime");
+        long max = active.isEmpty() ? 0 : known.playtimeNow(active.get(0));
+        for (KnownPlayers.Info i : active.subList(0, Math.min(5, active.size()))) {
+            long t = known.playtimeNow(i);
+            if (t > 0) {
+                top.bar(i.name(), i.sessions() + (i.sessions() == 1 ? " session" : " sessions"), max == 0 ? 0 : t, duration(t));
+            }
+        }
+        PanelData.Table table = out.table("Most active players", "Player", "Playtime", "Sessions", "First seen", "Last seen");
+        for (KnownPlayers.Info i : active.subList(0, Math.min(25, active.size()))) {
+            table.row(i.name(), duration(known.playtimeNow(i)), i.sessions(),
+                    i.firstSeen() == 0 ? "" : PanelData.time(i.firstSeen()),
+                    onlineIds.contains(i.uuid()) ? "online now" : i.lastSeen() == 0 ? "" : PanelData.time(i.lastSeen()));
+        }
+    }
+
+    /** Chart bucket per range: about 300 points whatever the range. */
+    private static long bucketFor(long range) {
+        if (range <= TimeUnit.HOURS.toMillis(1)) {
+            return Samples.INTERVAL_MS;
+        }
+        if (range <= TimeUnit.DAYS.toMillis(1)) {
+            return TimeUnit.MINUTES.toMillis(5);
+        }
+        return range <= TimeUnit.DAYS.toMillis(7) ? TimeUnit.MINUTES.toMillis(30) : TimeUnit.HOURS.toMillis(2);
+    }
+
+    static String duration(long ms) {
+        Duration d = Duration.ofMillis(Math.max(0, ms));
+        if (d.toDays() > 0) {
+            return d.toDays() + "d " + d.toHoursPart() + "h";
+        }
+        if (d.toHours() > 0) {
+            return d.toHours() + "h " + d.toMinutesPart() + "m";
+        }
+        return d.toMinutes() > 0 ? d.toMinutes() + " min" : d.toSeconds() + " s";
+    }
+}

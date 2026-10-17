@@ -72,7 +72,8 @@ function showLogin() {
       S.csrf = r.csrf;
       await boot();
     } catch (err) { msg.textContent = err.message; pw.value = ''; }
-  } } }, el('h2', {}, 'Log in'),
+  } } }, el('img', { src: 'logo.svg', class: 'login-logo', alt: '' }),
+    el('div', { class: 'login-word' }, el('span', { class: 'brand' }, el('span', { class: 'word' }, 'Hycon'))),
     S.setup ? el('p', { class: 'secret' }, 'First start: log in as ', el('b', {}, S.setup[0]), ' with password ', el('b', { class: 'mono' }, S.setup[1]),
       ' from the server machine, then choose your own password.') : null,
     el('label', {}, 'Account'), name, el('label', {}, 'Password'), pw,
@@ -109,14 +110,15 @@ function showPassword(forced) {
 
 function renderMe() {
   $('me').replaceChildren(
-    el('span', {}, S.me.name + ' · ' + S.me.level),
+    el('span', { class: 'who' }, S.me.name), el('span', { class: 'lvl' }, S.me.level),
     el('button', { on: { click: () => showPassword(false) } }, 'Password'),
     el('button', { on: { click: async () => { await api('POST', '/api/logout'); await boot(); } } }, 'Log out'));
 }
 
 function tabs() {
-  const list = [['players', 'Players', 'VIEWER'], ['bans', 'Bans', 'VIEWER'], ['console', 'Console', 'MODERATOR']];
+  const list = [['players', 'Players', 'VIEWER']];
   for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
+  list.push(['bans', 'Bans', 'VIEWER'], ['console', 'Console', 'MODERATOR']);
   list.push(['audit', 'Audit log', 'ADMIN'], ['accounts', 'Accounts', 'OWNER']);
   return list.filter((t) => can(t[2]));
 }
@@ -376,80 +378,204 @@ function accounts(view) {
   load().catch((e) => toast(e.message, true));
 }
 
-// ---------- Plugin dashboards (HyconPanel API) ----------
+// ---------- Dashboards (HyconPanel API) ----------
+
+const RANGES = [['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days']];
 
 function dashboard(view, id) {
-  let range = '6h';
+  let range = S.range || '24h';
   const out = el('div');
-  const picker = el('div', { class: 'row' }, ...['1h', '6h', '24h', '7d', '30d'].map((r) =>
-    el('button', { class: r === range ? 'primary' : '', on: { click: (e) => { range = r; [...picker.children].forEach((b) => { b.className = ''; }); e.target.className = 'primary'; load(); } } }, r)));
-  view.append(el('div', { class: 'row' }, el('h2', { id: 'dash-title' }, ''), picker), out);
+  const seg = el('div', { class: 'seg' });
+  const drawSeg = () => seg.replaceChildren(...RANGES.map(([r, t]) => el('button', { class: r === range ? 'on' : '',
+    on: { click: () => { range = S.range = r; drawSeg(); load(); } } }, t)));
+  drawSeg();
+  const title = el('h2', { class: 'big' });
+  view.append(el('div', { class: 'spread' }, title, seg), out);
+  // Chart/table choices survive the 15 s refresh.
+  const modes = {};
   async function load() {
     try {
       const d = await api('GET', '/api/panel?id=' + encodeURIComponent(id) + '&range=' + range);
-      $('dash-title').textContent = d.title;
-      out.replaceChildren(...blocks(d.blocks));
+      title.textContent = d.title;
+      out.replaceChildren(...blocks(d.blocks, modes));
     } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
   }
-  every(10000, load);
+  every(15000, load);
 }
 
-function blocks(list) {
-  const nodes = []; let tiles = null;
+function blocks(list, modes) {
+  const nodes = []; let tiles = null; let grid = null;
   for (const b of list) {
     if (b.type === 'stat') {
+      grid = null;
       if (!tiles) { tiles = el('div', { class: 'tiles' }); nodes.push(tiles); }
-      tiles.append(el('div', { class: 'tile' }, el('div', { class: 'h' }, b.label), el('div', { class: 'v' }, b.value), b.hint ? el('div', { class: 'h' }, b.hint) : null));
+      tiles.append(el('div', { class: 'tile' }, el('div', { class: 'h' }, b.label), el('div', { class: 'v' }, b.value), b.hint ? el('div', { class: 's' }, b.hint) : null));
       continue;
     }
     tiles = null;
+    if (b.type === 'bars' || b.type === 'columns') {
+      if (!grid) { grid = el('div', { class: 'grid3' }); nodes.push(grid); }
+      grid.append(b.type === 'bars' ? barsCard(b) : columnsCard(b));
+      continue;
+    }
+    grid = null;
     if (b.type === 'note') nodes.push(el('p', { class: 'muted' }, b.text));
-    else if (b.type === 'series') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title + (b.unit ? ' (' + b.unit + ')' : '')), chart(b)));
-    else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title),
-      el('table', {}, el('thead', {}, el('tr', {}, ...b.columns.map((c) => el('th', {}, c)))), el('tbody', {}, ...b.rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))))))));
+    else if (b.type === 'series') nodes.push(seriesCard(b, modes));
+    else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows)));
   }
   return nodes;
 }
 
-const COLORS = ['#2f6fde', '#e0803a', '#2f9e68', '#c2457a', '#8a63d2', '#c9a227'];
+const cell = (c) => (typeof c === 'string' && /^@\d{9,}$/.test(c) ? fmtTime(+c.slice(1)) : c);
+
+function tableBox(columns, rows) {
+  return el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, ...columns.map((c) => el('th', {}, c)))),
+    el('tbody', {}, rows.length ? rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, cell(c)))))
+      : el('tr', {}, el('td', { colspan: columns.length, class: 'muted' }, 'Nothing yet.')))));
+}
+
+const COLORS = ['#e2b54b', '#4fa3f7', '#e5534b', '#4fbf7a', '#a98bf0', '#f0884f'];
+const short = (v) => Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M'
+  : Math.abs(v) >= 1e4 ? (v / 1e3).toFixed(1) + 'k' : String(Math.round(v * 10) / 10);
+
+function seriesCard(s, modes) {
+  const key = s.title;
+  const mode = modes[key] || 'chart';
+  const body = el('div');
+  const seg = el('div', { class: 'seg' });
+  const draw = () => {
+    seg.replaceChildren(...['chart', 'table'].map((m) => el('button', { class: modes[key] === m || (!modes[key] && m === 'chart') ? 'on' : '',
+      on: { click: () => { modes[key] = m; draw(); } } }, m)));
+    if ((modes[key] || 'chart') === 'chart') body.replaceChildren(...[legend(s), chart(s)].filter(Boolean));
+    else body.replaceChildren(tableBox(['Time', ...(s.lines.length ? s.lines : [s.title])],
+      seriesRows(s).reverse().map(([t, vals]) => [fmtTime(t), ...vals.map((v) => (v === undefined ? '' : short(v)))])));
+  };
+  modes[key] = mode;
+  draw();
+  return el('div', { class: 'card' }, el('div', { class: 'spread' },
+    el('h3', {}, s.title, s.subtitle ? el('span', { class: 'sub' }, '  ' + s.subtitle) : null), seg), body);
+}
+
+/** [time, [value per line]] rows, one per distinct time. */
+function seriesRows(s) {
+  const map = new Map();
+  for (const [li, t, v] of s.points) { if (!map.has(t)) map.set(t, []); map.get(t)[li] = v; }
+  return [...map.entries()].sort((a, b) => a[0] - b[0]);
+}
+
+function legend(s) {
+  if (s.lines.length < 2) return null;
+  const last = [];
+  for (const [li, , v] of s.points) last[li] = v;
+  return el('div', { class: 'chips' }, ...s.lines.map((n, i) => {
+    const dot = el('i'); dot.style.background = COLORS[i % COLORS.length];
+    return el('span', { class: 'chip' }, dot, n, el('span', {}, last[i] === undefined ? '' : short(last[i])));
+  }));
+}
 
 function chart(s) {
   const NS = 'http://www.w3.org/2000/svg';
-  const W = 800, H = 200, L = 52, B = 22;
+  const W = 1000, H = 230, L = 44, R = 10, T = 10, B = 24;
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
   svg.setAttribute('class', 'chart');
-  const mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; svg.append(e); return e; };
-  if (!s.points.length) { mk('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle' }, 'No data yet'); return svg; }
-  let t0 = Infinity, t1 = -Infinity, v0 = Infinity, v1 = -Infinity;
-  for (const [, t, v] of s.points) { t0 = Math.min(t0, t); t1 = Math.max(t1, t); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
-  if (v0 > 0 && v0 < v1 * 0.5) v0 = 0;
-  if (v1 === v0) { v1 += 1; v0 = Math.max(0, v0 - 1); }
+  const mk = (tag, attrs, text, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text; (parent || svg).append(e); return e; };
+  if (!s.points.length) { mk('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle' }, 'No data yet - samples are taken every 30 seconds'); return svg; }
+  let t0 = Infinity, t1 = -Infinity, v1 = 0;
+  for (const [, t, v] of s.points) { t0 = Math.min(t0, t); t1 = Math.max(t1, t); v1 = Math.max(v1, v); }
+  for (const [a, b] of s.gaps || []) { t0 = Math.min(t0, a); t1 = Math.max(t1, b); }
   if (t1 === t0) t1 = t0 + 1;
-  const x = (t) => L + (t - t0) / (t1 - t0) * (W - L - 8);
-  const y = (v) => 6 + (1 - (v - v0) / (v1 - v0)) * (H - B - 6);
-  const short = (v) => Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : String(Math.round(v * 100) / 100);
+  v1 = v1 <= 0 ? 1 : v1 * 1.1;
+  const x = (t) => L + (t - t0) / (t1 - t0) * (W - L - R);
+  const y = (v) => T + (1 - v / v1) * (H - T - B);
   for (let i = 0; i <= 4; i++) {
-    const v = v0 + (v1 - v0) * i / 4;
-    mk('line', { x1: L, x2: W - 8, y1: y(v), y2: y(v), class: 'grid' });
-    mk('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end' }, short(v));
+    const v = v1 * i / 4;
+    mk('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'grid' });
+    mk('text', { x: L - 6, y: y(v) + 3, 'text-anchor': 'end' }, short(v));
   }
   const span = t1 - t0;
-  for (let i = 0; i <= 4; i++) {
-    const t = t0 + span * i / 4, d = new Date(t);
-    mk('text', { x: x(t), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === 4 ? 'end' : 'middle' },
+  for (let i = 0; i <= 6; i++) {
+    const t = t0 + span * i / 6, d = new Date(t);
+    mk('text', { x: x(t), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === 6 ? 'end' : 'middle' },
       span > 2 * 864e5 ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
   }
+  for (const [a, b] of s.gaps || []) mk('rect', { x: x(a), y: T, width: Math.max(2, x(b) - x(a)), height: H - T - B, class: 'gap' });
   const byLine = new Map();
   for (const [li, t, v] of s.points) { if (!byLine.has(li)) byLine.set(li, []); byLine.get(li).push([t, v]); }
+  const defs = mk('defs', {});
   for (const [li, pts] of byLine) {
     pts.sort((a, b) => a[0] - b[0]);
-    mk('polyline', { points: pts.map(([t, v]) => x(t).toFixed(1) + ',' + y(v).toFixed(1)).join(' '), fill: 'none', stroke: COLORS[li % COLORS.length], 'stroke-width': 2 });
+    const color = COLORS[li % COLORS.length];
+    const path = pts.map(([t, v]) => x(t).toFixed(1) + ',' + y(v).toFixed(1)).join(' ');
+    if (s.area && li === 0) {
+      const gid = 'fill' + Math.random().toString(36).slice(2);
+      const g = mk('linearGradient', { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 }, undefined, defs);
+      mk('stop', { offset: 0, 'stop-color': color, 'stop-opacity': 0.35 }, undefined, g);
+      mk('stop', { offset: 1, 'stop-color': color, 'stop-opacity': 0.03 }, undefined, g);
+      mk('polygon', { points: x(pts[0][0]).toFixed(1) + ',' + y(0) + ' ' + path + ' ' + x(pts[pts.length - 1][0]).toFixed(1) + ',' + y(0), fill: `url(#${gid})` });
+    }
+    mk('polyline', { points: path, fill: 'none', stroke: color, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' });
   }
-  if (s.lines.length < 2) return svg;
-  const wrap = el('div', {}, svg);
-  wrap.append(el('div', { class: 'legend' }, ...s.lines.map((n, i) => { const sw = el('i'); sw.style.background = COLORS[i % COLORS.length]; return el('span', {}, sw, n); })));
-  return wrap;
+  // Hover: a dashed line and the values at that time.
+  const rows = seriesRows(s);
+  const cursor = mk('line', { y1: T, y2: H - B, class: 'cursor', visibility: 'hidden' });
+  svg.addEventListener('mousemove', (e) => {
+    const r = svg.getBoundingClientRect();
+    const t = t0 + ((e.clientX - r.left) / r.width * W - L) / (W - L - R) * (t1 - t0);
+    let best = rows[0];
+    for (const row of rows) if (Math.abs(row[0] - t) < Math.abs(best[0] - t)) best = row;
+    cursor.setAttribute('x1', x(best[0])); cursor.setAttribute('x2', x(best[0])); cursor.setAttribute('visibility', 'visible');
+    const names = s.lines.length ? s.lines : [s.title];
+    tip(e, fmtTime(best[0]) + '\n' + best[1].map((v, i) => (v === undefined ? '' : names[i] + ': ' + short(v) + (s.unit ? ' ' + s.unit : ''))).filter(Boolean).join('\n'));
+  });
+  svg.addEventListener('mouseleave', () => { cursor.setAttribute('visibility', 'hidden'); tip(null); });
+  return svg;
+}
+
+function tip(e, text) {
+  let t = $('tip');
+  if (!e) { if (t) t.hidden = true; return; }
+  if (!t) { t = el('div', { id: 'tip' }); document.body.append(t); }
+  t.hidden = false;
+  t.replaceChildren(...text.split('\n').map((l, i) => el('div', { class: i ? '' : 'muted' }, l)));
+  t.style.left = Math.min(e.clientX + 14, innerWidth - t.offsetWidth - 8) + 'px';
+  t.style.top = (e.clientY + 14) + 'px';
+}
+
+function barsCard(b) {
+  const max = Math.max(1e-9, ...b.items.map((i) => i[2]));
+  return el('div', { class: 'card' }, el('h3', {}, b.title), b.items.length ? b.items.map(([label, note, v, text]) => {
+    const fill = el('div', { class: 'fill' }); fill.style.width = Math.max(1, v / max * 100) + '%';
+    return el('div', { class: 'bar' }, el('div', { class: 'top' }, el('span', {}, label, note ? el('span', { class: 'n' }, note) : null),
+      el('span', { class: 't' }, text)), el('div', { class: 'track' }, fill));
+  }) : el('p', { class: 'muted' }, 'Nothing yet.'));
+}
+
+function columnsCard(c) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const W = 400, H = 170, B = 18, n = Math.max(1, c.items.length);
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('class', 'cols');
+  const max = Math.max(1e-9, ...c.items.map((i) => i[1]));
+  const w = W / n;
+  c.items.forEach(([label, v], i) => {
+    const h = Math.max(v > 0 ? 2 : 1, v / max * (H - B - 6));
+    const r = document.createElementNS(NS, 'rect');
+    r.setAttribute('x', i * w + w * 0.15); r.setAttribute('width', w * 0.7); r.setAttribute('y', H - B - h); r.setAttribute('height', h);
+    r.addEventListener('mousemove', (e) => tip(e, label + '\n' + short(v)));
+    r.addEventListener('mouseleave', () => tip(null));
+    svg.append(r);
+    if (i % Math.ceil(n / 5) === 0 || i === n - 1) {
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', i * w + w / 2); t.setAttribute('y', H - 4); t.setAttribute('text-anchor', 'middle'); t.textContent = label;
+      svg.append(t);
+    }
+  });
+  return el('div', { class: 'card' }, el('h3', {}, c.title), svg);
 }
 
 boot().catch((e) => { $('view').replaceChildren(el('p', { class: 'bad' }, 'Could not reach the server: ' + e.message)); });

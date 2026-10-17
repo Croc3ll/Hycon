@@ -69,7 +69,7 @@ public final class MyPanel implements HyconPanel {
 ```
 
 List `Hycon:Hycon` as an optional dependency and keep Hycon imports in one class you only use when
-Hycon is installed. See `docs/PRISONCORE-HOOK.md` for a full example plan.
+Hycon is installed. See [docs/ADDING-A-PANEL.md](docs/ADDING-A-PANEL.md) for a full example.
 
 ## Develop
 

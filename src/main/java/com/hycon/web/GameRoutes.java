@@ -311,7 +311,7 @@ public final class GameRoutes {
 
     /** "1h", "6h", "24h", "7d", "30d" to ms; defaults to 6 hours, at most a year. */
     private static long range(String s) {
-        long def = TimeUnit.HOURS.toMillis(6);
+        long def = TimeUnit.DAYS.toMillis(1);
         if (s == null || s.length() < 2) {
             return def;
         }

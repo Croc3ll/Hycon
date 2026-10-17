@@ -32,7 +32,11 @@ import java.util.regex.Pattern;
  */
 public final class KnownPlayers {
 
-    public record Info(UUID uuid, String name, long firstSeen, long lastSeen, String world) {
+    /** {@code playtimeMs} and {@code sessions} count only time Hycon was installed. */
+    public record Info(UUID uuid, String name, long firstSeen, long lastSeen, String world, long playtimeMs, int sessions) {
+        Info with(String name, long first, long last, String world, long playtime, int sessions) {
+            return new Info(uuid, name, first, last, world, playtime, sessions);
+        }
     }
 
     /** A player file holds the whole inventory; the fields we need are near the start or in small blocks. */
@@ -43,6 +47,8 @@ public final class KnownPlayers {
     private final Path file;
     private final Map<UUID, Info> players = new ConcurrentHashMap<>();
     private final Map<String, UUID> byName = new ConcurrentHashMap<>();
+    /** Join time of everyone online, for playtime. Not saved: a crash loses only the current sessions. */
+    private final Map<UUID, Long> joinedAt = new ConcurrentHashMap<>();
     private volatile boolean dirty;
 
     public KnownPlayers(Path dataDir) {
@@ -55,9 +61,10 @@ public final class KnownPlayers {
                 for (Map.Entry<String, Object> e : JsonReader.object(Files.readString(file, StandardCharsets.UTF_8)).entrySet()) {
                     UUID uuid = UUID.fromString(e.getKey());
                     if (e.getValue() instanceof String n) {
-                        put(new Info(uuid, n, 0, 0, "")); // file from Hycon 0.1.0: names only
+                        put(new Info(uuid, n, 0, 0, "", 0, 0)); // file from Hycon 0.1.0: names only
                     } else if (e.getValue() instanceof Map<?, ?> m && m.get("name") instanceof String n) {
-                        put(new Info(uuid, n, num(m.get("first")), num(m.get("last")), m.get("world") instanceof String w ? w : ""));
+                        put(new Info(uuid, n, num(m.get("first")), num(m.get("last")), m.get("world") instanceof String w ? w : "",
+                                num(m.get("play")), (int) num(m.get("sessions"))));
                     }
                 }
             }
@@ -91,7 +98,7 @@ public final class KnownPlayers {
                 Matcher name = NAMEPLATE.matcher(text);
                 Matcher world = WORLD.matcher(text);
                 long last = Files.getLastModifiedTime(f).toMillis();
-                put(new Info(uuid, name.find() ? name.group(1) : uuid.toString(), 0, last, world.find() ? world.group(1) : ""));
+                put(new Info(uuid, name.find() ? name.group(1) : uuid.toString(), 0, last, world.find() ? world.group(1) : "", 0, 0));
                 dirty = true;
             }
         } catch (IOException ignored) {
@@ -100,13 +107,52 @@ public final class KnownPlayers {
         saveIfChanged();
     }
 
-    /** Join (or seen online): updates name, last seen, world; sets first seen if new. */
+    /** Seen online: updates name, last seen, world; sets first seen if new. */
     public void seen(UUID uuid, String name, String world) {
+        update(uuid, name, world, 0, 0);
+    }
+
+    /** A new session starts. */
+    public void joined(UUID uuid, String name, String world) {
+        joinedAt.put(uuid, System.currentTimeMillis());
+        update(uuid, name, world, 0, 1);
+    }
+
+    /** A session ends; its length is added to the player's playtime. */
+    public void left(UUID uuid, String name) {
+        Long start = joinedAt.remove(uuid);
+        update(uuid, name, null, start == null ? 0 : System.currentTimeMillis() - start, 0);
+    }
+
+    /** Server stopping: close every open session so its playtime is kept. */
+    public void leaveAll() {
+        for (UUID u : List.copyOf(joinedAt.keySet())) {
+            Info i = players.get(u);
+            if (i != null) {
+                left(u, i.name());
+            }
+        }
+    }
+
+    /** Playtime including the current session, for live tables. */
+    public long playtimeNow(Info i) {
+        Long start = joinedAt.get(i.uuid());
+        return i.playtimeMs() + (start == null ? 0 : System.currentTimeMillis() - start);
+    }
+
+    /** Everyone, unsorted (callers sort for their table). */
+    public List<Info> all() {
+        return new ArrayList<>(players.values());
+    }
+
+    private synchronized void update(UUID uuid, String name, String world, long addPlay, int addSessions) {
         long now = System.currentTimeMillis();
         Info old = players.get(uuid);
         long first = old == null || old.firstSeen() == 0 ? now : old.firstSeen();
         String w = world == null || world.isEmpty() ? (old == null ? "" : old.world()) : world;
-        put(new Info(uuid, name, first, now, w));
+        long play = (old == null ? 0 : old.playtimeMs()) + addPlay;
+        int sessions = (old == null ? 0 : old.sessions()) + addSessions;
+        put(new Info(uuid, name, first, now, w, play, sessions));
         dirty = true;
     }
 
@@ -150,7 +196,7 @@ public final class KnownPlayers {
         dirty = false;
         Json j = new Json().beginObject();
         players.forEach((u, i) -> j.name(u.toString()).beginObject().field("name", i.name()).field("first", i.firstSeen())
-                .field("last", i.lastSeen()).field("world", i.world()).endObject());
+                .field("last", i.lastSeen()).field("world", i.world()).field("play", i.playtimeMs()).field("sessions", i.sessions()).endObject());
         j.endObject();
         try {
             Path tmp = file.resolveSibling("players.json.tmp");

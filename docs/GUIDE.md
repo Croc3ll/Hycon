@@ -99,10 +99,18 @@ ADMIN and OWNER accounts also get a command box. Type a command without the `/`
 Commands run with **full console rights**, as the sender `Hycon:<your account>`. The reply shows in
 the log. If a command takes longer than 5 seconds, the panel stops waiting but the command keeps running.
 
-### Server, and dashboards from other plugins
-**Server** shows players online, uptime, memory, CPU cores and the Java version. Other plugins
-can add their own tabs here (PrisonCore's analytics, for example). The 1h…30d buttons pick how
-far back their charts go.
+### Analytics, and dashboards from other plugins
+**Analytics** shows players online now, unique players, peak and average players, uptime and
+memory, for the last 24 hours, 7 days or 30 days (buttons at the top right). Below that:
+
+- **Players online** over time; red bands are times the server was off. Hover for exact values,
+  or switch to **Table** for the raw numbers.
+- **Memory used** over time.
+- **Average players by hour** of the day, and **Most playtime**.
+- **Most active players**: playtime, sessions, first and last seen.
+
+Hycon samples every 30 seconds and keeps 31 days (`samples.log`). Playtime counts from when Hycon
+was installed. Other plugins can add their own tabs next to Analytics.
 
 ### Audit log (ADMIN and up)
 The newest 200 actions: logins (and failed ones), kicks, bans, unbans, commands and account changes,
@@ -224,6 +232,7 @@ All in Hycon's data folder:
 | `admins.json`     | Panel accounts with **hashed** passwords. Managed by Hycon; change accounts in the panel. Keep it private anyway. |
 | `audit.log`       | Every panel action, one JSON line each, only ever added to. Rotate or archive it yourself if it grows. |
 | `moderation.log`  | Every player's history: warnings, kicks, bans, unbans and staff notes, one JSON line each.     |
+| `samples.log`     | Players online and memory every 30 s, kept 31 days, for the Analytics charts.                    |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 
@@ -258,4 +267,4 @@ The jar is in `build/libs/`. `test-server.bat` (or `gradlew runServer`) builds i
 local test server in `run/` with Hycon loaded; the panel's data folder then links to
 `src/main/resources` (those runtime files are git-ignored).
 
-For adding your own dashboard tab from another plugin, see the README and `docs/PRISONCORE-HOOK.md`.
+For adding your own dashboard tab from another plugin, see `docs/ADDING-A-PANEL.md`.

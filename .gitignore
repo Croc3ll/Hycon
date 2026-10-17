@@ -14,3 +14,4 @@ src/main/resources/players.json
 src/main/resources/FIRST-LOGIN.txt
 src/main/resources/*.tmp
 src/main/resources/moderation.log
+src/main/resources/samples.log

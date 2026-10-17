@@ -6,12 +6,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * What a {@link HyconPanel} fills in. Three kinds of blocks, shown in the order added:
+ * What a {@link HyconPanel} fills in. Blocks are shown in the order added:
  * <ul>
  *   <li>{@link #stat} - a number tile ("Online: 12"),</li>
- *   <li>{@link #series} - a line chart over time,</li>
+ *   <li>{@link #series} - a line or filled area chart over time, with optional outage bands;
+ *       the page can switch it to a table,</li>
+ *   <li>{@link #bars} - labelled horizontal bars ("time per map"),</li>
+ *   <li>{@link #columns} - a small column chart ("players by hour"),</li>
  *   <li>{@link #table} - rows and columns.</li>
  * </ul>
+ * Consecutive {@code bars} and {@code columns} blocks sit side by side.
  * All text is shown as plain text (never as HTML), so values can come straight from players.
  */
 public final class PanelData {
@@ -56,6 +60,25 @@ public final class PanelData {
         return t;
     }
 
+    /** Horizontal bars, each with a label, a small grey note, a length (value) and the text shown. */
+    public Bars bars(String title) {
+        Bars b = new Bars(title);
+        add(b);
+        return b;
+    }
+
+    /** A column chart; columns are drawn in the order added, labels under every few. */
+    public Columns columns(String title) {
+        Columns c = new Columns(title);
+        add(c);
+        return c;
+    }
+
+    /** A table cell holding a time; the page shows it as a date and time in the viewer's time zone. */
+    public static String time(long epochMillis) {
+        return "@" + epochMillis;
+    }
+
     /** A line of text, e.g. "Economy plugin: VaultUnlocked". */
     public PanelData note(String text) {
         add(new Note(text));
@@ -72,6 +95,29 @@ public final class PanelData {
         final String title, unit;
         final List<double[]> pts = new ArrayList<>();
         final List<String> lines = new ArrayList<>();
+        final List<long[]> gaps = new ArrayList<>();
+        boolean area;
+        String subtitle;
+
+        /** Fill the area under the first line (good for counts like players online). */
+        public Series area() {
+            area = true;
+            return this;
+        }
+
+        /** Small grey text next to the title, e.g. "average per 5 min". */
+        public Series subtitle(String text) {
+            subtitle = text;
+            return this;
+        }
+
+        /** A red band from..to, e.g. while the server was offline. */
+        public Series gap(long fromMillis, long toMillis) {
+            if (gaps.size() < 200) {
+                gaps.add(new long[]{fromMillis, toMillis});
+            }
+            return this;
+        }
 
         Series(String title, String unit) {
             this.title = title;
@@ -115,6 +161,43 @@ public final class PanelData {
         }
     }
 
+    public static final class Bars {
+        final String title;
+        final List<String[]> items = new ArrayList<>();
+        final List<Double> values = new ArrayList<>();
+
+        Bars(String title) {
+            this.title = title;
+        }
+
+        /** {@code value} sets the bar length (relative to the largest); {@code text} is shown at the end. */
+        public Bars bar(String label, String note, double value, String text) {
+            if (items.size() < 50) {
+                items.add(new String[]{label, note == null ? "" : note, text == null ? "" : text});
+                values.add(value);
+            }
+            return this;
+        }
+    }
+
+    public static final class Columns {
+        final String title;
+        final List<String> labels = new ArrayList<>();
+        final List<Double> values = new ArrayList<>();
+
+        Columns(String title) {
+            this.title = title;
+        }
+
+        public Columns column(String label, double value) {
+            if (labels.size() < 200) {
+                labels.add(label);
+                values.add(value);
+            }
+            return this;
+        }
+    }
+
     private record Stat(String label, String value, String hint) {
     }
 
@@ -130,13 +213,33 @@ public final class PanelData {
                 case Stat s -> j.field("type", "stat").field("label", s.label).field("value", s.value).field("hint", s.hint);
                 case Note n -> j.field("type", "note").field("text", n.text);
                 case Series s -> {
-                    j.field("type", "series").field("title", s.title).field("unit", s.unit).name("lines").beginArray();
+                    j.field("type", "series").field("title", s.title).field("unit", s.unit).field("area", s.area)
+                            .field("subtitle", s.subtitle).name("gaps").beginArray();
+                    for (long[] g : s.gaps) {
+                        j.beginArray().value(g[0]).value(g[1]).endArray();
+                    }
+                    j.endArray().name("lines").beginArray();
                     for (String l : s.lines) {
                         j.value(l);
                     }
                     j.endArray().name("points").beginArray();
                     for (double[] p : s.pts) {
                         j.beginArray().value(p[0]).value(p[1]).value(p[2]).endArray();
+                    }
+                    j.endArray();
+                }
+                case Bars bs -> {
+                    j.field("type", "bars").field("title", bs.title).name("items").beginArray();
+                    for (int i = 0; i < bs.items.size(); i++) {
+                        String[] it = bs.items.get(i);
+                        j.beginArray().value(it[0]).value(it[1]).value(bs.values.get(i)).value(it[2]).endArray();
+                    }
+                    j.endArray();
+                }
+                case Columns c -> {
+                    j.field("type", "columns").field("title", c.title).name("items").beginArray();
+                    for (int i = 0; i < c.labels.size(); i++) {
+                        j.beginArray().value(c.labels.get(i)).value(c.values.get(i)).endArray();
                     }
                     j.endArray();
                 }

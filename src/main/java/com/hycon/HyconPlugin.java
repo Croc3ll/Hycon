@@ -19,7 +19,8 @@ import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
 import com.hycon.game.PlayerRecords;
-import com.hycon.game.ServerPanel;
+import com.hycon.analytics.AnalyticsPanel;
+import com.hycon.analytics.Samples;
 import com.hycon.web.AuthRoutes;
 import com.hycon.web.GameRoutes;
 import com.hycon.web.WebServer;
@@ -45,6 +46,8 @@ public final class HyconPlugin extends JavaPlugin {
     private AuditLog audit;
     private KnownPlayers known;
     private PlayerRecords records;
+    private Samples samples;
+    private ScheduledFuture<?> sampler;
     private LogTap logTap;
     private Sessions sessions;
     private WebServer web;
@@ -72,13 +75,14 @@ public final class HyconPlugin extends JavaPlugin {
         known = new KnownPlayers(dir);
         known.load();
         records = new PlayerRecords(dir);
+        samples = new Samples(dir);
         getCommandRegistry().registerCommand(new HyconCommand());
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
-            known.seen(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
+            known.joined(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
             return e;
         }));
-        getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.seen(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), null));
+        getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.left(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername()));
     }
 
     @Override
@@ -92,6 +96,7 @@ public final class HyconPlugin extends JavaPlugin {
             boolean created = admins.load();
             audit.open();
             records.open();
+            samples.open();
             if (created) {
                 log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
                         address(), AdminStore.DEFAULT_NAME, AdminStore.DEFAULT_PASSWORD);
@@ -116,7 +121,11 @@ public final class HyconPlugin extends JavaPlugin {
             web = null;
             return;
         }
-        HyconApi.register(new ServerPanel());
+        HyconApi.register(new AnalyticsPanel(samples, known));
+        sampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+            Runtime rt = Runtime.getRuntime();
+            samples.add(Universe.get().getPlayers().size(), (int) ((rt.totalMemory() - rt.freeMemory()) >> 20));
+        }, 0, Samples.INTERVAL_MS, TimeUnit.MILLISECONDS);
         // Players saved before Hycon was installed, so they can be searched too.
         Path playersDir = Universe.get().getPath().resolve("players");
         Thread.ofVirtual().name("Hycon-PlayerImport").start(() -> known.importSaved(playersDir));
@@ -134,6 +143,12 @@ public final class HyconPlugin extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (sampler != null) {
+            sampler.cancel(false);
+        }
+        if (samples != null) {
+            samples.close();
+        }
         if (housekeeping != null) {
             housekeeping.cancel(false);
         }
@@ -145,6 +160,7 @@ public final class HyconPlugin extends JavaPlugin {
         }
         HyconApi.clear();
         if (known != null) {
+            known.leaveAll();
             known.saveIfChanged();
         }
         if (audit != null) {

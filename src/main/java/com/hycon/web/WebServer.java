@@ -50,7 +50,7 @@ public final class WebServer {
     private static final int MAX_BODY = 16 * 1024;
     private static final Map<String, String> STATIC = Map.of(
             "/", "web/index.html", "/index.html", "web/index.html",
-            "/app.js", "web/app.js", "/style.css", "web/style.css");
+            "/app.js", "web/app.js", "/style.css", "web/style.css", "/logo.svg", "web/logo.svg");
 
     private final HyconConfig config;
     private final Sessions sessions;
@@ -136,7 +136,8 @@ public final class WebServer {
         String path = ex.getRequestURI().getPath();
         String res = STATIC.get(path);
         if (res != null && method.equals("GET")) {
-            String type = res.endsWith(".js") ? "text/javascript; charset=utf-8"
+            String type = res.endsWith(".svg") ? "image/svg+xml"
+                    : res.endsWith(".js") ? "text/javascript; charset=utf-8"
                     : res.endsWith(".css") ? "text/css; charset=utf-8" : "text/html; charset=utf-8";
             r.send(200, type, files.get(res));
             return;
