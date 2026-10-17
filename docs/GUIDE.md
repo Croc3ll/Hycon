@@ -61,8 +61,9 @@ Everyone online, with their world and UUID. Refreshes every 5 seconds.
   they're online). On first start Hycon also reads the players the server saved before Hycon was
   installed (`universe/players`), so they can be found too.
 
-- **Warn**: type a reason. If the player is online, a big red "Warning" title with your reason
-  appears on their screen, plus a chat line "[Warning #2] ...". Offline players get the warning
+- **Warn**: type a reason. If the player is online, a big "Warning" title appears in the middle of
+  their screen, the reason shows in a red notification popup ("Warning #2"), and a chat line
+  "[Warning #2] ..." keeps it readable afterwards. Offline players get the warning
   saved to their record only. Every warning is counted.
 
 ### Player profile

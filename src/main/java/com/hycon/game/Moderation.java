@@ -1,8 +1,10 @@
 package com.hycon.game;
 
 import com.hypixel.hytale.protocol.packets.interface_.EventTitleStyle;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.util.EventTitleUtil;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
 import com.hypixel.hytale.server.core.io.ConnectionRegistry;
 import com.hypixel.hytale.server.core.modules.accesscontrol.AccessControlModule;
 import com.hypixel.hytale.server.core.modules.accesscontrol.ban.Ban;
@@ -114,8 +116,8 @@ public final class Moderation {
     }
 
     /**
-     * Shows a warning to an online player: a big on-screen title (Hytale's event title, the same
-     * kind used for "Mine reset!") plus a chat line, so they see it even if the title is missed.
+     * Shows a warning to an online player: a big on-screen "Warning" title, the reason in a red
+     * notification popup, and a chat line so it can be read again later.
      * Runs on the player's world thread, where sending to the player is safe. Returns false if offline.
      */
     public boolean warn(Target t, String reason, int warningNumber) {
@@ -132,8 +134,12 @@ public final class Moderation {
             if (!p.isValid()) {
                 return; // left in the meantime
             }
-            EventTitleUtil.showEventTitleToPlayer(p, Message.raw("Warning").color("#FF5555").bold(true),
-                    Message.raw(text), EventTitleStyle.Major, null, 6.0F, 0.5F, 1.5F);
+            // Hytale's title always puts a small line above a big one, so the big line is just
+            // "Warning" and the reason goes into a red notification popup and chat instead.
+            EventTitleUtil.showEventTitleToPlayer(p, Message.raw("Warning"), Message.raw(""),
+                    EventTitleStyle.Major, null, 4.0F, 0.5F, 1.5F);
+            NotificationUtil.sendNotification(p.getPacketHandler(), Message.raw("Warning #" + warningNumber),
+                    Message.raw(text), null, null, NotificationStyle.Danger);
             p.sendMessage(Message.raw("[Warning #" + warningNumber + "] " + text).color("#FF5555"));
         });
         return true;
