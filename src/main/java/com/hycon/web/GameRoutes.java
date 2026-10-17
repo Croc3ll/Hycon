@@ -11,6 +11,7 @@ import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
 import com.hycon.game.PlayerRecords;
+import com.hycon.sync.SharingStore;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -30,10 +31,12 @@ public final class GameRoutes {
     private final AdminStore admins;
     private final KnownPlayers known;
     private final PlayerRecords records;
+    private final SharingStore sharing;
 
     public GameRoutes(WebServer web, Moderation moderation, ConsoleRunner console, LogTap log, AuditLog audit,
-                      AdminStore admins, KnownPlayers known, PlayerRecords records) {
+                      AdminStore admins, KnownPlayers known, PlayerRecords records, SharingStore sharing) {
         this.records = records;
+        this.sharing = sharing;
         this.web = web;
         this.moderation = moderation;
         this.console = console;
@@ -101,6 +104,10 @@ public final class GameRoutes {
         if (by.getMostSignificantBits() == 0 && by.getLeastSignificantBits() == 0) {
             return "Console";
         }
+        String source = sharing.sourceOf(by);
+        if (source != null) {
+            return "Shared: " + source;
+        }
         for (AdminStore.Admin a : admins.all()) {
             if (a.uuid().equals(by)) {
                 return "Hycon:" + a.name();
@@ -155,7 +162,13 @@ public final class GameRoutes {
             r.error(404, "Unknown player");
             return;
         }
+        Moderation.BanInfo current = moderation.ban(t.uuid());
+        String source = current == null ? null : sharing.sourceOf(current.by());
         boolean ok = moderation.unban(t.uuid());
+        if (ok && source != null) {
+            // A shared ban: remember it was lifted here, or the next sync would bring it back.
+            sharing.addException(source, t.uuid(), current.since().toEpochMilli());
+        }
         audit.record(r.who(), r.ip, "unban", label(t), null, ok);
         if (ok) {
             records.record(t.uuid(), PlayerRecords.Type.UNBAN, r.who(), reason(r), null);

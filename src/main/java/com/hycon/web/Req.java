@@ -49,6 +49,15 @@ public final class Req {
         return null;
     }
 
+    public String header(String name) {
+        return ex.getRequestHeaders().getFirst(name);
+    }
+
+    /** Raw JSON body for machine routes (already built elsewhere). */
+    public void okRaw(String json) throws IOException {
+        send(200, "application/json; charset=utf-8", json.getBytes(StandardCharsets.UTF_8));
+    }
+
     /** Account name for the audit log ("-" before login). */
     public String who() {
         return admin != null ? admin.name() : "-";

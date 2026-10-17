@@ -119,7 +119,7 @@ function tabs() {
   const list = [['players', 'Players', 'VIEWER']];
   for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
   list.push(['bans', 'Bans', 'VIEWER'], ['console', 'Console', 'MODERATOR']);
-  list.push(['audit', 'Audit log', 'ADMIN'], ['accounts', 'Accounts', 'OWNER']);
+  list.push(['audit', 'Audit log', 'ADMIN'], ['sharing', 'Ban sharing', 'OWNER'], ['accounts', 'Accounts', 'OWNER']);
   return list.filter((t) => can(t[2]));
 }
 
@@ -138,6 +138,7 @@ function render() {
   else if (tab === 'console') consoleView(view);
   else if (tab === 'audit') audit(view);
   else if (tab === 'accounts') accounts(view);
+  else if (tab === 'sharing') sharing(view);
   else if (tab.startsWith('panel:')) dashboard(view, tab.slice(6));
   else if (tab.startsWith('profile:')) profile(view, tab.slice(8));
 }
@@ -376,6 +377,71 @@ function accounts(view) {
         } } }, 'Remove')))));
   }
   load().catch((e) => toast(e.message, true));
+}
+
+// ---------- Ban sharing ----------
+
+function sharing(view) {
+  const out = el('div');
+  view.append(el('h2', { class: 'big' }, 'Ban sharing'),
+    el('p', { class: 'muted' }, 'Share this server\'s bans with other servers running Hycon, and follow theirs. '
+      + 'For one global ban list, give every server a key to every other (or let them all follow one main server).'), out);
+  const secret = el('div');
+  async function load() {
+    const d = await api('GET', '/api/sharing');
+    const feedUrl = location.origin + d.feedPath;
+    const keyName = el('input', { placeholder: 'Who gets this key, e.g. "Server 2"' });
+    const subName = el('input', { placeholder: 'Name, e.g. "Server 1"' });
+    const subUrl = el('input', { placeholder: 'Feed address, e.g. https://panel.server1.com' + d.feedPath });
+    const subKey = el('input', { placeholder: 'Key they gave you (hyk_...)', class: 'mono' });
+    const act = async (path, body, okMsg) => {
+      try { const r = await api('POST', path, body); toast(r.message || okMsg); await load(); return r; } catch (e) { toast(e.message, true); return null; }
+    };
+    out.replaceChildren(
+      el('div', { class: 'card' },
+        el('h3', {}, 'Following other servers'),
+        el('p', { class: 'muted' }, 'Their bans are added here and lifted when they lift them. Checked every ' + d.intervalMinutes
+          + ' minutes. Bans made on this server are never changed. Unbanning a shared player here keeps them unbanned here.'),
+        el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Address'),
+          el('th', {}, 'Status'), el('th', { class: 'num' }, 'Bans'), el('th', {}))),
+          el('tbody', {}, d.subscriptions.length ? d.subscriptions.map((x) => el('tr', {},
+            el('td', {}, x.name), el('td', { class: 'mono' }, x.url),
+            el('td', { class: x.error ? 'bad' : x.enabled ? 'good' : 'muted' },
+              !x.enabled ? 'Paused' : x.error ? x.error : x.lastSync ? 'Synced ' + fmtTime(x.lastSync) : 'Waiting for first sync'),
+            el('td', { class: 'num' }, x.imported === undefined ? '' : x.imported + ' / ' + x.feedBans),
+            el('td', { class: 'actions' },
+              el('button', { on: { click: () => act('/api/sharing/sub/enable', { name: x.name, enabled: !x.enabled }, x.enabled ? 'Paused' : 'Resumed') } }, x.enabled ? 'Pause' : 'Resume'),
+              el('button', { class: 'danger', on: { click: () => confirm('Stop following ' + x.name + '? Every ban that came from it is lifted here.')
+                && act('/api/sharing/sub/remove', { name: x.name }, 'Removed') } }, 'Remove'))))
+            : el('tr', {}, el('td', { colspan: 5, class: 'muted' }, 'Not following any server yet.'))))),
+        el('h3', {}, 'Follow a server'),
+        el('div', { class: 'row' }, subName, subUrl), el('p', { class: 'row' }, subKey,
+          el('button', { class: 'primary', on: { click: async () => {
+            if (await act('/api/sharing/sub/add', { name: subName.value.trim(), url: subUrl.value.trim(), token: subKey.value.trim() }, 'Added; first sync running')) {
+              subName.value = subUrl.value = subKey.value = '';
+            }
+          } } }, 'Follow')),
+        el('p', {}, el('button', { on: { click: () => act('/api/sharing/sync', {}, 'Syncing') } }, 'Sync now'))),
+      el('div', { class: 'card' },
+        el('h3', {}, 'Sharing this server\'s bans'),
+        el('p', { class: 'muted' }, 'Give another server a key and this address: ', el('span', { class: 'mono' }, feedUrl),
+          '. The other server must be able to reach this panel over the network (use HTTPS, see the guide).'),
+        el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Key for'), el('th', {}, 'Created'), el('th', {}))),
+          el('tbody', {}, d.keys.length ? d.keys.map((k) => el('tr', {}, el('td', {}, k.name), el('td', {}, fmtTime(k.created)),
+            el('td', { class: 'actions' }, el('button', { class: 'danger', on: { click: () => confirm('Revoke the key for ' + k.name + '? They stop receiving your bans.')
+              && act('/api/sharing/key/revoke', { name: k.name }, 'Key revoked') } }, 'Revoke'))))
+            : el('tr', {}, el('td', { colspan: 3, class: 'muted' }, 'No keys yet.'))))),
+        el('h3', {}, 'New key'),
+        el('div', { class: 'row' }, keyName, el('button', { class: 'primary', on: { click: async () => {
+          const r = await act('/api/sharing/key/create', { name: keyName.value.trim() }, 'Key created');
+          if (r) {
+            secret.replaceChildren(el('div', { class: 'secret' }, 'Key for ', el('b', {}, keyName.value.trim()), ': ', el('span', { class: 'mono' }, r.token),
+              el('div', { class: 'muted' }, 'Shown once. Send it privately, with the address ' + feedUrl + '.')));
+            keyName.value = '';
+          }
+        } } }, 'Create key')), secret));
+  }
+  load().catch((e) => out.replaceChildren(el('p', { class: 'bad' }, e.message)));
 }
 
 // ---------- Dashboards (HyconPanel API) ----------

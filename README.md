@@ -23,6 +23,13 @@ only works from the server machine itself. Then add accounts for your staff in t
 Locked out? In the server console: `/hycon resetpassword <name>` writes a new password to
 `FIRST-LOGIN.txt` (and creates the account as OWNER if it doesn't exist).
 
+## Ban sharing
+
+Owners can share ban lists between servers running Hycon (for example a network-wide ban list):
+each server gives the others a key to its ban feed, and every 2 minutes they import new bans and
+lift ones that were lifted at the source. Bans made locally are never touched. See
+[docs/GUIDE.md](docs/GUIDE.md#4b-sharing-bans-between-servers).
+
 ## Account levels
 
 | Level     | Can                                                            |

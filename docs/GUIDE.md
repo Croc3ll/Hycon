@@ -157,6 +157,38 @@ writes a new password for `root` to `FIRST-LOGIN.txt` in Hycon's data folder (no
 which is visible in the panel). With a name that doesn't exist, it creates
 that account as OWNER. `/hycon info` prints the panel's address.
 
+## 4b. Sharing bans between servers
+
+OWNER accounts get a **Ban sharing** tab. It lets servers that all run Hycon share their ban
+lists, for example one global ban list for a network.
+
+**How it works**
+
+- A server makes a **key** for each server that may read its bans, and sends that key plus its
+  feed address (`https://<its panel>/share/bans`) to the other owner.
+- The other server **follows** it: Ban sharing → Follow a server → name, address, key.
+- Every 2 minutes each server checks the servers it follows. New bans are added (shown as
+  "Shared: <name>" in the Bans list), and bans lifted or expired there are lifted here.
+- Only bans a server made itself are shared on (bans it got from others are not passed along),
+  so servers following each other never bounce bans back and forth.
+
+**A global ban list**: either every server follows every other server, or all servers follow one
+main server whose staff do the banning.
+
+**What stays local**
+
+- Bans made on your own server are never changed by sharing.
+- If you unban a shared ban here, it stays unbanned here, until that server bans the player again.
+- **Pause** stops checking but keeps the shared bans. **Remove** stops following and lifts every
+  ban that came from that server.
+- **Revoke** a key and that server stops receiving your bans at its next check.
+
+**Network**: the server being followed must be reachable from the others. Put its panel behind
+HTTPS as in [section 6](#6-opening-the-panel-from-another-computer) and add its domain to
+`AllowedHosts`. The feed only answers with a valid key; wrong keys are limited like failed
+logins and written to the audit log. Keys can't be read back later: if one is lost, revoke it and
+make a new one.
+
 ## 5. Settings (hycon.json)
 
 `hycon.json` is in Hycon's data folder and explains every option in its own comments.
@@ -233,6 +265,7 @@ All in Hycon's data folder:
 | `audit.log`       | Every panel action, one JSON line each, only ever added to. Rotate or archive it yourself if it grows. |
 | `moderation.log`  | Every player's history: warnings, kicks, bans, unbans and staff notes, one JSON line each.     |
 | `samples.log`     | Players online and memory every 30 s, kept 31 days, for the Analytics charts.                    |
+| `sharing.json`    | Share keys (stored hashed), followed servers (with their keys: keep it private), local exceptions. |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 

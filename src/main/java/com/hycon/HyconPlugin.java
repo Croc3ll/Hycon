@@ -23,6 +23,9 @@ import com.hycon.analytics.AnalyticsPanel;
 import com.hycon.analytics.Samples;
 import com.hycon.web.AuthRoutes;
 import com.hycon.web.GameRoutes;
+import com.hycon.web.SyncRoutes;
+import com.hycon.sync.BanSync;
+import com.hycon.sync.SharingStore;
 import com.hycon.web.WebServer;
 
 import javax.annotation.Nonnull;
@@ -47,6 +50,8 @@ public final class HyconPlugin extends JavaPlugin {
     private KnownPlayers known;
     private PlayerRecords records;
     private Samples samples;
+    private SharingStore sharing;
+    private BanSync banSync;
     private ScheduledFuture<?> sampler;
     private LogTap logTap;
     private Sessions sessions;
@@ -76,6 +81,7 @@ public final class HyconPlugin extends JavaPlugin {
         known.load();
         records = new PlayerRecords(dir);
         samples = new Samples(dir);
+        sharing = new SharingStore(dir);
         getCommandRegistry().registerCommand(new HyconCommand());
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
@@ -97,6 +103,7 @@ public final class HyconPlugin extends JavaPlugin {
             audit.open();
             records.open();
             samples.open();
+            sharing.load();
             if (created) {
                 log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
                         address(), AdminStore.DEFAULT_NAME, AdminStore.DEFAULT_PASSWORD);
@@ -113,7 +120,9 @@ public final class HyconPlugin extends JavaPlugin {
         try {
             web = new WebServer(config, sessions, admins);
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
-            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records).register();
+            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing).register();
+            banSync = new BanSync(sharing, known, audit);
+            new SyncRoutes(web, sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs())).register();
             web.start();
         } catch (IOException e) {
             ((HytaleLogger.Api) log.at(Level.SEVERE).withCause(e)).log("Hycon could not start the panel on %s:%d (see hycon.json)",
@@ -122,6 +131,7 @@ public final class HyconPlugin extends JavaPlugin {
             return;
         }
         HyconApi.register(new AnalyticsPanel(samples, known));
+        banSync.start();
         sampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             Runtime rt = Runtime.getRuntime();
             samples.add(Universe.get().getPlayers().size(), (int) ((rt.totalMemory() - rt.freeMemory()) >> 20));
@@ -143,6 +153,9 @@ public final class HyconPlugin extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (banSync != null) {
+            banSync.stop();
+        }
         if (sampler != null) {
             sampler.cancel(false);
         }
