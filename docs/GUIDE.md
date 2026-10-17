@@ -61,6 +61,21 @@ Everyone online, with their world and UUID. Refreshes every 5 seconds.
   they're online). On first start Hycon also reads the players the server saved before Hycon was
   installed (`universe/players`), so they can be found too.
 
+- **Warn**: type a reason. If the player is online, a big red "Warning" title with your reason
+  appears on their screen, plus a chat line "[Warning #2] ...". Offline players get the warning
+  saved to their record only. Every warning is counted.
+
+### Player profile
+Click any player's name to open their profile (their record):
+
+- UUID, first and last seen, last world, and whether they're online,
+- a count of warnings, kicks and bans, and their current ban if any,
+- buttons to Warn, Kick, Ban or Unban,
+- the full **history**: every warning, kick, ban and unban with when, who and why, plus
+  **staff notes** (written by moderators, never shown to the player).
+
+This history is kept in `moderation.log` and stays even after a ban ends.
+
 The **UUID** is Hytale's permanent ID for an account. It never changes, even if the player changes
 their name, so bans are always stored by UUID.
 
@@ -207,6 +222,7 @@ All in Hycon's data folder:
 | `hycon.json`      | Settings (yours to edit; Hycon never rewrites it).                                               |
 | `admins.json`     | Panel accounts with **hashed** passwords. Managed by Hycon; change accounts in the panel. Keep it private anyway. |
 | `audit.log`       | Every panel action, one JSON line each, only ever added to. Rotate or archive it yourself if it grows. |
+| `moderation.log`  | Every player's history: warnings, kicks, bans, unbans and staff notes, one JSON line each.     |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 

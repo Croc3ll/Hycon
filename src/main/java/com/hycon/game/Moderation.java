@@ -1,6 +1,8 @@
 package com.hycon.game;
 
+import com.hypixel.hytale.protocol.packets.interface_.EventTitleStyle;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.util.EventTitleUtil;
 import com.hypixel.hytale.server.core.io.ConnectionRegistry;
 import com.hypixel.hytale.server.core.modules.accesscontrol.AccessControlModule;
 import com.hypixel.hytale.server.core.modules.accesscontrol.ban.Ban;
@@ -109,6 +111,39 @@ public final class Moderation {
         Ban ban = new Ban(t.uuid(), by, now, duration == null ? null : now.plus(duration),
                 reason == null || reason.isBlank() ? "No reason." : reason);
         return AccessControlModule.get().ban(ban);
+    }
+
+    /**
+     * Shows a warning to an online player: a big on-screen title (Hytale's event title, the same
+     * kind used for "Mine reset!") plus a chat line, so they see it even if the title is missed.
+     * Runs on the player's world thread, where sending to the player is safe. Returns false if offline.
+     */
+    public boolean warn(Target t, String reason, int warningNumber) {
+        PlayerRef p = t.online();
+        if (p == null || p.getWorldUuid() == null) {
+            return false;
+        }
+        World w = Universe.get().getWorld(p.getWorldUuid());
+        if (w == null) {
+            return false;
+        }
+        String text = reason == null || reason.isBlank() ? "Please follow the server rules." : reason;
+        w.execute(() -> {
+            if (!p.isValid()) {
+                return; // left in the meantime
+            }
+            EventTitleUtil.showEventTitleToPlayer(p, Message.raw("Warning").color("#FF5555").bold(true),
+                    Message.raw(text), EventTitleStyle.Major, null, 6.0F, 0.5F, 1.5F);
+            p.sendMessage(Message.raw("[Warning #" + warningNumber + "] " + text).color("#FF5555"));
+        });
+        return true;
+    }
+
+    /** The ban in effect for this player, or null. */
+    public BanInfo ban(UUID uuid) {
+        Ban b = AccessControlModule.get().getBanProvider().getBan(uuid);
+        return b == null || !b.isInEffect() ? null
+                : new BanInfo(b.getTarget(), known.name(uuid), b.getBy(), b.getTimestamp(), b.getExpiresOn(), b.getReason());
     }
 
     public boolean unban(UUID uuid) {

@@ -110,6 +110,10 @@ public final class KnownPlayers {
         dirty = true;
     }
 
+    public Info get(UUID uuid) {
+        return players.get(uuid);
+    }
+
     public String name(UUID uuid) {
         Info i = players.get(uuid);
         return i == null || i.name().equals(uuid.toString()) ? null : i.name();

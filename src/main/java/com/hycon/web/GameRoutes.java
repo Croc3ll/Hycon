@@ -10,6 +10,7 @@ import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
+import com.hycon.game.PlayerRecords;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -28,9 +29,11 @@ public final class GameRoutes {
     private final AuditLog audit;
     private final AdminStore admins;
     private final KnownPlayers known;
+    private final PlayerRecords records;
 
     public GameRoutes(WebServer web, Moderation moderation, ConsoleRunner console, LogTap log, AuditLog audit,
-                      AdminStore admins, KnownPlayers known) {
+                      AdminStore admins, KnownPlayers known, PlayerRecords records) {
+        this.records = records;
         this.web = web;
         this.moderation = moderation;
         this.console = console;
@@ -47,6 +50,9 @@ public final class GameRoutes {
         web.post("/api/kick", Level.MODERATOR, this::kick);
         web.post("/api/ban", Level.MODERATOR, this::ban);
         web.post("/api/unban", Level.MODERATOR, this::unban);
+        web.post("/api/warn", Level.MODERATOR, this::warn);
+        web.post("/api/note", Level.MODERATOR, this::note);
+        web.get("/api/profile", Level.VIEWER, this::profile);
         web.get("/api/log", Level.MODERATOR, this::log);
         web.post("/api/command", Level.ADMIN, this::command);
         web.get("/api/audit", Level.ADMIN, this::audit);
@@ -114,6 +120,9 @@ public final class GameRoutes {
         }
         boolean ok = moderation.kick(t, reason);
         audit.record(r.who(), r.ip, "kick", label(t), reason, ok);
+        if (ok) {
+            records.record(t.uuid(), PlayerRecords.Type.KICK, r.who(), reason, null);
+        }
         done(r, ok, ok ? "Kicked " + t.name() : t.name() + " wasn't online");
     }
 
@@ -134,6 +143,9 @@ public final class GameRoutes {
         boolean ok = moderation.ban(t, r.admin.uuid(), reason, duration);
         String len = duration == null ? "permanent" : r.str("duration");
         audit.record(r.who(), r.ip, "ban", label(t), len + ": " + reason, ok);
+        if (ok) {
+            records.record(t.uuid(), PlayerRecords.Type.BAN, r.who(), reason, len);
+        }
         done(r, ok, ok ? "Banned " + t.name() + " (" + len + ")" : t.name() + " is already banned");
     }
 
@@ -145,7 +157,82 @@ public final class GameRoutes {
         }
         boolean ok = moderation.unban(t.uuid());
         audit.record(r.who(), r.ip, "unban", label(t), null, ok);
+        if (ok) {
+            records.record(t.uuid(), PlayerRecords.Type.UNBAN, r.who(), reason(r), null);
+        }
         done(r, ok, ok ? "Unbanned " + t.name() : t.name() + " wasn't banned");
+    }
+
+    /**
+     * Warns a player: always saved to their history; shown on screen if they are online, otherwise
+     * only recorded (they'll find it in their record, staff see it in the profile).
+     */
+    private void warn(Req r) throws IOException {
+        String reason = reason(r);
+        if (reason.isEmpty()) {
+            r.error(400, "A warning needs a reason");
+            return;
+        }
+        Moderation.Target t = moderation.resolve(r.str("player"));
+        if (t == null) {
+            r.error(404, "Unknown player");
+            return;
+        }
+        int number = records.count(t.uuid(), PlayerRecords.Type.WARN) + 1;
+        records.record(t.uuid(), PlayerRecords.Type.WARN, r.who(), reason, null);
+        boolean shown = moderation.warn(t, reason, number);
+        audit.record(r.who(), r.ip, "warn", label(t), reason, true);
+        r.ok(new Json().beginObject().field("ok", true).field("message", "Warning #" + number + " for " + t.name()
+                + (shown ? " shown in game" : " saved (player is offline)")).endObject());
+    }
+
+    /** A staff-only note on the player's profile; never shown to the player. */
+    private void note(Req r) throws IOException {
+        String text = r.str("text");
+        text = text == null ? "" : text.strip().replaceAll("[\r\n\t]+", " ");
+        if (text.isEmpty() || text.length() > 500) {
+            r.error(400, "Notes are 1-500 characters");
+            return;
+        }
+        Moderation.Target t = moderation.resolve(r.str("player"));
+        if (t == null) {
+            r.error(404, "Unknown player");
+            return;
+        }
+        records.record(t.uuid(), PlayerRecords.Type.NOTE, r.who(), text, null);
+        audit.record(r.who(), r.ip, "note", label(t), text, true);
+        r.ok(new Json().beginObject().field("ok", true).field("message", "Note saved").endObject());
+    }
+
+    /** Everything known about one player: identity, status, current ban and full history. */
+    private void profile(Req r) throws IOException {
+        Moderation.Target t = moderation.resolve(r.query("player"));
+        if (t == null) {
+            r.error(404, "Unknown player");
+            return;
+        }
+        KnownPlayers.Info info = known.get(t.uuid());
+        Json j = new Json().beginObject().field("uuid", t.uuid().toString()).field("name", t.name()).field("online", t.online() != null);
+        if (info != null) {
+            j.field("first", info.firstSeen()).field("last", info.lastSeen()).field("world", info.world());
+        }
+        j.field("warnings", records.count(t.uuid(), PlayerRecords.Type.WARN))
+                .field("kicks", records.count(t.uuid(), PlayerRecords.Type.KICK))
+                .field("bans", records.count(t.uuid(), PlayerRecords.Type.BAN));
+        Moderation.BanInfo ban = moderation.ban(t.uuid());
+        if (ban != null) {
+            j.name("ban").beginObject().field("by", byName(ban.by())).field("since", ban.since().toEpochMilli()).field("reason", ban.reason());
+            if (ban.expires() != null) {
+                j.field("expires", ban.expires().toEpochMilli());
+            }
+            j.endObject();
+        }
+        j.name("history").beginArray();
+        for (PlayerRecords.Entry e : records.history(t.uuid())) {
+            j.beginObject().field("time", e.time()).field("type", e.type().name()).field("by", e.by())
+                    .field("reason", e.reason()).field("detail", e.detail()).endObject();
+        }
+        r.ok(j.endArray().endObject());
     }
 
     private void log(Req r) throws IOException {

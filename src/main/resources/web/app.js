@@ -125,7 +125,7 @@ function render() {
   stop();
   renderMe();
   const list = tabs();
-  if (!list.some((t) => t[0] === S.tab)) S.tab = 'players';
+  if (!S.tab.startsWith('profile:') && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
   $('tabs').replaceChildren(...list.map(([id, title]) =>
     el('button', { class: id === S.tab ? 'active' : '', on: { click: () => { S.tab = id; render(); } } }, title)));
   const view = $('view');
@@ -137,6 +137,7 @@ function render() {
   else if (tab === 'audit') audit(view);
   else if (tab === 'accounts') accounts(view);
   else if (tab.startsWith('panel:')) dashboard(view, tab.slice(6));
+  else if (tab.startsWith('profile:')) profile(view, tab.slice(8));
 }
 
 function every(ms, fn) { fn(); S.timer = setInterval(fn, ms); }
@@ -153,8 +154,9 @@ function players(view) {
     try {
       const d = await api('GET', '/api/players');
       count.textContent = '(' + d.players.length + ')';
-      body.replaceChildren(...d.players.map((p) => el('tr', {}, el('td', {}, p.name), el('td', {}, p.world), el('td', { class: 'mono' }, p.uuid),
+      body.replaceChildren(...d.players.map((p) => el('tr', {}, el('td', {}, nameLink(p.name, p.uuid)), el('td', {}, p.world), el('td', { class: 'mono' }, p.uuid),
         el('td', { class: 'actions' }, can('MODERATOR') ? [
+          el('button', { on: { click: () => modDialog('warn', p.uuid, p.name) } }, 'Warn'),
           el('button', { on: { click: () => modDialog('kick', p.name) } }, 'Kick'),
           el('button', { class: 'danger', on: { click: () => modDialog('ban', p.name) } }, 'Ban')] : null))));
       if (!d.players.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Nobody online.')));
@@ -175,7 +177,7 @@ function directory() {
       const d = await api('GET', '/api/directory?q=' + encodeURIComponent(q.value.trim()));
       info.textContent = '(' + d.total + ' known' + (d.players.length < d.total ? ', showing ' + d.players.length : '') + ')';
       body.replaceChildren(...d.players.map((p) => el('tr', {},
-        el('td', {}, p.name),
+        el('td', {}, nameLink(p.name, p.uuid)),
         el('td', { class: p.online ? 'good' : 'muted', title: p.last ? fmtTime(p.last) : '' }, p.online ? 'Online' : 'Last seen ' + ago(p.last)),
         el('td', { class: 'mono' }, p.uuid),
         el('td', { class: 'muted' }, p.first ? fmtTime(p.first) : ''),
@@ -192,12 +194,14 @@ function directory() {
     el('p', { class: 'muted' }, 'Everyone who has joined, including players saved by the server before Hycon was installed. The UUID is the permanent ID of the account; it stays the same if the player changes their name.'));
 }
 
-function modDialog(action, player) {
+function modDialog(action, player, shownAs) {
   const reason = el('input', { maxlength: 200, placeholder: 'Shown to the player and saved in the audit log' });
   const dur = el('select', {}, ...[['permanent', 'Permanent'], ['30m', '30 minutes'], ['1h', '1 hour'], ['12h', '12 hours'],
     ['1d', '1 day'], ['3d', '3 days'], ['7d', '7 days'], ['30d', '30 days']].map(([v, t]) => el('option', { value: v }, t)));
   const msg = el('p', { class: 'bad' });
   const dlg = el('dialog', {});
+  const label = { ban: 'Ban', kick: 'Kick', warn: 'Warn' }[action];
+  if (action === 'warn') reason.placeholder = 'Shown to the player on screen and saved in their profile';
   const go = el('button', { class: action === 'ban' ? 'primary danger' : 'primary', on: { click: async () => {
     go.disabled = true;
     try {
@@ -206,8 +210,8 @@ function modDialog(action, player) {
       dlg.close();
       render();
     } catch (e) { msg.textContent = e.message; go.disabled = false; }
-  } } }, action === 'ban' ? 'Ban' : 'Kick');
-  dlg.append(el('h2', {}, (action === 'ban' ? 'Ban ' : 'Kick ') + player), el('label', {}, 'Reason'), reason,
+  } } }, label);
+  dlg.append(el('h2', {}, label + ' ' + (shownAs || player)), el('label', {}, 'Reason'), reason,
     action === 'ban' ? [el('label', {}, 'How long'), dur] : null,
     el('p', { class: 'row' }, go, el('button', { on: { click: () => dlg.close() } }, 'Cancel')), msg);
   dlg.addEventListener('close', () => dlg.remove());
@@ -232,6 +236,53 @@ function bans(view) {
       if (!d.bans.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'muted' }, 'No active bans.')));
     } catch (e) { toast(e.message, true); }
   })();
+}
+
+// ---------- Player profile ("dossier") ----------
+
+function nameLink(name, uuid) {
+  return el('a', { href: '#', on: { click: (e) => { e.preventDefault(); S.tab = 'profile:' + uuid; render(); } } }, name);
+}
+
+function profile(view, uuid) {
+  const out = el('div');
+  view.append(el('p', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); S.tab = 'players'; render(); } } }, '\u2190 Players')), out);
+  const TYPE = { WARN: 'Warning', KICK: 'Kick', BAN: 'Ban', UNBAN: 'Unban', NOTE: 'Note' };
+  (async () => {
+    const p = await api('GET', '/api/profile?player=' + encodeURIComponent(uuid));
+    const note = el('input', { maxlength: 500, placeholder: 'Staff note (never shown to the player)' });
+    const unban = async () => {
+      if (!confirm('Unban ' + p.name + '?')) return;
+      try { toast((await api('POST', '/api/unban', { player: p.uuid })).message); render(); } catch (e) { toast(e.message, true); }
+    };
+    out.replaceChildren(
+      el('div', { class: 'card' },
+        el('div', { class: 'row' }, el('h2', {}, p.name),
+          el('span', { class: p.online ? 'good' : 'muted' }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline')),
+        el('table', {}, el('tbody', {},
+          el('tr', {}, el('th', {}, 'UUID'), el('td', { class: 'mono' }, p.uuid)),
+          el('tr', {}, el('th', {}, 'First seen'), el('td', {}, p.first ? fmtTime(p.first) : 'unknown')),
+          el('tr', {}, el('th', {}, 'Last seen'), el('td', {}, p.online ? 'now' : p.last ? fmtTime(p.last) : 'unknown')),
+          el('tr', {}, el('th', {}, 'Last world'), el('td', {}, p.world || '')),
+          el('tr', {}, el('th', {}, 'Record'), el('td', {}, p.warnings + ' warnings, ' + p.kicks + ' kicks, ' + p.bans + ' bans')))),
+        p.ban ? el('p', { class: 'secret bad' }, 'Banned ' + (p.ban.expires ? 'until ' + fmtTime(p.ban.expires) : 'permanently')
+          + ' by ' + p.ban.by + ': ' + (p.ban.reason || '')) : null,
+        can('MODERATOR') ? el('p', { class: 'row' },
+          el('button', { on: { click: () => modDialog('warn', p.uuid, p.name) } }, 'Warn'),
+          p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
+          p.ban ? el('button', { on: { click: unban } }, 'Unban')
+            : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null),
+      el('div', { class: 'card' }, el('h2', {}, 'History'),
+        can('MODERATOR') ? el('form', { class: 'row', on: { submit: async (e) => {
+          e.preventDefault();
+          try { await api('POST', '/api/note', { player: p.uuid, text: note.value }); toast('Note saved'); render(); } catch (err) { toast(err.message, true); }
+        } } }, note, el('button', { type: 'submit' }, 'Add note')) : null,
+        el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'When'), el('th', {}, 'What'), el('th', {}, 'By'), el('th', {}, 'Reason'))),
+          el('tbody', {}, p.history.length ? p.history.map((h) => el('tr', {}, el('td', {}, fmtTime(h.time)),
+            el('td', { class: h.type === 'BAN' || h.type === 'WARN' ? 'bad' : '' }, TYPE[h.type] + (h.detail ? ' (' + h.detail + ')' : '')),
+            el('td', {}, h.by), el('td', {}, h.reason)))
+            : el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Clean record.'))))));
+  })().catch((e) => out.replaceChildren(el('p', { class: 'bad' }, e.message)));
 }
 
 // ---------- Live console ----------

@@ -18,6 +18,7 @@ import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
+import com.hycon.game.PlayerRecords;
 import com.hycon.game.ServerPanel;
 import com.hycon.web.AuthRoutes;
 import com.hycon.web.GameRoutes;
@@ -43,6 +44,7 @@ public final class HyconPlugin extends JavaPlugin {
     private AdminStore admins;
     private AuditLog audit;
     private KnownPlayers known;
+    private PlayerRecords records;
     private LogTap logTap;
     private Sessions sessions;
     private WebServer web;
@@ -69,6 +71,7 @@ public final class HyconPlugin extends JavaPlugin {
         audit = new AuditLog(dir);
         known = new KnownPlayers(dir);
         known.load();
+        records = new PlayerRecords(dir);
         getCommandRegistry().registerCommand(new HyconCommand());
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
@@ -88,6 +91,7 @@ public final class HyconPlugin extends JavaPlugin {
         try {
             boolean created = admins.load();
             audit.open();
+            records.open();
             if (created) {
                 log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
                         address(), AdminStore.DEFAULT_NAME, AdminStore.DEFAULT_PASSWORD);
@@ -104,7 +108,7 @@ public final class HyconPlugin extends JavaPlugin {
         try {
             web = new WebServer(config, sessions, admins);
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
-            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known).register();
+            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records).register();
             web.start();
         } catch (IOException e) {
             ((HytaleLogger.Api) log.at(Level.SEVERE).withCause(e)).log("Hycon could not start the panel on %s:%d (see hycon.json)",
@@ -145,6 +149,9 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (audit != null) {
             audit.close();
+        }
+        if (records != null) {
+            records.close();
         }
     }
 
