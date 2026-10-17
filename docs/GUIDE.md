@@ -126,8 +126,8 @@ with the account and the address they came from. Failed or refused actions are m
 The full history is in `audit.log` ([section 7](#7-files-hycon-keeps)).
 
 ### Your account
-Top right: **Password** changes your own password (this logs out your other browsers),
-**Log out** ends the session. Sessions also end by themselves after 30 idle minutes
+Top right: **Log out** ends the session. To change a password, an OWNER uses **Reset password**
+in the Accounts tab; the person then logs in with the temporary password and chooses a new one. Sessions also end by themselves after 30 idle minutes
 or 12 hours, whichever comes first (both can be changed in `hycon.json`).
 
 ## 4. Staff accounts

@@ -111,7 +111,6 @@ function showPassword(forced) {
 function renderMe() {
   $('me').replaceChildren(
     el('span', { class: 'who' }, S.me.name), el('span', { class: 'lvl' }, S.me.level),
-    el('button', { on: { click: () => showPassword(false) } }, 'Password'),
     el('button', { on: { click: async () => { await api('POST', '/api/logout'); await boot(); } } }, 'Log out'));
 }
 
