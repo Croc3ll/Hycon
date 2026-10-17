@@ -138,8 +138,9 @@ public final class Moderation {
             // "Warning" and the reason goes into a red notification popup and chat instead.
             EventTitleUtil.showEventTitleToPlayer(p, Message.raw("Warning"), Message.raw(""),
                     EventTitleStyle.Major, null, 4.0F, 0.5F, 1.5F);
-            NotificationUtil.sendNotification(p.getPacketHandler(), Message.raw("Warning #" + warningNumber),
-                    Message.raw(text), null, null, NotificationStyle.Danger);
+            // All in the main line: the popup's second line didn't show in game.
+            NotificationUtil.sendNotification(p.getPacketHandler(), Message.raw("Warning #" + warningNumber + ": " + text),
+                    null, null, null, NotificationStyle.Danger);
             p.sendMessage(Message.raw("[Warning #" + warningNumber + "] " + text).color("#FF5555"));
         });
         return true;
