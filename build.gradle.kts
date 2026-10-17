@@ -47,3 +47,25 @@ tasks.named<Jar>("jar") {
     archiveBaseName.set(project.property("mod_name").toString())
     archiveVersion.set(project.property("version").toString())
 }
+
+// Copies the jar into a test server's mods folder after every build, so the next server start
+// uses it. Set the folder in your own ~/.gradle/gradle.properties (not in this repo), e.g.
+//     hyconTestMods=D:/Hytale_Plugins/HyPrison/HyPrisons/run/mods
+// Nothing happens when it isn't set.
+val deployToTestServer by tasks.registering {
+    val target = providers.gradleProperty("hyconTestMods")
+    val jarFile = tasks.named<Jar>("jar").flatMap { it.archiveFile }
+    onlyIf { target.isPresent && file(target.get()).isDirectory }
+    doLast {
+        val src = jarFile.get().asFile
+        val dest = file(target.get()).resolve(src.name)
+        try {
+            src.copyTo(dest, overwrite = true)
+            logger.lifecycle("Hycon copied to $dest")
+        } catch (e: Exception) {
+            // Windows locks the jar while that server runs; a failed copy must not fail the build.
+            logger.warn("Could not copy Hycon to $dest (is that server running? stop it and build again): ${e.message}")
+        }
+    }
+}
+tasks.named("build") { finalizedBy(deployToTestServer) }

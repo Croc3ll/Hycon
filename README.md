@@ -74,3 +74,7 @@ Hycon is installed. See `docs/PRISONCORE-HOOK.md` for a full example plan.
 ## Develop
 
 `test-server.bat` (or `gradlew runServer`) builds the plugin and starts a local server in `run/`.
+
+To test inside another server too, add `hyconTestMods=<that server>/mods` to your own
+`~/.gradle/gradle.properties`; every `gradlew build` then copies the jar there (stop that server first,
+Windows locks the jar while it runs).
