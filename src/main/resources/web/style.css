@@ -130,3 +130,12 @@ a.who { display: inline-flex; align-items: center; gap: 8px; }
   border-radius: 3px; color: var(--gold); border: 1px solid var(--gold-dim); background: var(--gold-bg); }
 .badge.red { color: #ffb3ae; border-color: rgba(229, 83, 75, .5); background: var(--danger-bg); }
 .code { word-break: break-all; background: #0a0b0d; border: 1px solid var(--line); padding: 8px 10px; border-radius: 4px; margin: 8px 0; }
+.pill { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; border: 1px solid; }
+.pill.good { color: var(--ok); border-color: rgba(79, 191, 122, .5); background: rgba(79, 191, 122, .1); }
+.pill.warn { color: var(--gold); border-color: var(--gold-dim); background: var(--gold-bg); }
+.chips-stat { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.chip-stat { border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; min-width: 76px; background: #121418; }
+.chip-stat .v { font: 700 20px/1.1 var(--mono); }
+.chip-stat .v span { font-size: 11px; color: var(--muted); margin-left: 2px; }
+.chip-stat .l { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+.chip-stat.warn .v { color: var(--gold2); }

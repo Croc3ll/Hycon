@@ -10,11 +10,13 @@ import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
+import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
 import com.hycon.sync.SharingStore;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -32,9 +34,11 @@ public final class GameRoutes {
     private final KnownPlayers known;
     private final PlayerRecords records;
     private final SharingStore sharing;
+    private final PingLog pings;
 
     public GameRoutes(WebServer web, Moderation moderation, ConsoleRunner console, LogTap log, AuditLog audit,
-                      AdminStore admins, KnownPlayers known, PlayerRecords records, SharingStore sharing) {
+                      AdminStore admins, KnownPlayers known, PlayerRecords records, SharingStore sharing, PingLog pings) {
+        this.pings = pings;
         this.records = records;
         this.sharing = sharing;
         this.web = web;
@@ -56,6 +60,7 @@ public final class GameRoutes {
         web.post("/api/warn", Level.MODERATOR, this::warn);
         web.post("/api/note", Level.MODERATOR, this::note);
         web.get("/api/profile", Level.VIEWER, this::profile);
+        web.get("/api/ping", Level.VIEWER, this::ping);
         web.get("/api/log", Level.MODERATOR, this::log);
         web.post("/api/command", Level.ADMIN, this::command);
         web.get("/api/audit", Level.ADMIN, this::audit);
@@ -258,6 +263,62 @@ public final class GameRoutes {
                     .field("reason", e.reason()).field("detail", e.detail()).endObject();
         }
         r.ok(j.endArray().endObject());
+    }
+
+    /**
+     * A player's ping over the last days: the samples for the chart plus the summary numbers.
+     * A spike is a short burst: at least 250 ms with both neighbouring minutes under 150 ms.
+     * "Steady" means 95% of minutes under 150 ms and jitter (average change minute to minute)
+     * under 30 ms.
+     */
+    private void ping(Req r) throws IOException {
+        Moderation.Target t = moderation.resolve(r.query("player"));
+        if (t == null) {
+            r.error(404, "Unknown player");
+            return;
+        }
+        long since = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(PingLog.KEEP_DAYS);
+        List<PingLog.Sample> list = pings.read(t.uuid(), since);
+        Json j = new Json().beginObject().field("days", PingLog.KEEP_DAYS).field("samples", list.size());
+        if (!list.isEmpty()) {
+            int n = list.size();
+            int[] sorted = new int[n];
+            long sum = 0, jitterSum = 0;
+            int over150 = 0, over250 = 0, spikes = 0, worstAt = 0, jitterN = 0;
+            for (int i = 0; i < n; i++) {
+                int ms = list.get(i).ms();
+                sorted[i] = ms;
+                sum += ms;
+                over150 += ms >= 150 ? 1 : 0;
+                over250 += ms >= 250 ? 1 : 0;
+                if (ms > list.get(worstAt).ms()) {
+                    worstAt = i;
+                }
+                // Jitter only between minutes of the same session (no gap over 3 minutes).
+                if (i > 0 && list.get(i).time() - list.get(i - 1).time() < 180_000) {
+                    jitterSum += Math.abs(ms - list.get(i - 1).ms());
+                    jitterN++;
+                }
+                boolean calmBefore = i == 0 || list.get(i - 1).ms() < 150;
+                boolean calmAfter = i == n - 1 || list.get(i + 1).ms() < 150;
+                if (ms >= 250 && calmBefore && calmAfter) {
+                    spikes++;
+                }
+            }
+            java.util.Arrays.sort(sorted);
+            int p95 = sorted[Math.min(n - 1, (int) Math.ceil(n * 0.95) - 1)];
+            double jitter = jitterN == 0 ? 0 : jitterSum / (double) jitterN;
+            j.field("median", sorted[n / 2]).field("average", Math.round(sum / (double) n)).field("p95", p95)
+                    .field("worst", sorted[n - 1]).field("worstAt", list.get(worstAt).time()).field("best", sorted[0])
+                    .field("jitter", Math.round(jitter)).field("over150", Math.round(over150 * 100.0 / n))
+                    .field("over250", Math.round(over250 * 100.0 / n)).field("spikes", spikes)
+                    .field("steady", p95 < 150 && jitter < 30).name("points").beginArray();
+            for (PingLog.Sample s : list) {
+                j.beginArray().value(s.time()).value(s.ms()).endArray();
+            }
+            j.endArray();
+        }
+        r.ok(j.endObject());
     }
 
     private void log(Req r) throws IOException {

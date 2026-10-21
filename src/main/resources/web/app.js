@@ -324,6 +324,7 @@ function profile(view, uuid) {
           p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
           p.ban ? el('button', { on: { click: unban } }, 'Unban')
             : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null),
+      pingCard(p.uuid),
       el('div', { class: 'card' }, el('h2', {}, 'History'),
         can('MODERATOR') ? el('form', { class: 'row', on: { submit: async (e) => {
           e.preventDefault();
@@ -335,6 +336,47 @@ function profile(view, uuid) {
             el('td', {}, h.by), el('td', {}, h.reason)))
             : el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Clean record.'))))));
   })().catch((e) => out.replaceChildren(el('p', { class: 'bad' }, e.message)));
+}
+
+// ---------- Ping (profile) ----------
+
+// Server-measured ping for one player: summary chips, a STEADY/UNSTABLE badge, the chart with
+// red bands on spikes, and a plain-language summary. Filled in once the numbers arrive.
+function pingCard(uuid) {
+  const body = el('div', {}, el('p', { class: 'muted' }, 'Loading ping…'));
+  const badge = el('span');
+  const card = el('div', { class: 'card' }, el('div', { class: 'spread' },
+    el('h2', {}, 'Ping', el('span', { class: 'sub' }, '  server-measured, every minute while online')), badge), body);
+  (async () => {
+    const d = await api('GET', '/api/ping?player=' + encodeURIComponent(uuid));
+    if (!d.samples) {
+      body.replaceChildren(el('p', { class: 'muted' }, 'No ping recorded yet. Hycon measures it every minute while the player is online.'));
+      return;
+    }
+    badge.className = d.steady ? 'pill good' : 'pill warn';
+    badge.textContent = d.steady ? 'Steady' : 'Unstable';
+    const chip = (v, unit, label, warn) => el('div', { class: 'chip-stat' + (warn ? ' warn' : '') },
+      el('div', { class: 'v' }, String(v), unit ? el('span', {}, unit) : null), el('div', { class: 'l' }, label));
+    const spikes = [];
+    for (let i = 0; i < d.points.length; i++) {
+      const [t, ms] = d.points[i];
+      const calm = (k) => k < 0 || k >= d.points.length || d.points[k][1] < 150;
+      if (ms >= 250 && calm(i - 1) && calm(i + 1)) spikes.push([t - 30000, t + 30000]);
+    }
+    const series = { title: 'Ping', unit: 'ms', area: true, lines: ['Ping'], gaps: spikes, points: d.points.map(([t, ms]) => [0, t, ms]) };
+    body.replaceChildren(
+      el('div', { class: 'chips-stat' },
+        chip(d.median, 'ms', 'Median'), chip(d.average, 'ms', 'Average'), chip(d.p95, 'ms', '95% under', d.p95 >= 150),
+        chip(d.worst, 'ms', 'Worst', d.worst >= 250), chip(d.best, 'ms', 'Best'), chip(d.jitter, 'ms', 'Jitter', d.jitter >= 30),
+        chip(d.over150, '%', '≥ 150 ms', d.over150 > 5), chip(d.over250, '%', '≥ 250 ms', d.over250 > 1),
+        chip(d.spikes, '', 'Spikes', d.spikes > 0), chip(d.samples, '', 'Samples')),
+      el('p', { class: 'muted' }, 'Last ' + d.days + ' days. Each point is a one-minute average; red bands are spikes (a short lag burst of 250 ms or more).'),
+      chart(series),
+      el('p', { class: 'muted' }, el('b', { class: d.spikes ? 'bad' : '' }, d.spikes + (d.spikes === 1 ? ' spike' : ' spikes')),
+        ' over 250 ms · worst ', el('b', {}, d.worst + ' ms'), ' at ' + fmtTime(d.worstAt) + '. A spike is a brief lag burst; '
+        + 'steady means 95% of minutes under 150 ms and little jitter.'));
+  })().catch((e) => body.replaceChildren(el('p', { class: 'bad' }, e.message)));
+  return card;
 }
 
 // ---------- Live console ----------

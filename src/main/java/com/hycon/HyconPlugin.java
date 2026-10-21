@@ -18,6 +18,7 @@ import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
+import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
 import com.hycon.analytics.AnalyticsPanel;
 import com.hycon.analytics.Samples;
@@ -55,6 +56,8 @@ public final class HyconPlugin extends JavaPlugin {
     private BanSync banSync;
     private ShareServer shareServer;
     private ScheduledFuture<?> sampler;
+    private PingLog pingLog;
+    private ScheduledFuture<?> pingSampler;
     private LogTap logTap;
     private Sessions sessions;
     private WebServer web;
@@ -83,6 +86,7 @@ public final class HyconPlugin extends JavaPlugin {
         known.load();
         records = new PlayerRecords(dir);
         samples = new Samples(dir);
+        pingLog = new PingLog(dir);
         sharing = new SharingStore(dir);
         getCommandRegistry().registerCommand(new HyconCommand());
         // Joins and leaves keep the player directory's "last seen" current.
@@ -122,7 +126,7 @@ public final class HyconPlugin extends JavaPlugin {
         try {
             web = new WebServer(config, sessions, admins);
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
-            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing).register();
+            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing, pingLog).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
@@ -144,6 +148,7 @@ public final class HyconPlugin extends JavaPlugin {
             Runtime rt = Runtime.getRuntime();
             samples.add(Universe.get().getPlayers().size(), (int) ((rt.totalMemory() - rt.freeMemory()) >> 20));
         }, 0, Samples.INTERVAL_MS, TimeUnit.MILLISECONDS);
+        pingSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(pingLog::sample, 1, 1, TimeUnit.MINUTES);
         // Players saved before Hycon was installed, so they can be searched too.
         Path playersDir = Universe.get().getPath().resolve("players");
         Thread.ofVirtual().name("Hycon-PlayerImport").start(() -> known.importSaved(playersDir));
@@ -169,6 +174,9 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (sampler != null) {
             sampler.cancel(false);
+        }
+        if (pingSampler != null) {
+            pingSampler.cancel(false);
         }
         if (samples != null) {
             samples.close();
