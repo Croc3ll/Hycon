@@ -363,7 +363,15 @@ function pingCard(uuid) {
       const calm = (k) => k < 0 || k >= d.points.length || d.points[k][1] < 150;
       if (ms >= 250 && calm(i - 1) && calm(i + 1)) spikes.push([t - 30000, t + 30000]);
     }
-    const series = { title: 'Ping', unit: 'ms', area: true, lines: ['Ping'], gaps: spikes, points: d.points.map(([t, ms]) => [0, t, ms]) };
+    const near = (t) => { let best = d.points[0]; for (const pt of d.points) if (Math.abs(pt[0] - t) < Math.abs(best[0] - t)) best = pt; return best[1]; };
+    const byTime = new Map(d.kills.map((k) => [k.time, k]));
+    const series = { title: 'Ping', unit: 'ms', area: true, lines: ['Ping'], gaps: spikes, points: d.points.map(([t, ms]) => [0, t, ms]),
+      marks: d.kills.map((k) => [k.time, k.kill && k.ping >= 0 ? k.ping : near(k.time), k.kill ? (k.ping >= 150 ? 'killhigh' : 'kill') : 'death']),
+      markText: (t) => { const k = byTime.get(t); return (k.kill ? 'Killed ' : 'Killed by ') + k.other + (k.kill && k.ping >= 0 ? ' at ' + k.ping + ' ms' : ''); } };
+    const verdict = d.killCount === 0 ? null
+      : el('div', { class: 'verdict ' + (d.lagSuspect ? 'warn' : 'ok') }, d.lagSuspect
+        ? d.highPingKills + ' of ' + d.killCount + ' kills came during high ping (over 150 ms), ' + d.spikeKills + ' on a spike. Worth an eye.'
+        : 'Only ' + d.highPingKills + ' of ' + d.killCount + ' kills came during high ping - no sign of kills riding the lag.');
     body.replaceChildren(
       el('div', { class: 'chips-stat' },
         chip(d.median, 'ms', 'Median'), chip(d.average, 'ms', 'Average'), chip(d.p95, 'ms', '95% under', d.p95 >= 150),
@@ -372,6 +380,9 @@ function pingCard(uuid) {
         chip(d.spikes, '', 'Spikes', d.spikes > 0), chip(d.samples, '', 'Samples')),
       el('p', { class: 'muted' }, 'Last ' + d.days + ' days. Each point is a one-minute average; red bands are spikes (a short lag burst of 250 ms or more).'),
       chart(series),
+      el('div', { class: 'legend-row' }, el('span', {}, el('i', { class: 'lg kill' }), 'Kill'), el('span', {}, el('i', { class: 'lg killhigh' }), 'Kill at high ping'),
+        el('span', {}, el('i', { class: 'lg death' }), 'Death'), el('span', {}, el('i', { class: 'lg spike' }), 'Ping spike')),
+      verdict,
       el('p', { class: 'muted' }, el('b', { class: d.spikes ? 'bad' : '' }, d.spikes + (d.spikes === 1 ? ' spike' : ' spikes')),
         ' over 250 ms · worst ', el('b', {}, d.worst + ' ms'), ' at ' + fmtTime(d.worstAt) + '. A spike is a brief lag burst; '
         + 'steady means 95% of minutes under 150 ms and little jitter.'));
@@ -674,6 +685,11 @@ function chart(s) {
       mk('polygon', { points: x(pts[0][0]).toFixed(1) + ',' + y(0) + ' ' + path + ' ' + x(pts[pts.length - 1][0]).toFixed(1) + ',' + y(0), fill: `url(#${gid})` });
     }
     mk('polyline', { points: path, fill: 'none', stroke: color, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' });
+  }
+  for (const [t, v, kind] of s.marks || []) {
+    if (t < t0 || t > t1) continue;
+    const dot = mk('circle', { cx: x(t), cy: y(Math.max(0, v)), r: 5, class: 'mark ' + kind });
+    dot.addEventListener('mousemove', (e) => { e.stopPropagation(); tip(e, fmtTime(t) + '\n' + (s.markText ? s.markText(t, kind) : kind)); });
   }
   // Hover: a dashed line and the values at that time.
   const rows = seriesRows(s);

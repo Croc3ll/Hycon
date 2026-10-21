@@ -86,6 +86,12 @@ and spikes (a short burst of 250 ms or more, marked in red on the chart). **Stea
 minutes under 150 ms with little jitter; **Unstable** otherwise. Useful when someone blames lag,
 or when deciding whether odd behaviour could be connection trouble.
 
+Player-versus-player **kills** show on the ping chart as dots at the killer's ping at that second
+(red when 150 ms or more), and deaths as hollow circles; hover a dot for who and when. Below the
+chart a verdict says how many of the player's kills came at high ping. With at least 5 kills and
+more than half at high ping it says **Worth an eye**: a pattern seen with "lag switching" (lagging
+on purpose so others can't hit back). It's a pointer for a human look, not proof.
+
 The **UUID** is Hytale's permanent ID for an account. It never changes, even if the player changes
 their name, so bans are always stored by UUID.
 
@@ -289,6 +295,7 @@ All in Hycon's data folder:
 | `moderation.log`  | Every player's history: warnings, kicks, bans, unbans and staff notes, one JSON line each.     |
 | `samples.log`     | Players online and memory every 30 s, kept 31 days, for the Analytics charts.                    |
 | `sharing.json`    | Your share codes, followed servers and local exceptions. Holds secrets: keep it private.        |
+| `kills.log`       | Player-versus-player kills with the killer's ping, kept 14 days.                              |
 | `ping/`           | One small file per player with their ping every minute, kept 14 days.                          |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |

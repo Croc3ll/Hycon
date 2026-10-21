@@ -139,3 +139,14 @@ a.who { display: inline-flex; align-items: center; gap: 8px; }
 .chip-stat .v span { font-size: 11px; color: var(--muted); margin-left: 2px; }
 .chip-stat .l { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
 .chip-stat.warn .v { color: var(--gold2); }
+svg.chart .mark { stroke-width: 2; vector-effect: non-scaling-stroke; cursor: default; }
+svg.chart .mark.kill { fill: var(--gold); stroke: #0d0e11; }
+svg.chart .mark.killhigh { fill: var(--danger); stroke: #0d0e11; }
+svg.chart .mark.death { fill: #0d0e11; stroke: var(--muted); }
+.legend-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin: 8px 0; }
+.legend-row .lg { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.lg.kill { background: var(--gold); } .lg.killhigh { background: var(--danger); } .lg.death { border: 2px solid var(--muted); width: 7px; height: 7px; }
+.lg.spike { width: 3px; border-radius: 0; height: 11px; background: var(--danger); }
+.verdict { border: 1px solid; border-left-width: 4px; border-radius: 4px; padding: 9px 12px; margin: 8px 0; }
+.verdict.ok { border-color: rgba(79, 191, 122, .45); background: rgba(79, 191, 122, .06); }
+.verdict.warn { border-color: var(--gold-dim); background: var(--gold-bg); color: var(--gold2); }

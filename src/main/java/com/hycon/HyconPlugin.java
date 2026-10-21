@@ -18,6 +18,7 @@ import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
+import com.hycon.game.KillLog;
 import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
 import com.hycon.analytics.AnalyticsPanel;
@@ -57,6 +58,7 @@ public final class HyconPlugin extends JavaPlugin {
     private ShareServer shareServer;
     private ScheduledFuture<?> sampler;
     private PingLog pingLog;
+    private KillLog killLog;
     private ScheduledFuture<?> pingSampler;
     private LogTap logTap;
     private Sessions sessions;
@@ -87,6 +89,8 @@ public final class HyconPlugin extends JavaPlugin {
         records = new PlayerRecords(dir);
         samples = new Samples(dir);
         pingLog = new PingLog(dir);
+        killLog = new KillLog(dir);
+        getEntityStoreRegistry().registerSystem(killLog.new Tracker());
         sharing = new SharingStore(dir);
         getCommandRegistry().registerCommand(new HyconCommand());
         // Joins and leaves keep the player directory's "last seen" current.
@@ -110,6 +114,7 @@ public final class HyconPlugin extends JavaPlugin {
             records.open();
             samples.open();
             sharing.load();
+            killLog.open();
             if (created) {
                 log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
                         address(), AdminStore.DEFAULT_NAME, AdminStore.DEFAULT_PASSWORD);
@@ -126,7 +131,7 @@ public final class HyconPlugin extends JavaPlugin {
         try {
             web = new WebServer(config, sessions, admins);
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
-            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing, pingLog).register();
+            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
@@ -200,6 +205,9 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (records != null) {
             records.close();
+        }
+        if (killLog != null) {
+            killLog.close();
         }
     }
 

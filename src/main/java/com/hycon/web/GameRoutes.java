@@ -10,6 +10,7 @@ import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
+import com.hycon.game.KillLog;
 import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
 import com.hycon.sync.SharingStore;
@@ -35,10 +36,13 @@ public final class GameRoutes {
     private final PlayerRecords records;
     private final SharingStore sharing;
     private final PingLog pings;
+    private final KillLog kills;
 
     public GameRoutes(WebServer web, Moderation moderation, ConsoleRunner console, LogTap log, AuditLog audit,
-                      AdminStore admins, KnownPlayers known, PlayerRecords records, SharingStore sharing, PingLog pings) {
+                      AdminStore admins, KnownPlayers known, PlayerRecords records, SharingStore sharing, PingLog pings,
+                      KillLog kills) {
         this.pings = pings;
+        this.kills = kills;
         this.records = records;
         this.sharing = sharing;
         this.web = web;
@@ -280,6 +284,24 @@ public final class GameRoutes {
         long since = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(PingLog.KEEP_DAYS);
         List<PingLog.Sample> list = pings.read(t.uuid(), since);
         Json j = new Json().beginObject().field("days", PingLog.KEEP_DAYS).field("samples", list.size());
+        // Kills (with the killer's ping at that second) and deaths, for the dots and the lag verdict.
+        int killCount = 0, highPingKills = 0, spikeKills = 0;
+        j.name("kills").beginArray();
+        for (KillLog.Kill k : kills.involving(t.uuid(), since)) {
+            boolean mine = k.killer().equals(t.uuid());
+            UUID other = mine ? k.victim() : k.killer();
+            String otherName = known.name(other);
+            j.beginObject().field("time", k.time()).field("kill", mine).field("ping", k.ping())
+                    .field("other", otherName == null ? other.toString() : otherName).endObject();
+            if (mine) {
+                killCount++;
+                highPingKills += k.ping() >= 150 ? 1 : 0;
+                spikeKills += k.ping() >= 250 ? 1 : 0;
+            }
+        }
+        j.endArray().field("killCount", killCount).field("highPingKills", highPingKills).field("spikeKills", spikeKills)
+                // Worth a look: at least 5 kills and over half of them at high ping.
+                .field("lagSuspect", killCount >= 5 && highPingKills * 2 > killCount);
         if (!list.isEmpty()) {
             int n = list.size();
             int[] sorted = new int[n];
