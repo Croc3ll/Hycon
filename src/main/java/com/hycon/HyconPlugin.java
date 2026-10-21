@@ -19,6 +19,10 @@ import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
 import com.hycon.game.KillLog;
+import com.hycon.game.Reports;
+import com.hycon.game.Ties;
+import com.hycon.commands.ReportCommand;
+import com.hycon.web.IntelRoutes;
 import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
 import com.hycon.analytics.AnalyticsPanel;
@@ -59,6 +63,8 @@ public final class HyconPlugin extends JavaPlugin {
     private ScheduledFuture<?> sampler;
     private PingLog pingLog;
     private KillLog killLog;
+    private Reports reports;
+    private Ties ties;
     private ScheduledFuture<?> pingSampler;
     private LogTap logTap;
     private Sessions sessions;
@@ -93,9 +99,13 @@ public final class HyconPlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(killLog.new Tracker());
         sharing = new SharingStore(dir);
         getCommandRegistry().registerCommand(new HyconCommand());
+        reports = new Reports(dir);
+        ties = new Ties(dir);
+        getCommandRegistry().registerCommand(new ReportCommand(reports, known));
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
             known.joined(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
+            ties.joined(e.getPlayerRef().getUuid(), address(e.getPlayerRef()));
             return e;
         }));
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.left(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername()));
@@ -115,6 +125,8 @@ public final class HyconPlugin extends JavaPlugin {
             samples.open();
             sharing.load();
             killLog.open();
+            reports.load();
+            ties.load();
             if (created) {
                 log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
                         address(), AdminStore.DEFAULT_NAME, AdminStore.DEFAULT_PASSWORD);
@@ -132,6 +144,7 @@ public final class HyconPlugin extends JavaPlugin {
             web = new WebServer(config, sessions, admins);
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
             new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
+            new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
@@ -160,6 +173,7 @@ public final class HyconPlugin extends JavaPlugin {
         housekeeping = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             sessions.sweep();
             known.saveIfChanged();
+            ties.saveIfChanged();
         }, 1, 1, TimeUnit.MINUTES);
 
         log.at(Level.INFO).log("Hycon panel: %s", address());
@@ -196,6 +210,9 @@ public final class HyconPlugin extends JavaPlugin {
             logTap.uninstall();
         }
         HyconApi.clear();
+        if (ties != null) {
+            ties.saveIfChanged();
+        }
         if (known != null) {
             known.leaveAll();
             known.saveIfChanged();
@@ -209,6 +226,18 @@ public final class HyconPlugin extends JavaPlugin {
         if (killLog != null) {
             killLog.close();
         }
+    }
+
+    /** The player's IP address, or null (only ever hashed, see Ties). */
+    private static java.net.InetAddress address(com.hypixel.hytale.server.core.universe.PlayerRef p) {
+        try {
+            if (p.getPacketHandler().getChannel().remoteAddress() instanceof java.net.InetSocketAddress a) {
+                return a.getAddress();
+            }
+        } catch (RuntimeException ignored) {
+            // no connection details; the co-join tie still counts
+        }
+        return null;
     }
 
     public String status() {

@@ -150,3 +150,45 @@ svg.chart .mark.death { fill: #0d0e11; stroke: var(--muted); }
 .verdict { border: 1px solid; border-left-width: 4px; border-radius: 4px; padding: 9px 12px; margin: 8px 0; }
 .verdict.ok { border-color: rgba(79, 191, 122, .45); background: rgba(79, 191, 122, .06); }
 .verdict.warn { border-color: var(--gold-dim); background: var(--gold-bg); color: var(--gold2); }
+
+/* ---------- Connection map ---------- */
+.map-wrap { position: relative; border: 1px solid var(--line); border-radius: 6px; background:
+  linear-gradient(var(--line2) 1px, transparent 1px) 0 0 / 40px 40px, linear-gradient(90deg, var(--line2) 1px, transparent 1px) 0 0 / 40px 40px, #0b0c0f; }
+svg.map { width: 100%; height: 620px; display: block; cursor: grab; }
+svg.map:active { cursor: grabbing; }
+.map-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
+.map-tools button { padding: 4px 9px; font-size: 11px; background: rgba(22, 24, 29, .9); }
+.map-stats, .map-hint { position: absolute; bottom: 10px; font: 10px var(--mono); color: var(--dim); border: 1px solid var(--line);
+  border-radius: 4px; padding: 3px 8px; background: rgba(11, 12, 15, .85); letter-spacing: .6px; text-transform: uppercase; }
+.map-stats { left: 10px; } .map-hint { right: 10px; }
+.map-side { position: absolute; top: 10px; right: 10px; width: 270px; max-height: calc(100% - 60px); overflow: auto;
+  background: rgba(22, 24, 29, .96); border: 1px solid var(--gold-dim); border-radius: 6px; padding: 12px; }
+.map-ties { margin-top: 6px; }
+.map-tie { padding: 5px 4px; border-bottom: 1px solid var(--line2); cursor: pointer; font-size: 13px; }
+.map-tie:hover { color: var(--gold2); }
+.map-tie .lg { margin-right: 8px; }
+svg.map .node text { fill: #c9cdd5; font: 11px var(--mono); pointer-events: none; paint-order: stroke; stroke: #0b0c0f; stroke-width: 3px; }
+svg.map .node { cursor: pointer; }
+svg.map .node .dot { fill: #9aa0a8; }
+svg.map .node .ring { fill: none; stroke: none; stroke-width: 2.5; }
+svg.map .node.center .dot { fill: var(--gold); }
+svg.map .node.center text { fill: #fff; font-weight: 700; }
+svg.map .node.online .dot { fill: #b9e6c9; }
+svg.map .node.reported .ring { stroke: #e8a23a; }
+svg.map .node.banned .ring { stroke: var(--danger); }
+svg.map .node.shared .ring { stroke: var(--danger); } svg.map .node.shared .dot { fill: var(--danger); }
+svg.map .node.focus .ring { stroke: var(--gold2); stroke-width: 3.5; }
+svg.map .tie { stroke-opacity: .65; cursor: pointer; }
+svg.map .tie.lit { stroke-opacity: 1; filter: drop-shadow(0 0 3px rgba(243, 210, 124, .6)); }
+svg.map .tie-same { stroke: #b07cf0; }
+svg.map .tie-cojoin { stroke: #8b909b; stroke-dasharray: 5 4; }
+svg.map .tie-report { stroke: #e8a23a; }
+svg.map .tie-kill { stroke: #c85a5a; }
+.lg.node-center { background: var(--gold); } .lg.node-player { background: #9aa0a8; } .lg.node-online { background: #b9e6c9; }
+.lg.node-banned { border: 2px solid var(--danger); width: 7px; height: 7px; } .lg.node-shared { background: var(--danger); }
+.lg.node-reported { border: 2px solid #e8a23a; width: 7px; height: 7px; }
+.lg.tie-same, .lg.tie-cojoin, .lg.tie-report, .lg.tie-kill { width: 16px; height: 2px; border-radius: 0; vertical-align: 3px; }
+.lg.tie-same { background: #b07cf0; } .lg.tie-report { background: #e8a23a; } .lg.tie-kill { background: #c85a5a; }
+.lg.tie-cojoin { background: repeating-linear-gradient(90deg, #8b909b 0 5px, transparent 5px 9px); }
+.warnc { color: #e8a23a; }
+.badge.dim { color: var(--muted); border-color: var(--line); background: transparent; }

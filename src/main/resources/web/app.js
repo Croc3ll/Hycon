@@ -52,6 +52,7 @@ async function boot() {
   if (!S.me) return showLogin();
   if (S.me.mustChange) return showPassword(true);
   try { S.panels = (await api('GET', '/api/panels')).panels; } catch (e) { S.panels = []; }
+  if (can('MODERATOR')) { try { S.openReports = (await api('GET', '/api/reports?status=open')).open; } catch (e) { S.openReports = 0; } }
   render();
 }
 
@@ -117,7 +118,8 @@ function renderMe() {
 function tabs() {
   const list = [['players', 'Players', 'VIEWER']];
   for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
-  list.push(['bans', 'Bans', 'VIEWER'], ['console', 'Console', 'MODERATOR']);
+  list.push(['bans', 'Bans', 'VIEWER'], ['reports', S.openReports ? 'Reports (' + S.openReports + ')' : 'Reports', 'MODERATOR'],
+    ['console', 'Console', 'MODERATOR']);
   list.push(['audit', 'Audit log', 'ADMIN'], ['sharing', 'Ban sharing', 'OWNER'], ['accounts', 'Accounts', 'OWNER']);
   return list.filter((t) => can(t[2]));
 }
@@ -138,6 +140,7 @@ function render() {
   else if (tab === 'audit') audit(view);
   else if (tab === 'accounts') accounts(view);
   else if (tab === 'sharing') sharing(view);
+  else if (tab === 'reports') reportsView(view);
   else if (tab.startsWith('panel:')) dashboard(view, tab.slice(6));
   else if (tab.startsWith('profile:')) profile(view, tab.slice(8));
 }
@@ -325,6 +328,7 @@ function profile(view, uuid) {
           p.ban ? el('button', { on: { click: unban } }, 'Unban')
             : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null),
       pingCard(p.uuid),
+      can('MODERATOR') ? connectionMap(p.uuid) : null,
       el('div', { class: 'card' }, el('h2', {}, 'History'),
         can('MODERATOR') ? el('form', { class: 'row', on: { submit: async (e) => {
           e.preventDefault();
@@ -479,6 +483,46 @@ function accounts(view) {
         } } }, 'Remove')))));
   }
   load().catch((e) => toast(e.message, true));
+}
+
+// ---------- Reports ----------
+
+function reportsView(view) {
+  let status = 'open';
+  const body = el('tbody');
+  const seg = el('div', { class: 'seg' });
+  const drawSeg = () => seg.replaceChildren(...[['open', 'Open'], ['handled', 'Handled'], ['dismissed', 'Dismissed'], ['all', 'All']]
+    .map(([k, t]) => el('button', { class: k === status ? 'on' : '', on: { click: () => { status = k; drawSeg(); load(); } } }, t)));
+  drawSeg();
+  view.append(el('div', { class: 'card' }, el('div', { class: 'spread' },
+    el('div', {}, el('h2', {}, 'Reports'), el('span', { class: 'muted' }, 'Players report with /report <player> <reason>. Staff with hycon.reports.notify see new ones in chat.')), seg),
+    el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'When'), el('th', {}, 'Reported'), el('th', {}, 'By'),
+      el('th', {}, 'Reason'), el('th', {}, 'Status'), el('th', {}))), body))));
+  async function close(r, st) {
+    const note = st === 'handled' ? prompt('What was done? (optional, saved in their history)', '') : '';
+    if (note === null) return;
+    try { toast((await api('POST', '/api/reports/close', { id: r.id, status: st, note })).message); S.openReports = Math.max(0, (S.openReports || 1) - 1); render(); }
+    catch (e) { toast(e.message, true); }
+  }
+  async function load() {
+    try {
+      const d = await api('GET', '/api/reports?status=' + status);
+      S.openReports = d.open;
+      body.replaceChildren(...d.reports.map((r) => el('tr', {},
+        el('td', {}, fmtTime(r.time)),
+        el('td', {}, nameLink(r.targetName, r.target), r.againstTotal > 1 ? el('span', { class: 'badge red', title: 'reports against this player' }, ' ' + r.againstTotal + '×') : null),
+        el('td', {}, nameLink(r.reporterName, r.reporter)),
+        el('td', {}, r.reason),
+        el('td', {}, el('span', { class: r.status === 'OPEN' ? 'badge' : 'badge dim' }, r.status.toLowerCase()), r.closedBy ? el('div', { class: 'muted' }, r.closedBy + (r.note ? ': ' + r.note : '')) : null),
+        el('td', { class: 'actions' }, r.status === 'OPEN' ? [
+          el('button', { on: { click: () => modDialog('warn', r.target, r.targetName) } }, 'Warn'),
+          el('button', { class: 'danger', on: { click: () => modDialog('ban', r.target, r.targetName) } }, 'Ban'),
+          el('button', { on: { click: () => close(r, 'handled') } }, 'Handled'),
+          el('button', { on: { click: () => close(r, 'dismissed') } }, 'Dismiss')] : null))));
+      if (!d.reports.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'muted' }, status === 'open' ? 'No open reports.' : 'Nothing here.')));
+    } catch (e) { toast(e.message, true); }
+  }
+  load();
 }
 
 // ---------- Ban sharing ----------

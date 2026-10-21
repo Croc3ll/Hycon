@@ -107,6 +107,33 @@ Hycon uses the server's own ban list (`bans.json`), so bans made with `/ban` in 
 and the other way round. Temporary bans end on their own. Bans from the panel show
 `Hycon:<account>` as "by".
 
+### Reports (MODERATOR and up)
+Players report others in game with **`/report <player> <reason>`** (one report a minute, one open
+report per player they report). The **Reports** tab lists them, with the open count in the tab
+name: **Warn** or **Ban** straight from a report, mark it **Handled** (with an optional note, which is
+also saved in the player's history) or **Dismiss** it. Staff with the permission
+`hycon.reports.notify` get a chat line in game for every new report.
+
+### Connection map (on profiles, MODERATOR and up)
+A web of everyone tied to the player, and everyone tied to them ("further out"), with a summary
+like "18 direct, 10 further out · among them 3 banned, 5 reported". Ties:
+
+| Tie | Meaning |
+|---|---|
+| **Same connection** (purple) | Joined from the same IP address: alt accounts or one household. |
+| **Joins together** (dashed) | Joined within 2 minutes of each other at least 3 times: they play together. |
+| **Reported** (orange) | One reported the other with `/report`. |
+| **Killed** (red) | Player-versus-player kills in the last 14 days. |
+
+Rings: red = banned (filled red = a ban shared from another server), orange = reported; online
+players are lighter. Click a player to see their ties in a side panel, click a tie to walk across,
+**Expand** to pull in that player's own web, **Open profile** to jump there. Drag players to pin them,
+drag the background to pan, click the map then scroll to zoom; **Settle**, **Fit** and **Unpin** tidy up.
+
+IP addresses are never stored: Hycon keeps only a keyed hash (HMAC with a secret made for your server)
+in `ties.json`, enough to tell "same address" and nothing more. Ties start building from when this
+version is installed.
+
 ### Console
 The live server log, updated every 1.5 seconds. Warnings are yellow, errors red, panel commands blue.
 Scroll up to read back; it keeps scrolling with new lines while you're at the bottom.
@@ -297,6 +324,8 @@ All in Hycon's data folder:
 | `sharing.json`    | Your share codes, followed servers and local exceptions. Holds secrets: keep it private.        |
 | `kills.log`       | Player-versus-player kills with the killer's ping, kept 14 days.                              |
 | `ping/`           | One small file per player with their ping every minute, kept 14 days.                          |
+| `reports.json`    | Player reports and what staff did with them.                                                  |
+| `ties.json`       | Same-connection (hashed) and co-join ties for the connection map. Keep it private.            |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 
