@@ -27,13 +27,28 @@ public final class PanelData {
     private final List<Object> blocks = new ArrayList<>();
     private int points;
 
+    private final boolean allTime;
+
     public PanelData(long rangeMillis) {
+        this(rangeMillis, false);
+    }
+
+    public PanelData(long rangeMillis, boolean allTime) {
         this.rangeMillis = rangeMillis;
+        this.allTime = allTime;
     }
 
     /** How far back the browser asked for chart data (the tab's 1h / 6h / 24h / 7d / 30d picker). */
     public long rangeMillis() {
         return rangeMillis;
+    }
+
+    /**
+     * True when the browser picked "All time". {@link #rangeMillis()} then reaches back to 1970, so
+     * {@code now - rangeMillis()} includes everything; use this to label things "all time".
+     */
+    public boolean allTime() {
+        return allTime;
     }
 
     /** A number tile. {@code hint} is optional small text under the value. */

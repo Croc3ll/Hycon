@@ -202,3 +202,10 @@ svg.chart .threshold.warn { stroke: rgba(226, 181, 75, .7); }
 svg.chart .threshold.bad { stroke: rgba(229, 83, 75, .7); }
 svg.chart .threshold-label.warn { fill: var(--gold); } svg.chart .threshold-label.bad { fill: var(--danger); }
 svg.chart .zone-bad { fill: rgba(229, 83, 75, .07); }
+
+/* ---------- Dashboard notes (summaries) ---------- */
+.notebox { background: linear-gradient(180deg, rgba(226, 181, 75, .06), rgba(226, 181, 75, .02)); border: 1px solid var(--line);
+  border-left: 3px solid var(--gold); border-radius: 6px; padding: 14px 18px; margin-bottom: 16px; }
+.notebox h3 { color: var(--gold2); margin: 4px 0 8px; }
+.notebox h3:not(:first-child) { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line2); }
+.notebox p { margin: 6px 0; line-height: 1.55; color: var(--text); }

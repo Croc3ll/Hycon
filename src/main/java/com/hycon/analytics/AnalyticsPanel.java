@@ -174,7 +174,8 @@ public final class AnalyticsPanel implements HyconPanel {
     private void regulars(PanelData out, long now, Set<UUID> onlineIds) {
         long today = now / DAY_MS;
         // Regulars: at least a week of history, so a 24 h view still shows who sticks around.
-        long window = Math.max(out.rangeMillis(), TimeUnit.DAYS.toMillis(7));
+        // Days played are only kept KEEP_DAYS, so that's as far back as this table can look.
+        long window = Math.min(Math.max(out.rangeMillis(), TimeUnit.DAYS.toMillis(7)), TimeUnit.DAYS.toMillis(KnownPlayers.KEEP_DAYS));
         long fromDay = (now - window) / DAY_MS + 1;
         int windowDays = (int) (today - fromDay + 1);
         List<KnownPlayers.Info> regulars = new ArrayList<>();

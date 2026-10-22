@@ -58,7 +58,9 @@ public final class ShopPanel implements HyconPanel {
     /** Called on a Hycon web thread each time the tab refreshes (about every 15 s). Keep it quick. */
     @Override
     public void render(PanelData out) {
-        long since = System.currentTimeMillis() - out.rangeMillis(); // the 24 h / 7 d / 30 d buttons
+        // The 24 h / 7 d / 30 d / All time buttons. For All time, out.allTime() is true and
+        // rangeMillis() reaches back to 1970, so this "since" includes everything.
+        long since = System.currentTimeMillis() - out.rangeMillis();
 
         // Number tiles across the top.
         out.stat("Sales", String.valueOf(stats.salesSince(since)))
@@ -138,7 +140,7 @@ The JVM only loads `ShopPanel` the first time it's used, so when Hycon is missin
 | `bars(title).bar(label, note, value, text)` | Horizontal bars; length relative to the largest value.          |
 | `columns(title).column(label, value)` | A small column chart (e.g. per hour).                                  |
 | `table(title, columns...).row(cells...)` | A table; use `PanelData.time(ms)` for dates.                        |
-| `note(text)`                          | A line of grey text.                                                  |
+| `note(text)`                          | A line of text. Notes in a row share one boxed panel; a short line with no full stop (e.g. "Summary") becomes the box's heading. |
 
 All text is shown as plain text, never as HTML, so player names and item names are safe to pass
 straight through. Each tab is capped (100 blocks, 5000 chart points, 1000 table rows).

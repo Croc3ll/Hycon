@@ -405,7 +405,7 @@ public final class GameRoutes {
             r.error(404, "No such dashboard");
             return;
         }
-        PanelData data = new PanelData(range(r.query("range")));
+        PanelData data = new PanelData(range(r.query("range")), "all".equals(r.query("range")));
         try {
             p.render(data);
         } catch (RuntimeException | LinkageError e) {
@@ -420,6 +420,10 @@ public final class GameRoutes {
     /** "1h", "6h", "24h", "7d", "30d" to ms; defaults to 6 hours, at most a year. */
     private static long range(String s) {
         long def = TimeUnit.DAYS.toMillis(1);
+        if ("all".equals(s)) {
+            // "All time": a range reaching back to 1970, so "now - range" includes every record.
+            return System.currentTimeMillis();
+        }
         if (s == null || s.length() < 2) {
             return def;
         }

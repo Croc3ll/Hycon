@@ -593,7 +593,7 @@ function sharing(view) {
 
 // ---------- Dashboards (HyconPanel API) ----------
 
-const RANGES = [['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days']];
+const RANGES = [['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days'], ['all', 'All time']];
 
 function dashboard(view, id) {
   let range = S.range || '24h';
@@ -617,8 +617,9 @@ function dashboard(view, id) {
 }
 
 function blocks(list, modes) {
-  const nodes = []; let tiles = null; let grid = null;
+  const nodes = []; let tiles = null; let grid = null; let notes = null;
   for (const b of list) {
+    if (b.type !== 'note') notes = null;
     if (b.type === 'stat') {
       grid = null;
       if (!tiles) { tiles = el('div', { class: 'tiles' }); nodes.push(tiles); }
@@ -632,7 +633,13 @@ function blocks(list, modes) {
       continue;
     }
     grid = null;
-    if (b.type === 'note') nodes.push(el('p', { class: 'muted' }, b.text));
+    if (b.type === 'note') {
+      // Consecutive notes share one boxed panel; a short line without a full stop is its heading.
+      const heading = b.text.length <= 40 && !/[.!?:]$/.test(b.text.trim());
+      if (!notes || heading) { notes = el('div', { class: 'notebox' }); nodes.push(notes); }
+      notes.append(heading ? el('h3', {}, b.text) : el('p', {}, b.text));
+      continue;
+    }
     else if (b.type === 'series') nodes.push(seriesCard(b, modes));
     else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows)));
   }
