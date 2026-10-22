@@ -149,7 +149,8 @@ public final class AnalyticsPanel implements HyconPanel {
         if (positions.worlds().isEmpty()) {
             out.heatmap("Where players spend time", PositionLog.CELL, "player-min");
         }
-        for (String w : positions.worlds().subList(0, Math.min(2, positions.worlds().size()))) {
+        // Every world with time spent (up to 8, busiest first); the page shows them as tabs of one map.
+        for (String w : positions.worlds().subList(0, Math.min(8, positions.worlds().size()))) {
             PanelData.Heatmap h = out.heatmap("Where players spend time - " + w, PositionLog.CELL, "player-min").world(w);
             positions.heat(w).forEach((k, v) -> {
                 int comma = k.indexOf(',');

@@ -227,3 +227,35 @@ function heatmapCard(h) {
       })) : null,
       el('span', { class: 'muted' }, 'click the map, then scroll to zoom · drag to move')));
 }
+
+// Several worlds' maps as one card: a tab per world (name and time recorded), one map shown at a
+// time and built only when first opened. The chosen world is remembered across refreshes.
+const HEAT_TABS = new Map();
+function heatGroup(first) {
+  const maps = [first];
+  const box = el('div');
+  const tabs = el('div', { class: 'seg world-tabs' });
+  const built = new Map();
+  const key = () => maps.map((m) => m.world || m.title).join('|');
+  function show(i) {
+    HEAT_TABS.set(key(), maps[i].world || maps[i].title);
+    [...tabs.children].forEach((b, k) => { b.className = k === i ? 'on' : ''; });
+    if (!built.has(i)) built.set(i, heatmapCard(maps[i]));
+    box.replaceChildren(built.get(i));
+  }
+  function draw() {
+    if (maps.length === 1) { box.replaceChildren(heatmapCard(maps[0])); tabs.hidden = true; return; }
+    tabs.hidden = false;
+    tabs.replaceChildren(...maps.map((m, i) => {
+      const mins = m.cells.reduce((t, c) => t + c[2], 0);
+      return el('button', { on: { click: () => show(i) } }, (m.world || m.title) + ' · ' + short(mins) + ' ' + (m.unit || ''));
+    }));
+    const want = HEAT_TABS.get(key());
+    const i = Math.max(0, maps.findIndex((m) => (m.world || m.title) === want));
+    show(i);
+  }
+  const node = el('div', {}, el('div', { class: 'world-pick' }, el('span', { class: 'muted' }, 'World:'), tabs), box);
+  node.heatGroup = { add: (m) => { maps.push(m); built.clear(); draw(); } };
+  draw();
+  return node;
+}

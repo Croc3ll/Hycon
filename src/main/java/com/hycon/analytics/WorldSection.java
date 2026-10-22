@@ -83,7 +83,8 @@ public final class WorldSection implements HyconProfileSection {
             // An empty map with its "nothing recorded yet" text, so it's clear where it will appear.
             out.heatmap("Where " + name + " spends time", CELL, "min");
         }
-        for (String w : worlds.subList(0, Math.min(2, worlds.size()))) {
+        // Every world they spent time in (up to 8, most time first): tabs of one map on the page.
+        for (String w : worlds.subList(0, Math.min(8, worlds.size()))) {
             PanelData.Heatmap h = out.heatmap("Where " + name + " spends time - " + w, CELL, "min").world(w);
             grids.get(w).forEach((k, v) -> h.cell((int) (k >> 32), (int) k.longValue(), v * PositionLog.MINUTES_PER_SAMPLE));
 

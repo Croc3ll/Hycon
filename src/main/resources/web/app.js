@@ -675,7 +675,11 @@ function blocks(list, modes) {
       continue;
     }
     else if (b.type === 'series') nodes.push(seriesCard(b, modes));
-    else if (b.type === 'heatmap') nodes.push(heatmapCard(b));
+    else if (b.type === 'heatmap') {
+      // Maps of several worlds in a row become one card with a tab per world.
+      const last = nodes[nodes.length - 1];
+      if (last && last.heatGroup) last.heatGroup.add(b); else nodes.push(heatGroup(b));
+    }
     else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows)));
   }
   return nodes;

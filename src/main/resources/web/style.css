@@ -251,3 +251,7 @@ canvas.heatmap:active { cursor: grabbing; }
 .heat-scale i { background: linear-gradient(90deg, rgb(40,70,200), rgb(40,170,230), rgb(60,200,90), rgb(240,220,60), rgb(235,60,45)) !important; }
 .heat-keys { display: inline-flex; gap: 12px; margin: 0 12px; }
 .heat-keys b { display: inline-block; width: 14px; height: 14px; border-radius: 50%; color: #111; font-size: 9px; text-align: center; line-height: 14px; margin-right: 4px; }
+
+.world-pick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.world-pick .seg { flex-wrap: wrap; }
+.world-pick .seg[hidden], .world-pick:has(.seg[hidden]) { display: none; }

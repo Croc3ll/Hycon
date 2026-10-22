@@ -89,7 +89,8 @@ This history is kept in `moderation.log` and stays even after a ban ends.
   time)**, the **path** they walked (each stretch coloured the same way), **markers** where they
   broke (B), placed (P) or used (U) blocks, and a "Last seen here" pin. Zoom with **+ / − / Fit** or
   click the map and scroll; drag to move; hover for coordinates, time spent and what was done there.
-  The **Map / Heat / Path / Marks** buttons switch layers on and off, and **↻ Refresh** reloads the
+  With several worlds (e.g. a hideout world), a **World** row of tabs picks which world's map
+  to show, with the time spent in each. The **Map / Heat / Path / Marks** buttons switch layers on and off, and **↻ Refresh** reloads the
   numbers without losing your zoom, and pie
   charts of the blocks they break, place and use and what they craft, plus the zones they found.
 - Other plugins can add their own sections here (PrisonCore adds what they mine and where their
