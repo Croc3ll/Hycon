@@ -35,6 +35,35 @@ public final class ConsoleRunner {
     }
 
     /**
+     * Completions for the last word of {@code line} (what Tab offers in the panel): Hytale's own
+     * suggestions for that command (sub-commands, arguments), plus player names starting with the
+     * word: online players first, then anyone who has played. Each is the full replacement word.
+     */
+    public List<String> complete(String admin, String line, List<String> onlineNames, List<String> knownNames) {
+        String c = line.startsWith("/") ? line.substring(1) : line;
+        List<String> words = new java.util.ArrayList<>(List.of(c.split(" ", -1)));
+        String last = words.get(words.size() - 1);
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        try {
+            out.addAll(CommandManager.get().suggestCompletions(new PanelCommandSender(admin), words, words.size() - 1));
+        } catch (RuntimeException ignored) {
+            // a command whose completion fails still gets player names
+        }
+        if (words.size() > 1) { // the first word is the command itself, never a player
+            String lower = last.toLowerCase(Locale.ROOT);
+            for (List<String> names : List.of(onlineNames, knownNames)) {
+                for (String n : names) {
+                    if (n.toLowerCase(Locale.ROOT).startsWith(lower)) {
+                        out.add(n);
+                    }
+                }
+            }
+        }
+        out.remove(last); // already typed in full
+        return out.stream().limit(30).toList();
+    }
+
+    /**
      * Runs the command and waits up to 5 seconds for it to finish, so its replies can be shown.
      * Slower commands keep running; their later replies just aren't returned.
      */

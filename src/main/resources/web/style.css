@@ -209,3 +209,10 @@ svg.chart .zone-bad { fill: rgba(229, 83, 75, .07); }
 .notebox h3 { color: var(--gold2); margin: 4px 0 8px; }
 .notebox h3:not(:first-child) { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line2); }
 .notebox p { margin: 6px 0; line-height: 1.55; color: var(--text); }
+/* ---------- Console tab completion ---------- */
+.complete-box { position: relative; flex: 1; min-width: 140px; display: flex; }
+.complete-box input { flex: 1; }
+.complete-list { position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); max-height: 240px; overflow: auto; z-index: 10;
+  background: #121418; border: 1px solid var(--gold-dim); border-radius: 4px; font: 12px var(--mono); }
+.complete-list div { padding: 5px 10px; cursor: pointer; }
+.complete-list div:hover, .complete-list div.on { background: var(--gold-bg); color: var(--gold2); }

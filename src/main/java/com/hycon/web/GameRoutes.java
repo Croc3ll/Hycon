@@ -67,6 +67,7 @@ public final class GameRoutes {
         web.get("/api/ping", Level.VIEWER, this::ping);
         web.get("/api/log", Level.MODERATOR, this::log);
         web.post("/api/command", Level.ADMIN, this::command);
+        web.get("/api/complete", Level.ADMIN, this::complete);
         web.get("/api/audit", Level.ADMIN, this::audit);
         web.get("/api/panels", Level.VIEWER, this::panels);
         web.get("/api/panel", Level.VIEWER, this::panel);
@@ -377,6 +378,30 @@ public final class GameRoutes {
         for (String line : res.output()) {
             j.value(line);
             log.addText("[Hycon] " + line);
+        }
+        r.ok(j.endArray().endObject());
+    }
+
+    private void complete(Req r) throws IOException {
+        String line = r.query("line");
+        if (line == null || line.length() > 300 || line.indexOf('\n') >= 0) {
+            r.error(400, "Bad input");
+            return;
+        }
+        List<String> online = new java.util.ArrayList<>();
+        for (Moderation.OnlinePlayer p : moderation.online()) {
+            online.add(p.name());
+        }
+        List<String> knownNames = new java.util.ArrayList<>();
+        for (KnownPlayers.Info i : known.all()) {
+            if (!i.name().equals(i.uuid().toString())) {
+                knownNames.add(i.name());
+            }
+        }
+        knownNames.sort(String.CASE_INSENSITIVE_ORDER);
+        Json j = new Json().beginObject().name("options").beginArray();
+        for (String s : console.complete(r.admin.name(), line, online, knownNames)) {
+            j.value(s);
         }
         r.ok(j.endArray().endObject());
     }

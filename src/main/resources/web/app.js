@@ -400,6 +400,32 @@ function pingCard(uuid) {
 function consoleView(view) {
   const box = el('div', { id: 'console', class: 'mono' });
   const input = el('input', { class: 'mono', placeholder: 'Command, e.g. who  (runs with full console rights)', autocomplete: 'off' });
+  // Tab completion: the server answers with full replacements for the last word.
+  const picks = el('div', { class: 'complete-list', hidden: true });
+  let cycle = null;   // { base, options, i } while pressing Tab repeatedly
+  const lastWordStart = (v) => v.lastIndexOf(' ') + 1;
+  const apply = (base, word) => { input.value = base + word; };
+  async function tabComplete() {
+    if (cycle) {            // Tab again: next choice
+      cycle.i = (cycle.i + 1) % cycle.options.length;
+      apply(cycle.base, cycle.options[cycle.i]);
+      [...picks.children].forEach((c, k) => c.classList.toggle('on', k === cycle.i));
+      return;
+    }
+    const v = input.value;
+    let d;
+    try { d = await api('GET', '/api/complete?line=' + encodeURIComponent(v)); } catch (e) { toast(e.message, true); return; }
+    const base = v.slice(0, lastWordStart(v));
+    if (!d.options.length) { toast('Nothing to complete'); return; }
+    if (d.options.length === 1) { apply(base, d.options[0] + ' '); return; }
+    cycle = { base, options: d.options, i: 0 };
+    apply(base, d.options[0]);
+    picks.replaceChildren(...d.options.map((o, k) => el('div', { class: k === 0 ? 'on' : '', on: { mousedown: (ev) => {
+      ev.preventDefault(); apply(base, o + ' '); cycle = null; picks.hidden = true; input.focus();
+    } } }, o)));
+    picks.hidden = false;
+  }
+  input.addEventListener('blur', () => { picks.hidden = true; cycle = null; });
   const history = []; let hi = 0;
   S.logAfter = -1;
   view.append(el('div', { class: 'card' }, el('h2', {}, 'Console'), box,
@@ -414,8 +440,13 @@ function consoleView(view) {
         if (r.error) toast(r.error, true);
         if (!r.finished) toast('Still running; later output appears in the log');
       } catch (err) { toast(err.message, true); }
-    } } }, input, el('button', { class: 'primary', type: 'submit' }, 'Run')) : el('p', { class: 'muted' }, 'Running commands needs the ADMIN level.')));
+    } } }, el('div', { class: 'complete-box' }, input, picks), el('button', { class: 'primary', type: 'submit' }, 'Run'))
+      : el('p', { class: 'muted' }, 'Running commands needs the ADMIN level.')),
+    can('ADMIN') ? el('p', { class: 'muted' }, 'Tab completes commands and player names; press it again to go through the choices.') : null);
   input.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') { e.preventDefault(); tabComplete(); return; }
+    if (e.key !== 'Shift') { cycle = null; picks.hidden = true; }
+    if (e.key === 'Escape') return;
     if (e.key === 'ArrowUp' && hi > 0) { input.value = history[--hi]; e.preventDefault(); }
     if (e.key === 'ArrowDown') { hi = Math.min(history.length, hi + 1); input.value = history[hi] || ''; e.preventDefault(); }
   });
