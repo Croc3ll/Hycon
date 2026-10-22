@@ -31,7 +31,9 @@ public final class ReportCommand extends CommandBase {
         this.reports = reports;
         this.known = known;
         requireNoPermission();
-        // The reason is free text after the name, read from the raw input like Hytale's own /ban does.
+        // The name is a real argument so Tab suggests players (see PlayerNameArg); the reason is free
+        // text after it, read from the raw input like Hytale's own /ban does.
+        withRequiredArg("player", "Who to report (Tab suggests names)", new PlayerNameArg(known));
         setAllowsExtraArguments(true);
     }
 
