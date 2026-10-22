@@ -369,7 +369,7 @@ function pingCard(uuid) {
     }
     const near = (t) => { let best = d.points[0]; for (const pt of d.points) if (Math.abs(pt[0] - t) < Math.abs(best[0] - t)) best = pt; return best[1]; };
     const byTime = new Map(d.kills.map((k) => [k.time, k]));
-    const series = { title: 'Ping', unit: 'ms', area: true, lines: ['Ping'], gaps: spikes, points: d.points.map(([t, ms]) => [0, t, ms]),
+    const series = { title: 'Ping', unit: 'ms', area: true, lines: ['Ping'], gaps: spikes, zoomable: true, thresholds: [[150, 'warn'], [250, 'bad']], points: d.points.map(([t, ms]) => [0, t, ms]),
       marks: d.kills.map((k) => [k.time, k.kill && k.ping >= 0 ? k.ping : near(k.time), k.kill ? (k.ping >= 150 ? 'killhigh' : 'kill') : 'death']),
       markText: (t) => { const k = byTime.get(t); return (k.kill ? 'Killed ' : 'Killed by ') + k.other + (k.kill && k.ping >= 0 ? ' at ' + k.ping + ' ms' : ''); } };
     const verdict = d.killCount === 0 ? null
@@ -382,7 +382,8 @@ function pingCard(uuid) {
         chip(d.worst, 'ms', 'Worst', d.worst >= 250), chip(d.best, 'ms', 'Best'), chip(d.jitter, 'ms', 'Jitter', d.jitter >= 30),
         chip(d.over150, '%', '≥ 150 ms', d.over150 > 5), chip(d.over250, '%', '≥ 250 ms', d.over250 > 1),
         chip(d.spikes, '', 'Spikes', d.spikes > 0), chip(d.samples, '', 'Samples')),
-      el('p', { class: 'muted' }, 'Last ' + d.days + ' days. Each point is a one-minute average; red bands are spikes (a short lag burst of 250 ms or more).'),
+      el('p', { class: 'muted' }, 'Last ' + d.days + ' days. Each point is a one-minute average; red bands are spikes (a short lag burst of 250 ms or more). '
+        + 'Click the chart, then scroll to zoom; drag to pan.'),
       chart(series),
       el('div', { class: 'legend-row' }, el('span', {}, el('i', { class: 'lg kill' }), 'Kill'), el('span', {}, el('i', { class: 'lg killhigh' }), 'Kill at high ping'),
         el('span', {}, el('i', { class: 'lg death' }), 'Death'), el('span', {}, el('i', { class: 'lg spike' }), 'Ping spike')),
@@ -685,7 +686,52 @@ function legend(s) {
   }));
 }
 
+// A chart; with s.zoomable it gets + / - / fit buttons, scroll-to-zoom (after a click) and drag-to-pan
+// on the time axis, plus the visible range in the corner.
 function chart(s) {
+  if (!s.zoomable || !s.points.length) return drawChart(s);
+  let full = [Infinity, -Infinity];
+  for (const [, t] of s.points) { full[0] = Math.min(full[0], t); full[1] = Math.max(full[1], t); }
+  if (full[1] - full[0] < 60000) return drawChart(s);
+  let win = full.slice(), armed = false;
+  const box = el('div', { class: 'zoomchart' });
+  const label = el('div', { class: 'zoom-range' });
+  const clamp = (a, b) => {
+    const span = Math.min(full[1] - full[0], Math.max(10 * 60000, b - a));   // never closer than 10 minutes
+    a = Math.max(full[0], Math.min(a, full[1] - span));
+    return [a, a + span];
+  };
+  const zoom = (f, at) => { const c = at ?? (win[0] + win[1]) / 2; win = clamp(c - (c - win[0]) * f, c + (win[1] - c) * f); draw(); };
+  const fmt = (t) => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const tools = el('div', { class: 'zoom-tools' },
+    el('button', { on: { click: () => zoom(0.5) } }, '+'), el('button', { on: { click: () => zoom(2) } }, '−'),
+    el('button', { on: { click: () => { win = full.slice(); draw(); } } }, 'fit'));
+  let svg;
+  function draw() {
+    const next = drawChart(s, win);
+    if (svg) svg.replaceWith(next); else box.append(next);
+    svg = next;
+    label.textContent = fmt(win[0]) + ' → ' + fmt(win[1]);
+    const toTime = (clientX) => { const r = svg.getBoundingClientRect(); return win[0] + ((clientX - r.left) / r.width * 1000 - 44) / (1000 - 54) * (win[1] - win[0]); };
+    svg.addEventListener('mousedown', (e) => {
+      armed = true;
+      const start = e.clientX, w0 = win.slice(), r = svg.getBoundingClientRect();
+      const mv = (m) => { const dt = (m.clientX - start) / r.width * (w0[1] - w0[0]); win = clamp(w0[0] - dt, w0[1] - dt); draw(); };
+      const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); };
+      addEventListener('mousemove', mv); addEventListener('mouseup', up);
+    });
+    svg.addEventListener('wheel', (e) => { if (!armed) return; e.preventDefault(); zoom(e.deltaY < 0 ? 0.8 : 1.25, toTime(e.clientX)); }, { passive: false });
+    svg.addEventListener('mouseleave', () => { armed = false; });
+  }
+  box.append(tools, label);
+  draw();
+  return box;
+}
+
+function drawChart(s, win) {
+  // A zoom window shows only what's inside it.
+  if (win) s = { ...s, points: s.points.filter((p) => p[1] >= win[0] && p[1] <= win[1]),
+    gaps: (s.gaps || []).filter((g) => g[1] >= win[0] && g[0] <= win[1]) };
   const NS = 'http://www.w3.org/2000/svg';
   const W = 1000, H = 230, L = 44, R = 10, T = 10, B = 24;
   const svg = document.createElementNS(NS, 'svg');
@@ -698,8 +744,11 @@ function chart(s) {
   let t0 = Infinity, t1 = -Infinity, v1 = 0;
   for (const [, t, v] of s.points) { t0 = Math.min(t0, t); t1 = Math.max(t1, t); v1 = Math.max(v1, v); }
   for (const [a, b] of s.gaps || []) { t0 = Math.min(t0, a); t1 = Math.max(t1, b); }
+  if (win) { t0 = win[0]; t1 = win[1]; }
   if (t1 === t0) t1 = t0 + 1;
   v1 = v1 <= 0 ? 1 : v1 * 1.1;
+  // Threshold lines (e.g. 150 / 250 ms) stay in view even when the data is far below them.
+  for (const [v] of s.thresholds || []) v1 = Math.max(v1, v * 1.15);
   const x = (t) => L + (t - t0) / (t1 - t0) * (W - L - R);
   const y = (v) => T + (1 - v / v1) * (H - T - B);
   for (let i = 0; i <= 4; i++) {
@@ -712,6 +761,11 @@ function chart(s) {
     const t = t0 + span * i / 6, d = new Date(t);
     mk('text', { x: x(t), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === 6 ? 'end' : 'middle' },
       span > 2 * 864e5 ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
+  }
+  for (const [v, kind] of s.thresholds || []) {
+    if (kind === 'bad') mk('rect', { x: L, y: T, width: W - L - R, height: Math.max(0, y(v) - T), class: 'zone-bad' });
+    mk('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'threshold ' + kind });
+    mk('text', { x: L - 6, y: y(v) + 3, 'text-anchor': 'end', class: 'threshold-label ' + kind }, String(v));
   }
   for (const [a, b] of s.gaps || []) mk('rect', { x: x(a), y: T, width: Math.max(2, x(b) - x(a)), height: H - T - B, class: 'gap' });
   const byLine = new Map();

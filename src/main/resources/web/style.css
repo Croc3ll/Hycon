@@ -192,3 +192,13 @@ svg.map .tie-kill { stroke: #c85a5a; }
 .lg.tie-cojoin { background: repeating-linear-gradient(90deg, #8b909b 0 5px, transparent 5px 9px); }
 .warnc { color: #e8a23a; }
 .badge.dim { color: var(--muted); border-color: var(--line); background: transparent; }
+/* ---------- Zoomable charts ---------- */
+.zoomchart { position: relative; border: 1px solid var(--line); border-radius: 6px; background: #0b0c0f; padding-top: 34px; }
+.zoom-tools { position: absolute; top: 6px; left: 8px; display: flex; gap: 6px; z-index: 1; }
+.zoom-tools button { padding: 3px 10px; font-size: 12px; background: #121418; }
+.zoom-range { position: absolute; top: 10px; right: 12px; font: 10px var(--mono); color: var(--dim); letter-spacing: .6px; }
+svg.chart .threshold { stroke-dasharray: 4 4; stroke-width: 1; vector-effect: non-scaling-stroke; }
+svg.chart .threshold.warn { stroke: rgba(226, 181, 75, .7); }
+svg.chart .threshold.bad { stroke: rgba(229, 83, 75, .7); }
+svg.chart .threshold-label.warn { fill: var(--gold); } svg.chart .threshold-label.bad { fill: var(--danger); }
+svg.chart .zone-bad { fill: rgba(229, 83, 75, .07); }
