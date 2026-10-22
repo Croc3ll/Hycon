@@ -17,6 +17,11 @@ dependencies {
 }
 ```
 
+Building Hycon also makes `build/api/hycon-api.jar` (just the API). To keep your copy current, add
+`hyconApiJar=<path to your libs/hycon-api.jar>` to your own `~/.gradle/gradle.properties`; every
+Hycon build then refreshes it. An old copy that ends up on a server's class path loads before Hycon's
+own classes and breaks the panel with `NoSuchMethodError`.
+
 Never use `implementation` here: a second copy of Hycon's classes inside your jar would not be
 the one Hycon reads, so your tab would never appear.
 
