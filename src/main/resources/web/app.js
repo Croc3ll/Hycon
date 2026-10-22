@@ -920,6 +920,19 @@ function heatmapCard(h) {
   svg.style.aspectRatio = String(Math.max(0.4, Math.min(3, w / hgt)));
   const mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; svg.append(e); return e; };
   mk('rect', { x: x0, y: z0, width: w, height: hgt, class: 'heat-bg' });
+  // The real world map underneath (Hytale's own map images, stitched by the server), if known.
+  let mapImg = null;
+  if (h.world) {
+    const C = 32, cx = (b) => Math.floor(b / C);
+    let cx0 = cx(x0 * h.cell), cx1 = cx(x1 * h.cell), cz0 = cx(z0 * h.cell), cz1 = cx(z1 * h.cell);
+    // The server draws at most 48 chunks per side: keep the middle of a bigger area.
+    const clip = (a, b) => { if (b - a < 48) return [a, b]; const m = Math.floor((a + b) / 2); return [m - 23, m + 24]; };
+    [cx0, cx1] = clip(cx0, cx1); [cz0, cz1] = clip(cz0, cz1);
+    mapImg = mk('image', { x: cx0 * C / h.cell, y: cz0 * C / h.cell, width: (cx1 - cx0 + 1) * C / h.cell, height: (cz1 - cz0 + 1) * C / h.cell,
+      href: '/api/worldmap?world=' + encodeURIComponent(h.world) + '&cx0=' + cx0 + '&cz0=' + cz0 + '&cx1=' + cx1 + '&cz1=' + cz1,
+      preserveAspectRatio: 'none', class: 'heat-map' });
+    svg.classList.add('with-map');
+  }
   const colour = (v) => {
     const t = Math.log(1 + v) / Math.log(1 + max);           // 0..1
     const stops = [[0, [40, 46, 54]], [0.45, [143, 113, 48]], [0.75, [226, 181, 75]], [1, [229, 83, 75]]];
@@ -940,7 +953,9 @@ function heatmapCard(h) {
   }
   const total = h.cells.reduce((t, c) => t + c[2], 0);
   return el('div', { class: 'card' },
-    el('div', { class: 'spread' }, el('h3', {}, h.title), el('span', { class: 'muted mono' },
+    el('div', { class: 'spread' }, el('h3', {}, h.title), mapImg ? el('button', { on: { click: (e) => {
+      const on = svg.classList.toggle('with-map'); mapImg.style.display = on ? '' : 'none'; e.target.textContent = on ? 'Map: on' : 'Map: off';
+    } } }, 'Map: on') : null, el('span', { class: 'muted mono' },
       'X ' + x0 * h.cell + '..' + x1 * h.cell + ' · Z ' + z0 * h.cell + '..' + z1 * h.cell + ' · ' + h.cell + '-block squares · ' + short(total) + ' ' + (h.unit || ''))),
     svg,
     el('div', { class: 'heat-scale' }, el('span', {}, 'less'), el('i'), el('span', {}, 'more'), el('span', { class: 'muted' }, '  north is up')));

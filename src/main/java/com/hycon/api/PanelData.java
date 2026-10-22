@@ -218,6 +218,13 @@ public final class PanelData {
         final int cellSize;
         final List<int[]> cells = new ArrayList<>();
         final List<String[]> pins = new ArrayList<>();
+        String world;
+
+        /** The world's name: Hycon then draws the real world map under the heat. */
+        public Heatmap world(String name) {
+            this.world = name;
+            return this;
+        }
 
         Heatmap(String title, int cellSize, String unit) {
             this.title = title;
@@ -324,7 +331,8 @@ public final class PanelData {
                     j.endArray();
                 }
                 case Heatmap h -> {
-                    j.field("type", "heatmap").field("title", h.title).field("unit", h.unit).field("cell", h.cellSize).name("cells").beginArray();
+                    j.field("type", "heatmap").field("title", h.title).field("unit", h.unit).field("cell", h.cellSize)
+                            .field("world", h.world).name("cells").beginArray();
                     for (int[] c : h.cells) {
                         j.beginArray().value(c[0]).value(c[1]).value(c[2]).endArray();
                     }

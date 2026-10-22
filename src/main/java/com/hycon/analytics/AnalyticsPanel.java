@@ -147,7 +147,7 @@ public final class AnalyticsPanel implements HyconPanel {
 
         // Where everyone spends time (since Hycon was installed), busiest worlds first.
         for (String w : positions.worlds().subList(0, Math.min(2, positions.worlds().size()))) {
-            PanelData.Heatmap h = out.heatmap("Where players spend time - " + w, PositionLog.CELL, "player-min");
+            PanelData.Heatmap h = out.heatmap("Where players spend time - " + w, PositionLog.CELL, "player-min").world(w);
             positions.heat(w).forEach((k, v) -> {
                 int comma = k.indexOf(',');
                 h.cell(Integer.parseInt(k.substring(0, comma)), Integer.parseInt(k.substring(comma + 1)), v);

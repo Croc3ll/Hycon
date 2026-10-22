@@ -241,3 +241,5 @@ svg.heat .heat-pin { fill: #4fa3f7; stroke: #0b0c0f; stroke-width: .3; }
 svg.heat .heat-label { fill: #cfe4ff; font-family: var(--mono); paint-order: stroke; stroke: #0b0c0f; stroke-width: .4; }
 .heat-scale { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 8px; }
 .heat-scale i { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgb(40,46,54), rgb(143,113,48), rgb(226,181,75), rgb(229,83,75)); }
+svg.heat .heat-map { image-rendering: pixelated; }
+svg.heat.with-map rect:not(.heat-bg) { opacity: .7; }

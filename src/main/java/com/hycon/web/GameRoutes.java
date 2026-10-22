@@ -72,6 +72,7 @@ public final class GameRoutes {
         web.get("/api/panels", Level.VIEWER, this::panels);
         web.get("/api/panel", Level.VIEWER, this::panel);
         web.get("/api/profile-sections", Level.VIEWER, this::profileSections);
+        web.get("/api/worldmap", Level.VIEWER, this::worldMap);
     }
 
     private void players(Req r) throws IOException {
@@ -449,6 +450,23 @@ public final class GameRoutes {
         Json j = new Json().beginObject().field("title", p.title()).name("blocks");
         data.write(j);
         r.ok(j.endObject());
+    }
+
+    private final com.hycon.game.WorldMapImages mapImages = new com.hycon.game.WorldMapImages();
+
+    /** The real world map for an area (chunk coordinates), as a PNG to lay under a heatmap. */
+    private void worldMap(Req r) throws IOException {
+        try {
+            byte[] png = mapImages.png(r.query("world"), Integer.parseInt(r.query("cx0")), Integer.parseInt(r.query("cz0")),
+                    Integer.parseInt(r.query("cx1")), Integer.parseInt(r.query("cz1")));
+            if (png == null) {
+                r.error(404, "No map for that world");
+                return;
+            }
+            r.send(200, "image/png", png);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            r.error(400, e.getMessage() == null ? "Bad area" : e.getMessage());
+        }
     }
 
     /**

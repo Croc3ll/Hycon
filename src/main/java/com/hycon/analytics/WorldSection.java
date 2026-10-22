@@ -78,7 +78,7 @@ public final class WorldSection implements HyconProfileSection {
                 .stat("Zones found", String.valueOf(activity.get(player, PlayerActivity.Kind.ZONES).size()));
 
         for (String w : worlds.subList(0, Math.min(2, worlds.size()))) {
-            PanelData.Heatmap h = out.heatmap("Where " + name + " spends time - " + w, CELL, "min");
+            PanelData.Heatmap h = out.heatmap("Where " + name + " spends time - " + w, CELL, "min").world(w);
             grids.get(w).forEach((k, v) -> h.cell((int) (k >> 32), (int) k.longValue(), v));
             PositionLog.Spot last = null;
             for (PositionLog.Spot s : spots) {
