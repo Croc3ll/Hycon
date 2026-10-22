@@ -77,6 +77,10 @@ public final class WorldSection implements HyconProfileSection {
                 .stat("Blocks placed", String.format("%,d", sum(activity.get(player, PlayerActivity.Kind.PLACED))))
                 .stat("Zones found", String.valueOf(activity.get(player, PlayerActivity.Kind.ZONES).size()));
 
+        if (worlds.isEmpty()) {
+            // An empty map with its "nothing recorded yet" text, so it's clear where it will appear.
+            out.heatmap("Where " + name + " spends time", CELL, "min");
+        }
         for (String w : worlds.subList(0, Math.min(2, worlds.size()))) {
             PanelData.Heatmap h = out.heatmap("Where " + name + " spends time - " + w, CELL, "min").world(w);
             grids.get(w).forEach((k, v) -> h.cell((int) (k >> 32), (int) k.longValue(), v));

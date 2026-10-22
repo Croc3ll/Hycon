@@ -907,7 +907,7 @@ function pieCard(p) {
 // A top-down world heatmap: cells coloured by value on a log scale (dark -> gold -> red), so a busy
 // spawn doesn't wash out quieter places. North is up (smaller Z). Pins mark spots like "Last seen here".
 function heatmapCard(h) {
-  if (!h.cells.length) return el('div', { class: 'card' }, el('h3', {}, h.title), el('p', { class: 'muted' }, 'No positions recorded yet (taken once a minute while players are online).'));
+  if (!h.cells.length) return el('div', { class: 'card' }, el('h3', {}, h.title), el('p', { class: 'muted' }, 'Nothing recorded yet. Positions are noted once a minute while players are online; join and move around for a few minutes.'));
   const NS = 'http://www.w3.org/2000/svg';
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, max = 1;
   for (const [x, z, v] of h.cells) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); max = Math.max(max, v); }
