@@ -416,11 +416,13 @@ function consoleView(view) {
     let d;
     try { d = await api('GET', '/api/complete?line=' + encodeURIComponent(v)); } catch (e) { toast(e.message, true); return; }
     const base = v.slice(0, lastWordStart(v));
+    const kinds = new Map(d.options.map((o) => [o.text, o.kind]));
+    d.options = d.options.map((o) => o.text);
     if (!d.options.length) { toast('Nothing to complete'); return; }
     if (d.options.length === 1) { apply(base, d.options[0] + ' '); return; }
     cycle = { base, options: d.options, i: 0 };
     apply(base, d.options[0]);
-    picks.replaceChildren(...d.options.map((o, k) => el('div', { class: k === 0 ? 'on' : '', on: { mousedown: (ev) => {
+    picks.replaceChildren(...d.options.map((o, k) => el('div', { class: (k === 0 ? 'on ' : '') + 'k-' + kinds.get(o), title: { online: 'Online', offline: 'Offline' }[kinds.get(o)] || '', on: { mousedown: (ev) => {
       ev.preventDefault(); apply(base, o + ' '); cycle = null; picks.hidden = true; input.focus();
     } } }, o)));
     picks.hidden = false;

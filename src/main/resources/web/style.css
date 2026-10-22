@@ -216,3 +216,8 @@ svg.chart .zone-bad { fill: rgba(229, 83, 75, .07); }
   background: #121418; border: 1px solid var(--gold-dim); border-radius: 4px; font: 12px var(--mono); }
 .complete-list div { padding: 5px 10px; cursor: pointer; }
 .complete-list div:hover, .complete-list div.on { background: var(--gold-bg); color: var(--gold2); }
+/* Tab list: online players green, offline players red. */
+.complete-list .k-online { color: var(--ok); }
+.complete-list .k-offline { color: var(--danger); }
+.complete-list .k-online::after { content: '  online'; color: var(--dim); font-size: 10px; }
+.complete-list .k-offline::after { content: '  offline'; color: var(--dim); font-size: 10px; }

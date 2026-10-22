@@ -399,9 +399,17 @@ public final class GameRoutes {
             }
         }
         knownNames.sort(String.CASE_INSENSITIVE_ORDER);
+        List<String> options = console.complete(r.admin.name(), line, online, knownNames);
+        java.util.Set<String> onlineLower = new java.util.HashSet<>();
+        online.forEach(n -> onlineLower.add(n.toLowerCase(java.util.Locale.ROOT)));
+        java.util.Set<String> knownLower = new java.util.HashSet<>();
+        knownNames.forEach(n -> knownLower.add(n.toLowerCase(java.util.Locale.ROOT)));
+        // Each option says whether it's an online player, an offline player or anything else,
+        // so the panel can colour names green or red.
         Json j = new Json().beginObject().name("options").beginArray();
-        for (String s : console.complete(r.admin.name(), line, online, knownNames)) {
-            j.value(s);
+        for (String o : options) {
+            String key = o.toLowerCase(java.util.Locale.ROOT);
+            j.beginObject().field("text", o).field("kind", onlineLower.contains(key) ? "online" : knownLower.contains(key) ? "offline" : "other").endObject();
         }
         r.ok(j.endArray().endObject());
     }
