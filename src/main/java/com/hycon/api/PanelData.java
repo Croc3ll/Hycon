@@ -15,7 +15,7 @@ import java.util.List;
  *   <li>{@link #columns} - a small column chart ("players by hour"),</li>
  *   <li>{@link #table} - rows and columns.</li>
  * </ul>
- * Consecutive {@code bars} and {@code columns} blocks sit side by side.
+ * Consecutive {@code bars}, {@code columns} and {@code pie} blocks sit side by side.
  * All text is shown as plain text (never as HTML), so values can come straight from players.
  */
 public final class PanelData {
@@ -73,6 +73,24 @@ public final class PanelData {
         Table t = new Table(title, columns);
         add(t);
         return t;
+    }
+
+    /**
+     * A top-down heatmap of a world: each cell is a {@code cellSize}x{@code cellSize}-block square,
+     * coloured by its value (e.g. minutes spent there). Cells are given in cell coordinates
+     * (block coordinate / cellSize, rounded down). Since API 3.
+     */
+    public Heatmap heatmap(String title, int cellSize, String unit) {
+        Heatmap h = new Heatmap(title, cellSize, unit);
+        add(h);
+        return h;
+    }
+
+    /** A pie (donut) chart, e.g. where money came from. Slices are drawn largest first. Since API 3. */
+    public Pie pie(String title) {
+        Pie p = new Pie(title);
+        add(p);
+        return p;
     }
 
     /** Horizontal bars, each with a label, a small grey note, a length (value) and the text shown. */
@@ -195,6 +213,60 @@ public final class PanelData {
         }
     }
 
+    public static final class Heatmap {
+        final String title, unit;
+        final int cellSize;
+        final List<int[]> cells = new ArrayList<>();
+        final List<String[]> pins = new ArrayList<>();
+
+        Heatmap(String title, int cellSize, String unit) {
+            this.title = title;
+            this.cellSize = Math.max(1, cellSize);
+            this.unit = unit;
+        }
+
+        public Heatmap cell(int cellX, int cellZ, int value) {
+            if (value > 0 && cells.size() < 20_000) {
+                cells.add(new int[]{cellX, cellZ, value});
+            }
+            return this;
+        }
+
+        /** A labelled marker at a block position, e.g. a mine or the spawn. */
+        public Heatmap pin(String label, int x, int z) {
+            if (pins.size() < 100) {
+                pins.add(new String[]{label, String.valueOf(x), String.valueOf(z)});
+            }
+            return this;
+        }
+    }
+
+    public static final class Pie {
+        final String title;
+        final List<String> labels = new ArrayList<>();
+        final List<Double> values = new ArrayList<>();
+        String unit;
+
+        Pie(String title) {
+            this.title = title;
+        }
+
+        /** Shown after values in the legend, e.g. "money" or "blocks". */
+        public Pie unit(String unit) {
+            this.unit = unit;
+            return this;
+        }
+
+        /** One slice; zero or negative values are left out. */
+        public Pie slice(String label, double value) {
+            if (value > 0 && labels.size() < 50) {
+                labels.add(label);
+                values.add(value);
+            }
+            return this;
+        }
+    }
+
     public static final class Columns {
         final String title;
         final List<String> labels = new ArrayList<>();
@@ -248,6 +320,24 @@ public final class PanelData {
                     for (int i = 0; i < bs.items.size(); i++) {
                         String[] it = bs.items.get(i);
                         j.beginArray().value(it[0]).value(it[1]).value(bs.values.get(i)).value(it[2]).endArray();
+                    }
+                    j.endArray();
+                }
+                case Heatmap h -> {
+                    j.field("type", "heatmap").field("title", h.title).field("unit", h.unit).field("cell", h.cellSize).name("cells").beginArray();
+                    for (int[] c : h.cells) {
+                        j.beginArray().value(c[0]).value(c[1]).value(c[2]).endArray();
+                    }
+                    j.endArray().name("pins").beginArray();
+                    for (String[] p : h.pins) {
+                        j.beginArray().value(p[0]).value(Double.parseDouble(p[1])).value(Double.parseDouble(p[2])).endArray();
+                    }
+                    j.endArray();
+                }
+                case Pie p -> {
+                    j.field("type", "pie").field("title", p.title).field("unit", p.unit).name("items").beginArray();
+                    for (int i = 0; i < p.labels.size(); i++) {
+                        j.beginArray().value(p.labels.get(i)).value(p.values.get(i)).endArray();
                     }
                     j.endArray();
                 }

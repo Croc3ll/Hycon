@@ -25,10 +25,11 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 2; // 2: area charts, outage bands, bars, columns
+    public static final int API_VERSION = 3; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();
+    private static final Map<String, HyconProfileSection> SECTIONS = new ConcurrentHashMap<>();
 
     private HyconApi() {
     }
@@ -59,8 +60,30 @@ public final class HyconApi {
         return list;
     }
 
-    /** Drops every tab; called when Hycon shuts down. */
+    /** Adds (or replaces, by id) a section on every player's profile. Since API version 3. */
+    public static void registerProfileSection(HyconProfileSection section) {
+        if (section == null || section.id() == null || !ID.matcher(section.id()).matches()) {
+            throw new IllegalArgumentException("Section id must be 1-40 letters, digits, - _ or .");
+        }
+        SECTIONS.put(section.id(), section);
+    }
+
+    public static void unregisterProfileSection(String id) {
+        if (id != null) {
+            SECTIONS.remove(id);
+        }
+    }
+
+    /** All profile sections, sorted by title. */
+    public static List<HyconProfileSection> profileSections() {
+        List<HyconProfileSection> list = new ArrayList<>(SECTIONS.values());
+        list.sort((a, b) -> String.CASE_INSENSITIVE_ORDER.compare(a.title(), b.title()));
+        return list;
+    }
+
+    /** Drops every tab and section; called when Hycon shuts down. */
     public static void clear() {
         PANELS.clear();
+        SECTIONS.clear();
     }
 }

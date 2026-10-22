@@ -25,6 +25,10 @@ import com.hycon.commands.ReportCommand;
 import com.hycon.web.IntelRoutes;
 import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
+import com.hycon.analytics.ActivitySection;
+import com.hycon.analytics.WorldSection;
+import com.hycon.game.PlayerActivity;
+import com.hycon.game.PositionLog;
 import com.hycon.analytics.AnalyticsPanel;
 import com.hycon.analytics.Samples;
 import com.hycon.web.AuthRoutes;
@@ -63,6 +67,8 @@ public final class HyconPlugin extends JavaPlugin {
     private ScheduledFuture<?> sampler;
     private PingLog pingLog;
     private KillLog killLog;
+    private PlayerActivity activity;
+    private PositionLog positions;
     private Reports reports;
     private Ties ties;
     private ScheduledFuture<?> pingSampler;
@@ -97,6 +103,9 @@ public final class HyconPlugin extends JavaPlugin {
         pingLog = new PingLog(dir);
         killLog = new KillLog(dir);
         getEntityStoreRegistry().registerSystem(killLog.new Tracker());
+        activity = new PlayerActivity(dir);
+        activity.systems().forEach(getEntityStoreRegistry()::registerSystem);
+        positions = new PositionLog(dir);
         sharing = new SharingStore(dir);
         getCommandRegistry().registerCommand(new HyconCommand());
         reports = new Reports(dir);
@@ -127,6 +136,7 @@ public final class HyconPlugin extends JavaPlugin {
             killLog.open();
             reports.load();
             ties.load();
+            positions.load();
             if (created) {
                 log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
                         address(), AdminStore.DEFAULT_NAME, AdminStore.DEFAULT_PASSWORD);
@@ -156,7 +166,9 @@ public final class HyconPlugin extends JavaPlugin {
             web = null;
             return;
         }
-        HyconApi.register(new AnalyticsPanel(samples, known));
+        HyconApi.register(new AnalyticsPanel(samples, known, positions));
+        HyconApi.registerProfileSection(new WorldSection(positions, activity));
+        HyconApi.registerProfileSection(new ActivitySection(known, pingLog, killLog, records, reports));
         banSync.start();
         shareServer.update(); // opens the share port only if share keys exist
         if (shareServer.error() != null) {
@@ -166,7 +178,10 @@ public final class HyconPlugin extends JavaPlugin {
             Runtime rt = Runtime.getRuntime();
             samples.add(Universe.get().getPlayers().size(), (int) ((rt.totalMemory() - rt.freeMemory()) >> 20));
         }, 0, Samples.INTERVAL_MS, TimeUnit.MILLISECONDS);
-        pingSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(pingLog::sample, 1, 1, TimeUnit.MINUTES);
+        pingSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+            pingLog.sample();
+            positions.sample();
+        }, 1, 1, TimeUnit.MINUTES);
         // Players saved before Hycon was installed, so they can be searched too.
         Path playersDir = Universe.get().getPath().resolve("players");
         Thread.ofVirtual().name("Hycon-PlayerImport").start(() -> known.importSaved(playersDir));
@@ -174,6 +189,8 @@ public final class HyconPlugin extends JavaPlugin {
             sessions.sweep();
             known.saveIfChanged();
             ties.saveIfChanged();
+            positions.saveIfChanged();
+            activity.save(onlineIds());
         }, 1, 1, TimeUnit.MINUTES);
 
         log.at(Level.INFO).log("Hycon panel: %s", address());
@@ -213,6 +230,12 @@ public final class HyconPlugin extends JavaPlugin {
         if (ties != null) {
             ties.saveIfChanged();
         }
+        if (positions != null) {
+            positions.saveIfChanged();
+        }
+        if (activity != null) {
+            activity.save(java.util.Set.of());
+        }
         if (known != null) {
             known.leaveAll();
             known.saveIfChanged();
@@ -226,6 +249,14 @@ public final class HyconPlugin extends JavaPlugin {
         if (killLog != null) {
             killLog.close();
         }
+    }
+
+    private static java.util.Set<java.util.UUID> onlineIds() {
+        java.util.Set<java.util.UUID> ids = new java.util.HashSet<>();
+        for (com.hypixel.hytale.server.core.universe.PlayerRef p : Universe.get().getPlayers()) {
+            ids.add(p.getUuid());
+        }
+        return ids;
     }
 
     /** The player's IP address, or null (only ever hashed, see Ties). */

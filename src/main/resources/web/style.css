@@ -221,3 +221,23 @@ svg.chart .zone-bad { fill: rgba(229, 83, 75, .07); }
 .complete-list .k-offline { color: var(--danger); }
 .complete-list .k-online::after { content: '  online'; color: var(--dim); font-size: 10px; }
 .complete-list .k-offline::after { content: '  offline'; color: var(--dim); font-size: 10px; }
+/* ---------- Pie charts and profile sections ---------- */
+.pie-wrap { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+svg.pie { width: 150px; height: 150px; flex: none; }
+svg.pie path { stroke: var(--panel); stroke-width: 1; cursor: default; }
+svg.pie path:hover { opacity: .85; }
+svg.pie .pie-total { fill: var(--text); font: 700 14px var(--mono); }
+.pie-legend { flex: 1; min-width: 140px; font-size: 12px; }
+.pie-legend div { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--line2); }
+.pie-legend i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.pie-legend .pl { flex: 1; }
+.pie-legend .pv { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+.section > h2 { margin: 20px 0 10px; color: var(--gold2); }
+/* ---------- Heatmaps ---------- */
+svg.heat { width: 100%; max-height: 560px; display: block; border: 1px solid var(--line); border-radius: 4px; }
+svg.heat .heat-bg { fill: #0b0c0f; }
+svg.heat rect:not(.heat-bg):hover { stroke: #fff; stroke-width: .15; }
+svg.heat .heat-pin { fill: #4fa3f7; stroke: #0b0c0f; stroke-width: .3; }
+svg.heat .heat-label { fill: #cfe4ff; font-family: var(--mono); paint-order: stroke; stroke: #0b0c0f; stroke-width: .4; }
+.heat-scale { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 8px; }
+.heat-scale i { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgb(40,46,54), rgb(143,113,48), rgb(226,181,75), rgb(229,83,75)); }

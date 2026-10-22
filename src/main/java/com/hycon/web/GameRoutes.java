@@ -71,6 +71,7 @@ public final class GameRoutes {
         web.get("/api/audit", Level.ADMIN, this::audit);
         web.get("/api/panels", Level.VIEWER, this::panels);
         web.get("/api/panel", Level.VIEWER, this::panel);
+        web.get("/api/profile-sections", Level.VIEWER, this::profileSections);
     }
 
     private void players(Req r) throws IOException {
@@ -448,6 +449,36 @@ public final class GameRoutes {
         Json j = new Json().beginObject().field("title", p.title()).name("blocks");
         data.write(j);
         r.ok(j.endObject());
+    }
+
+    /**
+     * Every plugin's section for one player's profile, each drawn like a dashboard tab. A section
+     * that throws only shows its error; the others still appear.
+     */
+    private void profileSections(Req r) throws IOException {
+        Moderation.Target t = moderation.resolve(r.query("player"));
+        if (t == null) {
+            r.error(404, "Unknown player");
+            return;
+        }
+        String range = r.query("range");
+        Json j = new Json().beginObject().name("sections").beginArray();
+        for (com.hycon.api.HyconProfileSection s : HyconApi.profileSections()) {
+            if (r.admin.level().rank < s.minLevel()) {
+                continue;
+            }
+            PanelData data = new PanelData(range(range), "all".equals(range));
+            j.beginObject().field("id", s.id()).field("title", s.title());
+            try {
+                s.render(t.uuid(), t.name(), data);
+                j.name("blocks");
+                data.write(j);
+            } catch (RuntimeException | LinkageError e) {
+                j.field("error", s.title() + " failed: " + e);
+            }
+            j.endObject();
+        }
+        r.ok(j.endArray().endObject());
     }
 
     /** "1h", "6h", "24h", "7d", "30d" to ms; defaults to 6 hours, at most a year. */

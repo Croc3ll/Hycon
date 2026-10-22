@@ -327,6 +327,7 @@ function profile(view, uuid) {
           p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
           p.ban ? el('button', { on: { click: unban } }, 'Unban')
             : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null),
+      profileSections(p.uuid),
       pingCard(p.uuid),
       can('MODERATOR') ? connectionMap(p.uuid) : null,
       el('div', { class: 'card' }, el('h2', {}, 'History'),
@@ -660,9 +661,9 @@ function blocks(list, modes) {
       continue;
     }
     tiles = null;
-    if (b.type === 'bars' || b.type === 'columns') {
+    if (b.type === 'bars' || b.type === 'columns' || b.type === 'pie') {
       if (!grid) { grid = el('div', { class: 'grid3' }); nodes.push(grid); }
-      grid.append(b.type === 'bars' ? barsCard(b) : columnsCard(b));
+      grid.append(b.type === 'bars' ? barsCard(b) : b.type === 'pie' ? pieCard(b) : columnsCard(b));
       continue;
     }
     grid = null;
@@ -674,6 +675,7 @@ function blocks(list, modes) {
       continue;
     }
     else if (b.type === 'series') nodes.push(seriesCard(b, modes));
+    else if (b.type === 'heatmap') nodes.push(heatmapCard(b));
     else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows)));
   }
   return nodes;
@@ -862,6 +864,105 @@ function barsCard(b) {
     return el('div', { class: 'bar' }, el('div', { class: 'top' }, el('span', {}, label, note ? el('span', { class: 'n' }, note) : null),
       el('span', { class: 't' }, text)), el('div', { class: 'track' }, fill));
   }) : el('p', { class: 'muted' }, 'Nothing yet.'));
+}
+
+// A donut chart with a legend: share and value per slice, largest first.
+const PIE_COLORS = ['#e2b54b', '#4fa3f7', '#e5534b', '#4fbf7a', '#a98bf0', '#f0884f', '#5cc8c8', '#d97ab8', '#9aa0a8'];
+function pieCard(p) {
+  const items = [...p.items].sort((a, b) => b[1] - a[1]);
+  const total = items.reduce((t, i) => t + i[1], 0);
+  if (!total) return el('div', { class: 'card' }, el('h3', {}, p.title), el('p', { class: 'muted' }, 'Nothing yet.'));
+  // Past 8 slices the rest go into "Other", so the chart stays readable.
+  const shown = items.length > 9 ? [...items.slice(0, 8), ['Other', items.slice(8).reduce((t, i) => t + i[1], 0)]] : items;
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '-60 -60 120 120');
+  svg.setAttribute('class', 'pie');
+  let a0 = -Math.PI / 2;
+  shown.forEach(([label, v], i) => {
+    const frac = v / total, a1 = a0 + frac * Math.PI * 2;
+    const path = document.createElementNS(NS, 'path');
+    const r = 50, ri = 30, big = frac > 0.5 ? 1 : 0;
+    const pt = (rad, a) => (rad * Math.cos(a)).toFixed(2) + ' ' + (rad * Math.sin(a)).toFixed(2);
+    path.setAttribute('d', frac >= 0.9999
+      ? `M 0 -50 A 50 50 0 1 1 -0.01 -50 L -0.01 -30 A 30 30 0 1 0 0 -30 Z`
+      : `M ${pt(r, a0)} A ${r} ${r} 0 ${big} 1 ${pt(r, a1)} L ${pt(ri, a1)} A ${ri} ${ri} 0 ${big} 0 ${pt(ri, a0)} Z`);
+    path.setAttribute('fill', PIE_COLORS[i % PIE_COLORS.length]);
+    path.addEventListener('mousemove', (e) => tip(e, label + '\n' + short(v) + (p.unit ? ' ' + p.unit : '') + ' · ' + Math.round(frac * 100) + '%'));
+    path.addEventListener('mouseleave', () => tip(null));
+    svg.append(path);
+    a0 = a1;
+  });
+  const center = document.createElementNS(NS, 'text');
+  center.setAttribute('text-anchor', 'middle'); center.setAttribute('y', 4); center.setAttribute('class', 'pie-total');
+  center.textContent = short(total);
+  svg.append(center);
+  return el('div', { class: 'card' }, el('h3', {}, p.title), el('div', { class: 'pie-wrap' }, svg,
+    el('div', { class: 'pie-legend' }, ...shown.map(([label, v], i) => {
+      const dot = el('i'); dot.style.background = PIE_COLORS[i % PIE_COLORS.length];
+      return el('div', {}, dot, el('span', { class: 'pl' }, label), el('span', { class: 'pv' }, short(v) + ' · ' + Math.round(v / total * 100) + '%'));
+    }))));
+}
+
+// A top-down world heatmap: cells coloured by value on a log scale (dark -> gold -> red), so a busy
+// spawn doesn't wash out quieter places. North is up (smaller Z). Pins mark spots like "Last seen here".
+function heatmapCard(h) {
+  if (!h.cells.length) return el('div', { class: 'card' }, el('h3', {}, h.title), el('p', { class: 'muted' }, 'No positions recorded yet (taken once a minute while players are online).'));
+  const NS = 'http://www.w3.org/2000/svg';
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, max = 1;
+  for (const [x, z, v] of h.cells) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); max = Math.max(max, v); }
+  for (const [, bx, bz] of h.pins) { x0 = Math.min(x0, Math.floor(bx / h.cell)); x1 = Math.max(x1, Math.floor(bx / h.cell)); z0 = Math.min(z0, Math.floor(bz / h.cell)); z1 = Math.max(z1, Math.floor(bz / h.cell)); }
+  x0 -= 2; z0 -= 2; x1 += 3; z1 += 3;
+  const w = x1 - x0, hgt = z1 - z0;
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `${x0} ${z0} ${w} ${hgt}`);
+  svg.setAttribute('class', 'heat');
+  svg.style.aspectRatio = String(Math.max(0.4, Math.min(3, w / hgt)));
+  const mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; svg.append(e); return e; };
+  mk('rect', { x: x0, y: z0, width: w, height: hgt, class: 'heat-bg' });
+  const colour = (v) => {
+    const t = Math.log(1 + v) / Math.log(1 + max);           // 0..1
+    const stops = [[0, [40, 46, 54]], [0.45, [143, 113, 48]], [0.75, [226, 181, 75]], [1, [229, 83, 75]]];
+    let i = 1; while (i < stops.length - 1 && t > stops[i][0]) i++;
+    const [ta, ca] = stops[i - 1], [tb, cb] = stops[i], f = (t - ta) / (tb - ta || 1);
+    return 'rgb(' + ca.map((c, k) => Math.round(c + (cb[k] - c) * f)).join(',') + ')';
+  };
+  for (const [x, z, v] of h.cells) {
+    const r = mk('rect', { x, y: z, width: 1.02, height: 1.02, fill: colour(v) });
+    r.addEventListener('mousemove', (e) => tip(e, 'X ' + x * h.cell + '..' + (x * h.cell + h.cell - 1) + ', Z ' + z * h.cell + '..' + (z * h.cell + h.cell - 1)
+      + '\n' + short(v) + ' ' + (h.unit || '')));
+    r.addEventListener('mouseleave', () => tip(null));
+  }
+  const size = Math.max(w, hgt) / 60;
+  for (const [label, bx, bz] of h.pins) {
+    mk('circle', { cx: bx / h.cell, cy: bz / h.cell, r: size, class: 'heat-pin' });
+    mk('text', { x: bx / h.cell + size * 1.6, y: bz / h.cell + size * 0.6, class: 'heat-label', 'font-size': size * 1.7 }, label);
+  }
+  const total = h.cells.reduce((t, c) => t + c[2], 0);
+  return el('div', { class: 'card' },
+    el('div', { class: 'spread' }, el('h3', {}, h.title), el('span', { class: 'muted mono' },
+      'X ' + x0 * h.cell + '..' + x1 * h.cell + ' · Z ' + z0 * h.cell + '..' + z1 * h.cell + ' · ' + h.cell + '-block squares · ' + short(total) + ' ' + (h.unit || ''))),
+    svg,
+    el('div', { class: 'heat-scale' }, el('span', {}, 'less'), el('i'), el('span', {}, 'more'), el('span', { class: 'muted' }, '  north is up')));
+}
+
+// Plugin sections on a profile (Hycon's own Activity, PrisonCore's Prison, ...), with a range picker.
+function profileSections(uuid) {
+  const out = el('div');
+  let range = S.range || '30d';
+  const seg = el('div', { class: 'seg' });
+  const drawSeg = () => seg.replaceChildren(...RANGES.map(([r, t]) => el('button', { class: r === range ? 'on' : '',
+    on: { click: () => { range = S.range = r; drawSeg(); load(); } } }, t)));
+  drawSeg();
+  async function load() {
+    try {
+      const d = await api('GET', '/api/profile-sections?player=' + encodeURIComponent(uuid) + '&range=' + range);
+      out.replaceChildren(...d.sections.map((sec) => el('div', { class: 'section' },
+        el('h2', {}, sec.title), sec.error ? el('p', { class: 'bad' }, sec.error) : blocks(sec.blocks, {}))));
+    } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
+  }
+  load();
+  return el('div', {}, el('div', { class: 'spread' }, el('span', { class: 'muted' }, 'Player stats'), seg), out);
 }
 
 function columnsCard(c) {

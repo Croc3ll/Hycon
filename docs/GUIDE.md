@@ -79,6 +79,21 @@ the colour of their UUID (Hytale offers no picture of a player's character to sh
 
 This history is kept in `moderation.log` and stays even after a ban ends.
 
+**Player stats** (on the profile, with its own 24 h / 7 d / 30 d / All time picker):
+
+- **Activity**: playtime, sessions and average length, days played in the last 30 days, PvP
+  kills/deaths, warnings and reports; minutes online per day and by hour of day; pie charts of
+  their moderation record and PvP.
+- **Where and what**: the world they spend most time in, distance walked, a **heatmap** of where
+  they spend time (8-block squares, brighter = more minutes, with a "Last seen here" pin), and pie
+  charts of the blocks they break, place and use and what they craft, plus the zones they found.
+- Other plugins can add their own sections here (PrisonCore adds what they mine and where their
+  money comes from and goes).
+
+Positions are noted once a minute while players are online (kept 14 days per player); interactions
+are counted since this version of Hycon was installed. The **Analytics** tab shows the same kind
+of heatmap for the whole server.
+
 **Ping** (on the profile): the player's ping as the server measures it, a one-minute average
 taken every minute while they're online, kept 14 days. Shows median, average, the 95% mark,
 worst, best, jitter (how much it jumps minute to minute), share of minutes over 150 and 250 ms,
@@ -326,6 +341,9 @@ All in Hycon's data folder:
 | `ping/`           | One small file per player with their ping every minute, kept 14 days.                          |
 | `reports.json`    | Player reports and what staff did with them.                                                  |
 | `ties.json`       | Same-connection (hashed) and co-join ties for the connection map. Keep it private.            |
+| `activity/`       | Per player: blocks broken, placed and used, things crafted, zones found.                     |
+| `positions/`      | Per player: where they were each minute, kept 14 days.                                        |
+| `heat.json`       | Server-wide minutes per 16-block square, for the Analytics heatmap.                           |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 

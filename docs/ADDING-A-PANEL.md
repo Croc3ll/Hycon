@@ -145,6 +145,8 @@ The JVM only loads `ShopPanel` the first time it's used, so when Hycon is missin
 | `bars(title).bar(label, note, value, text)` | Horizontal bars; length relative to the largest value.          |
 | `columns(title).column(label, value)` | A small column chart (e.g. per hour).                                  |
 | `table(title, columns...).row(cells...)` | A table; use `PanelData.time(ms)` for dates.                        |
+| `pie(title).unit(u).slice(label, value)` | A donut chart with a legend (shares in %). Sits side by side with bars and columns. |
+| `heatmap(title, cellSize, unit).cell(cx, cz, value).pin(label, x, z)` | A top-down world map, coloured by value per square. |
 | `note(text)`                          | A line of text. Notes in a row share one boxed panel; a short line with no full stop (e.g. "Summary") becomes the box's heading. |
 
 All text is shown as plain text, never as HTML, so player names and item names are safe to pass
@@ -156,3 +158,10 @@ straight through. Each tab is capped (100 blocks, 5000 chart points, 1000 table 
   (counters, caches, your own database), never from the world or entities directly.
 - Keep it fast: it runs on every refresh of every open browser tab.
 - Exceptions in `render` show as an error on your tab; they don't affect Hycon or the server.
+
+## A section on every player's profile (API version 3)
+
+Implement `HyconProfileSection` instead of `HyconPanel`: `render(UUID player, String name, PanelData out)`
+fills in that one player's numbers and charts. Register it with
+`HyconApi.registerProfileSection(...)` and remove it with `HyconApi.unregisterProfileSection(id)`.
+It appears under the player's profile with the same range picker.

@@ -6,6 +6,8 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hycon.api.HyconPanel;
 import com.hycon.api.PanelData;
 import com.hycon.game.KnownPlayers;
+import com.hycon.game.PositionLog;
+import com.hypixel.hytale.server.core.universe.world.World;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -27,10 +29,12 @@ public final class AnalyticsPanel implements HyconPanel {
 
     private final Samples samples;
     private final KnownPlayers known;
+    private final PositionLog positions;
 
-    public AnalyticsPanel(Samples samples, KnownPlayers known) {
+    public AnalyticsPanel(Samples samples, KnownPlayers known, PositionLog positions) {
         this.samples = samples;
         this.known = known;
+        this.positions = positions;
     }
 
     @Override
@@ -140,6 +144,21 @@ public final class AnalyticsPanel implements HyconPanel {
                     onlineIds.contains(i.uuid()) ? "online now" : i.lastSeen() == 0 ? "" : PanelData.time(i.lastSeen()));
         }
         regulars(out, now, onlineIds);
+
+        // Where everyone spends time (since Hycon was installed), busiest worlds first.
+        for (String w : positions.worlds().subList(0, Math.min(2, positions.worlds().size()))) {
+            PanelData.Heatmap h = out.heatmap("Where players spend time - " + w, PositionLog.CELL, "player-min");
+            positions.heat(w).forEach((k, v) -> {
+                int comma = k.indexOf(',');
+                h.cell(Integer.parseInt(k.substring(0, comma)), Integer.parseInt(k.substring(comma + 1)), v);
+            });
+            for (PlayerRef p : Universe.get().getPlayers()) {
+                World pw = p.getWorldUuid() == null ? null : Universe.get().getWorld(p.getWorldUuid());
+                if (pw != null && pw.getName().equals(w) && p.getTransform() != null) {
+                    h.pin(p.getUsername(), (int) p.getTransform().getPosition().x, (int) p.getTransform().getPosition().z);
+                }
+            }
+        }
     }
 
     /**

@@ -20,3 +20,6 @@ src/main/resources/ping/
 src/main/resources/kills.log
 src/main/resources/reports.json
 src/main/resources/ties.json
+src/main/resources/activity/
+src/main/resources/positions/
+src/main/resources/heat.json
