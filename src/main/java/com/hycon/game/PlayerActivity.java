@@ -34,10 +34,26 @@ import java.util.concurrent.ConcurrentHashMap;
  * blocks broken, blocks placed, blocks used (doors, chests, benches...), items crafted and zones
  * discovered. One file per player ({@code activity/<uuid>.json}); counters for players who are
  * offline and saved are dropped from memory, so a big player base costs nothing while away.
+ *
+ * <p>Breaking, placing and using are also counted per {@link #SPOT}x{@link #SPOT}-block square
+ * ("spots"), for the markers on the player's map. Adding up per square keeps this small even for a
+ * player mining thousands of blocks: one counter per square and kind, not one entry per block.
  */
 public final class PlayerActivity {
 
     public enum Kind { BROKEN, PLACED, USED, CRAFTED, ZONES }
+
+    /** Marker square size in blocks. */
+    public static final int SPOT = 4;
+    /** Squares remembered per player; the busiest ones matter, a stray block far away doesn't. */
+    private static final int MAX_SPOTS = 3000;
+
+    /** One marker: where, what kind, how often, and the last block type there. */
+    public record Spot(String world, int x, int z, Kind kind, long count, String type) {
+    }
+
+    /** "world|squareX|squareZ|KIND" to {count, last type}. */
+    private final Map<UUID, Map<String, Object[]>> spots = new ConcurrentHashMap<>();
 
     /** Different types kept per kind; past this, new types are ignored (protects against odd blocks). */
     private static final int MAX_TYPES = 400;
@@ -71,6 +87,42 @@ public final class PlayerActivity {
         }
     }
 
+    /** Records an action at a block, for the map markers. */
+    public void spot(UUID player, String world, int x, int z, Kind kind, String type) {
+        Map<String, Object[]> m = spotsOf(player);
+        String key = world + "|" + Math.floorDiv(x, SPOT) + "|" + Math.floorDiv(z, SPOT) + "|" + kind.name();
+        synchronized (m) {
+            Object[] v = m.get(key);
+            if (v != null) {
+                v[0] = (Long) v[0] + 1;
+                v[1] = type;
+            } else if (m.size() < MAX_SPOTS) {
+                m.put(key, new Object[]{1L, type});
+            } else {
+                return;
+            }
+        }
+        dirty.add(player);
+    }
+
+    /** This player's markers (block coordinates are the square's corner). */
+    public java.util.List<Spot> spots(UUID player) {
+        Map<String, Object[]> m = spotsOf(player);
+        java.util.List<Spot> out = new java.util.ArrayList<>();
+        synchronized (m) {
+            m.forEach((k, v) -> {
+                String[] p = k.split("\\|");
+                out.add(new Spot(p[0], Integer.parseInt(p[1]) * SPOT, Integer.parseInt(p[2]) * SPOT, Kind.valueOf(p[3]), (Long) v[0], (String) v[1]));
+            });
+        }
+        return out;
+    }
+
+    private Map<String, Object[]> spotsOf(UUID player) {
+        of(player); // loads the file (spots included) on first use
+        return spots.computeIfAbsent(player, k -> new HashMap<>());
+    }
+
     /** Writes changed players; forgets saved players who are offline. Run every minute. */
     public void save(Set<UUID> online) {
         for (UUID u : Set.copyOf(dirty)) {
@@ -88,6 +140,14 @@ public final class PlayerActivity {
                 }
                 j.endObject();
             }
+            Map<String, Object[]> sp = spots.get(u);
+            j.name("SPOTS").beginObject();
+            if (sp != null) {
+                synchronized (sp) {
+                    sp.forEach((k, v) -> j.name(k).beginArray().value((Long) v[0]).value((String) v[1]).endArray());
+                }
+            }
+            j.endObject();
             j.endObject();
             try {
                 Files.createDirectories(dir);
@@ -99,6 +159,7 @@ public final class PlayerActivity {
             }
         }
         counts.keySet().removeIf(u -> !online.contains(u) && !dirty.contains(u));
+        spots.keySet().removeIf(u -> !counts.containsKey(u));
     }
 
     private Map<Kind, Map<String, Long>> of(UUID player) {
@@ -114,6 +175,15 @@ public final class PlayerActivity {
         if (Files.exists(f)) {
             try {
                 Map<String, Object> m = JsonReader.object(Files.readString(f, StandardCharsets.UTF_8));
+                if (m.get("SPOTS") instanceof Map<?, ?> sm) {
+                    Map<String, Object[]> sp = new HashMap<>();
+                    sm.forEach((k, v) -> {
+                        if (k instanceof String key && v instanceof java.util.List<?> l && l.size() == 2 && l.get(0) instanceof Double n) {
+                            sp.put(key, new Object[]{n.longValue(), l.get(1) instanceof String t ? t : ""});
+                        }
+                    });
+                    spots.put(player, sp);
+                }
                 for (Kind k : Kind.values()) {
                     if (m.get(k.name()) instanceof Map<?, ?> km) {
                         km.forEach((t, n) -> {
@@ -137,7 +207,7 @@ public final class PlayerActivity {
             super(type);
         }
 
-        abstract void count(UUID player, E event);
+        abstract void count(UUID player, String world, E event);
 
         @Override
         public void handle(int index, @Nonnull ArchetypeChunk<EntityStore> chunk, @Nonnull Store<EntityStore> store,
@@ -145,7 +215,7 @@ public final class PlayerActivity {
             PlayerRef p = store.getComponent(chunk.getReferenceTo(index), PlayerRef.getComponentType());
             if (p != null) {
                 try {
-                    count(p.getUuid(), event);
+                    count(p.getUuid(), store.getExternalData().getWorld().getName(), event);
                 } catch (RuntimeException ignored) {
                     // never let statistics break the game action itself
                 }
@@ -163,33 +233,36 @@ public final class PlayerActivity {
     public java.util.List<EntityEventSystem<EntityStore, ?>> systems() {
         return java.util.List.of(
                 new Hook<>(BreakBlockEvent.class) {
-                    void count(UUID p, BreakBlockEvent e) {
+                    void count(UUID p, String w, BreakBlockEvent e) {
                         if (!e.isCancelled()) {
                             add(p, Kind.BROKEN, e.getBlockType().getId(), 1);
+                            spot(p, w, e.getTargetBlock().x, e.getTargetBlock().z, Kind.BROKEN, e.getBlockType().getId());
                         }
                     }
                 },
                 new Hook<>(PlaceBlockEvent.class) {
-                    void count(UUID p, PlaceBlockEvent e) {
+                    void count(UUID p, String w, PlaceBlockEvent e) {
                         if (!e.isCancelled() && e.getItemInHand() != null) {
                             add(p, Kind.PLACED, e.getItemInHand().getItemId(), 1);
+                            spot(p, w, e.getTargetBlock().x, e.getTargetBlock().z, Kind.PLACED, e.getItemInHand().getItemId());
                         }
                     }
                 },
                 new Hook<>(UseBlockEvent.Post.class) {
-                    void count(UUID p, UseBlockEvent.Post e) {
+                    void count(UUID p, String w, UseBlockEvent.Post e) {
                         add(p, Kind.USED, e.getBlockType().getId(), 1);
+                        spot(p, w, e.getTargetBlock().x, e.getTargetBlock().z, Kind.USED, e.getBlockType().getId());
                     }
                 },
                 new Hook<>(CraftRecipeEvent.Post.class) {
-                    void count(UUID p, CraftRecipeEvent.Post e) {
+                    void count(UUID p, String w, CraftRecipeEvent.Post e) {
                         MaterialQuantity out = e.getCraftedRecipe().getPrimaryOutput();
                         String id = out != null && out.getItemId() != null ? out.getItemId() : e.getCraftedRecipe().getId();
                         add(p, Kind.CRAFTED, id, Math.max(1, e.getQuantity()));
                     }
                 },
                 new Hook<>(DiscoverZoneEvent.Display.class) {
-                    void count(UUID p, DiscoverZoneEvent.Display e) {
+                    void count(UUID p, String w, DiscoverZoneEvent.Display e) {
                         add(p, Kind.ZONES, e.getDiscoveryInfo().zoneName(), 1);
                     }
                 });

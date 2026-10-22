@@ -216,8 +216,12 @@ public final class PanelData {
     public static final class Heatmap {
         final String title, unit;
         final int cellSize;
-        final List<int[]> cells = new ArrayList<>();
+        final List<double[]> cells = new ArrayList<>();
         final List<String[]> pins = new ArrayList<>();
+        /** Path segments: each a list of block positions x, z, x, z, ... */
+        final List<List<Integer>> path = new ArrayList<>();
+        final List<String[]> marks = new ArrayList<>();
+        int pathPoints;
         String world;
 
         /** The world's name: Hycon then draws the real world map under the heat. */
@@ -232,9 +236,40 @@ public final class PanelData {
             this.unit = unit;
         }
 
-        public Heatmap cell(int cellX, int cellZ, int value) {
+        public Heatmap cell(int cellX, int cellZ, double value) {
             if (value > 0 && cells.size() < 20_000) {
-                cells.add(new int[]{cellX, cellZ, value});
+                cells.add(new double[]{cellX, cellZ, value});
+            }
+            return this;
+        }
+
+        /** Starts a new stretch of path (e.g. a new session); following {@link #step}s join it up. */
+        public Heatmap segment() {
+            path.add(new ArrayList<>());
+            return this;
+        }
+
+        /** The next point of the current path stretch, in block coordinates. */
+        public Heatmap step(int x, int z) {
+            if (path.isEmpty()) {
+                segment();
+            }
+            if (pathPoints < 6000) {
+                pathPoints++;
+                List<Integer> seg = path.get(path.size() - 1);
+                seg.add(x);
+                seg.add(z);
+            }
+            return this;
+        }
+
+        /**
+         * A marker for something done at a place, e.g. kind "broken" with a count and a description.
+         * Kinds the page knows: broken, placed, used (anything else gets a plain marker).
+         */
+        public Heatmap mark(String kind, int x, int z, long count, String label) {
+            if (marks.size() < 3000) {
+                marks.add(new String[]{kind, String.valueOf(x), String.valueOf(z), String.valueOf(count), label});
             }
             return this;
         }
@@ -333,12 +368,27 @@ public final class PanelData {
                 case Heatmap h -> {
                     j.field("type", "heatmap").field("title", h.title).field("unit", h.unit).field("cell", h.cellSize)
                             .field("world", h.world).name("cells").beginArray();
-                    for (int[] c : h.cells) {
-                        j.beginArray().value(c[0]).value(c[1]).value(c[2]).endArray();
+                    for (double[] c : h.cells) {
+                        j.beginArray().value(c[0]).value(c[1]).value(Math.round(c[2] * 100) / 100.0).endArray();
                     }
                     j.endArray().name("pins").beginArray();
                     for (String[] p : h.pins) {
                         j.beginArray().value(p[0]).value(Double.parseDouble(p[1])).value(Double.parseDouble(p[2])).endArray();
+                    }
+                    j.endArray().name("path").beginArray();
+                    for (List<Integer> seg : h.path) {
+                        if (seg.size() >= 4) {
+                            j.beginArray();
+                            for (int v : seg) {
+                                j.value(v);
+                            }
+                            j.endArray();
+                        }
+                    }
+                    j.endArray().name("marks").beginArray();
+                    for (String[] m : h.marks) {
+                        j.beginArray().value(m[0]).value(Double.parseDouble(m[1])).value(Double.parseDouble(m[2]))
+                                .value(Double.parseDouble(m[3])).value(m[4]).endArray();
                     }
                     j.endArray();
                 }

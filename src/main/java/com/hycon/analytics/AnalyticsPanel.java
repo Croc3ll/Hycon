@@ -153,7 +153,7 @@ public final class AnalyticsPanel implements HyconPanel {
             PanelData.Heatmap h = out.heatmap("Where players spend time - " + w, PositionLog.CELL, "player-min").world(w);
             positions.heat(w).forEach((k, v) -> {
                 int comma = k.indexOf(',');
-                h.cell(Integer.parseInt(k.substring(0, comma)), Integer.parseInt(k.substring(comma + 1)), v);
+                h.cell(Integer.parseInt(k.substring(0, comma)), Integer.parseInt(k.substring(comma + 1)), v * PositionLog.MINUTES_PER_SAMPLE);
             });
             for (PlayerRef p : Universe.get().getPlayers()) {
                 World pw = p.getWorldUuid() == null ? null : Universe.get().getWorld(p.getWorldUuid());

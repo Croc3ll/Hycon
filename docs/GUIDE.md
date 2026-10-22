@@ -85,13 +85,17 @@ This history is kept in `moderation.log` and stays even after a ban ends.
   kills/deaths, warnings and reports; minutes online per day and by hour of day; pie charts of
   their moderation record and PvP.
 - **Where and what**: the world they spend most time in, distance walked, a **heatmap** of where
-  they spend time (8-block squares, brighter = more minutes, with a "Last seen here" pin), drawn
-  over the real world map (Hytale's own map images; **Map: on/off** hides it), and pie
+  they spend time over the real world map: smooth heat from **blue (little time) to red (most
+  time)**, the **path** they walked (each stretch coloured the same way), **markers** where they
+  broke (B), placed (P) or used (U) blocks, and a "Last seen here" pin. Zoom with **+ / − / Fit** or
+  click the map and scroll; drag to move; hover for coordinates, time spent and what was done there.
+  The **Map / Heat / Path / Marks** buttons switch layers on and off, and **↻ Refresh** reloads the
+  numbers without losing your zoom, and pie
   charts of the blocks they break, place and use and what they craft, plus the zones they found.
 - Other plugins can add their own sections here (PrisonCore adds what they mine and where their
   money comes from and goes).
 
-Positions are noted once a minute while players are online (kept 14 days per player); interactions
+Positions are noted every 15 seconds while players are online (kept 14 days per player); interactions
 are counted since this version of Hycon was installed. The **Analytics** tab shows the same kind
 of heatmap for the whole server. The first time an area's map is shown, Hytale may need a few
 seconds to draw it; it's cached for 5 minutes after that (areas up to 48x48 chunks).

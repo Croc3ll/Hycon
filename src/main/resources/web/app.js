@@ -904,63 +904,6 @@ function pieCard(p) {
     }))));
 }
 
-// A top-down world heatmap: cells coloured by value on a log scale (dark -> gold -> red), so a busy
-// spawn doesn't wash out quieter places. North is up (smaller Z). Pins mark spots like "Last seen here".
-function heatmapCard(h) {
-  if (!h.cells.length) return el('div', { class: 'card' }, el('h3', {}, h.title), el('p', { class: 'muted' }, 'Nothing recorded yet. Positions are noted once a minute while players are online; join and move around for a few minutes.'));
-  const NS = 'http://www.w3.org/2000/svg';
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, max = 1;
-  for (const [x, z, v] of h.cells) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); max = Math.max(max, v); }
-  for (const [, bx, bz] of h.pins) { x0 = Math.min(x0, Math.floor(bx / h.cell)); x1 = Math.max(x1, Math.floor(bx / h.cell)); z0 = Math.min(z0, Math.floor(bz / h.cell)); z1 = Math.max(z1, Math.floor(bz / h.cell)); }
-  x0 -= 2; z0 -= 2; x1 += 3; z1 += 3;
-  const w = x1 - x0, hgt = z1 - z0;
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', `${x0} ${z0} ${w} ${hgt}`);
-  svg.setAttribute('class', 'heat');
-  svg.style.aspectRatio = String(Math.max(0.4, Math.min(3, w / hgt)));
-  const mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; svg.append(e); return e; };
-  mk('rect', { x: x0, y: z0, width: w, height: hgt, class: 'heat-bg' });
-  // The real world map underneath (Hytale's own map images, stitched by the server), if known.
-  let mapImg = null;
-  if (h.world) {
-    const C = 32, cx = (b) => Math.floor(b / C);
-    let cx0 = cx(x0 * h.cell), cx1 = cx(x1 * h.cell), cz0 = cx(z0 * h.cell), cz1 = cx(z1 * h.cell);
-    // The server draws at most 48 chunks per side: keep the middle of a bigger area.
-    const clip = (a, b) => { if (b - a < 48) return [a, b]; const m = Math.floor((a + b) / 2); return [m - 23, m + 24]; };
-    [cx0, cx1] = clip(cx0, cx1); [cz0, cz1] = clip(cz0, cz1);
-    mapImg = mk('image', { x: cx0 * C / h.cell, y: cz0 * C / h.cell, width: (cx1 - cx0 + 1) * C / h.cell, height: (cz1 - cz0 + 1) * C / h.cell,
-      href: '/api/worldmap?world=' + encodeURIComponent(h.world) + '&cx0=' + cx0 + '&cz0=' + cz0 + '&cx1=' + cx1 + '&cz1=' + cz1,
-      preserveAspectRatio: 'none', class: 'heat-map' });
-    svg.classList.add('with-map');
-  }
-  const colour = (v) => {
-    const t = Math.log(1 + v) / Math.log(1 + max);           // 0..1
-    const stops = [[0, [40, 46, 54]], [0.45, [143, 113, 48]], [0.75, [226, 181, 75]], [1, [229, 83, 75]]];
-    let i = 1; while (i < stops.length - 1 && t > stops[i][0]) i++;
-    const [ta, ca] = stops[i - 1], [tb, cb] = stops[i], f = (t - ta) / (tb - ta || 1);
-    return 'rgb(' + ca.map((c, k) => Math.round(c + (cb[k] - c) * f)).join(',') + ')';
-  };
-  for (const [x, z, v] of h.cells) {
-    const r = mk('rect', { x, y: z, width: 1.02, height: 1.02, fill: colour(v) });
-    r.addEventListener('mousemove', (e) => tip(e, 'X ' + x * h.cell + '..' + (x * h.cell + h.cell - 1) + ', Z ' + z * h.cell + '..' + (z * h.cell + h.cell - 1)
-      + '\n' + short(v) + ' ' + (h.unit || '')));
-    r.addEventListener('mouseleave', () => tip(null));
-  }
-  const size = Math.max(w, hgt) / 60;
-  for (const [label, bx, bz] of h.pins) {
-    mk('circle', { cx: bx / h.cell, cy: bz / h.cell, r: size, class: 'heat-pin' });
-    mk('text', { x: bx / h.cell + size * 1.6, y: bz / h.cell + size * 0.6, class: 'heat-label', 'font-size': size * 1.7 }, label);
-  }
-  const total = h.cells.reduce((t, c) => t + c[2], 0);
-  return el('div', { class: 'card' },
-    el('div', { class: 'spread' }, el('h3', {}, h.title), mapImg ? el('button', { on: { click: (e) => {
-      const on = svg.classList.toggle('with-map'); mapImg.style.display = on ? '' : 'none'; e.target.textContent = on ? 'Map: on' : 'Map: off';
-    } } }, 'Map: on') : null, el('span', { class: 'muted mono' },
-      'X ' + x0 * h.cell + '..' + x1 * h.cell + ' · Z ' + z0 * h.cell + '..' + z1 * h.cell + ' · ' + h.cell + '-block squares · ' + short(total) + ' ' + (h.unit || ''))),
-    svg,
-    el('div', { class: 'heat-scale' }, el('span', {}, 'less'), el('i'), el('span', {}, 'more'), el('span', { class: 'muted' }, '  north is up')));
-}
-
 // Plugin sections on a profile (Hycon's own Activity, PrisonCore's Prison, ...), with a range picker.
 function profileSections(uuid) {
   const out = el('div');
@@ -977,7 +920,8 @@ function profileSections(uuid) {
     } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
   }
   load();
-  return el('div', {}, el('div', { class: 'spread' }, el('span', { class: 'muted' }, 'Player stats'), seg), out);
+  return el('div', {}, el('div', { class: 'spread' }, el('span', { class: 'muted' }, 'Player stats'),
+    el('div', { class: 'row' }, el('button', { on: { click: load } }, '↻ Refresh'), seg)), out);
 }
 
 function columnsCard(c) {

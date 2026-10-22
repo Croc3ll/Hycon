@@ -14,8 +14,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * "Where and what" on every profile: a heatmap of where the player spends time (from the
- * once-a-minute position log, up to 14 days), how far they travel, and what they do with the world:
+ * "Where and what" on every profile: a heatmap of where the player spends time with their path and
+ * markers for what they did where (from the position log, a sample every 15 s, up to 14 days), how
+ * far they travel, and what they do with the world:
  * blocks broken, placed and used, items crafted, zones discovered (since Hycon was installed).
  */
 public final class WorldSection implements HyconProfileSection {
@@ -71,7 +72,8 @@ public final class WorldSection implements HyconProfileSection {
         worlds.sort((a, b) -> perWorld.get(b) - perWorld.get(a));
 
         Map<String, Long> broken = activity.get(player, PlayerActivity.Kind.BROKEN);
-        out.stat("Most time in", worlds.isEmpty() ? "-" : worlds.get(0), worlds.isEmpty() ? null : perWorld.get(worlds.get(0)) + " min")
+        out.stat("Most time in", worlds.isEmpty() ? "-" : worlds.get(0),
+                        worlds.isEmpty() ? null : Math.round(perWorld.get(worlds.get(0)) * PositionLog.MINUTES_PER_SAMPLE) + " min")
                 .stat("Travelled", String.format("%,.0f blocks", travelled), "walking distance, last " + PositionLog.KEEP_DAYS + " days at most")
                 .stat("Blocks broken", String.format("%,d", sum(broken)), "since Hycon was installed")
                 .stat("Blocks placed", String.format("%,d", sum(activity.get(player, PlayerActivity.Kind.PLACED))))
@@ -83,16 +85,32 @@ public final class WorldSection implements HyconProfileSection {
         }
         for (String w : worlds.subList(0, Math.min(2, worlds.size()))) {
             PanelData.Heatmap h = out.heatmap("Where " + name + " spends time - " + w, CELL, "min").world(w);
-            grids.get(w).forEach((k, v) -> h.cell((int) (k >> 32), (int) k.longValue(), v));
+            grids.get(w).forEach((k, v) -> h.cell((int) (k >> 32), (int) k.longValue(), v * PositionLog.MINUTES_PER_SAMPLE));
+
+            // The path, one stretch per session; long histories keep every n-th point so the
+            // page stays quick (the heat above still counts every sample).
+            List<PositionLog.Spot> inWorld = spots.stream().filter(s -> s.world().equals(w)).toList();
+            int every = Math.max(1, inWorld.size() / 5000 + 1);
             PositionLog.Spot last = null;
-            for (PositionLog.Spot s : spots) {
-                if (s.world().equals(w)) {
-                    last = s;
+            for (int i = 0; i < inWorld.size(); i++) {
+                PositionLog.Spot s = inWorld.get(i);
+                if (last == null || s.time() - last.time() > SAME_SESSION_MS) {
+                    h.segment();
                 }
+                if (i % every == 0 || i == inWorld.size() - 1) {
+                    h.step(s.x(), s.z());
+                }
+                last = s;
             }
             if (last != null) {
                 h.pin("Last seen here", last.x(), last.z());
             }
+
+            // Where they broke, placed and used blocks (per 4-block square), busiest first.
+            activity.spots(player).stream().filter(sp -> sp.world().equals(w))
+                    .sorted((a, b) -> Long.compare(b.count(), a.count())).limit(1500)
+                    .forEach(sp -> h.mark(sp.kind().name().toLowerCase(), sp.x() + PlayerActivity.SPOT / 2, sp.z() + PlayerActivity.SPOT / 2,
+                            sp.count(), verb(sp.kind()) + " " + pretty(sp.type())));
         }
 
         pie(out, "Blocks broken", broken, "blocks");
@@ -110,6 +128,15 @@ public final class WorldSection implements HyconProfileSection {
         PanelData.Pie p = out.pie(title).unit(unit);
         counts.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
                 .forEach(e -> p.slice(pretty(e.getKey()), e.getValue()));
+    }
+
+    private static String verb(PlayerActivity.Kind k) {
+        return switch (k) {
+            case BROKEN -> "Broke";
+            case PLACED -> "Placed";
+            case USED -> "Used";
+            default -> k.name();
+        };
     }
 
     /** "Rock_Stone_Cobble" -> "Rock Stone Cobble". */

@@ -22,18 +22,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Where players spend their time, for the heatmaps. Every minute each online player's world and
- * position is noted:
+ * Where players spend their time, for the heatmaps. Every {@link #SAMPLE_SECONDS} seconds each online
+ * player's world and position is noted (one short line per player, so it stays cheap):
  * <ul>
  *   <li>per player in {@code positions/<uuid>.log} ({@code time,world,x,z}), kept {@link #KEEP_DAYS} days,
  *       for the map on their profile;</li>
- *   <li>server-wide as minutes per {@link #CELL}x{@link #CELL}-block cell per world in {@code heat.json},
+ *   <li>server-wide as samples per {@link #CELL}x{@link #CELL}-block cell per world in {@code heat.json},
  *       for the map on the Analytics tab (since Hycon was installed).</li>
  * </ul>
  */
 public final class PositionLog {
 
     public static final int KEEP_DAYS = 14;
+    /** How often positions are noted. 15 s shows paths and short visits; one sample = 1/4 minute. */
+    public static final int SAMPLE_SECONDS = 15;
+    public static final double MINUTES_PER_SAMPLE = SAMPLE_SECONDS / 60.0;
     /** Map cell size in blocks: fine enough to tell a mine from the spawn, coarse enough to stay small. */
     public static final int CELL = 16;
     private static final int MAX_CELLS_PER_WORLD = 40_000;
@@ -72,7 +75,7 @@ public final class PositionLog {
         }
     }
 
-    /** Every minute: note where each online player is. */
+    /** Every {@link #SAMPLE_SECONDS}: note where each online player is. */
     public void sample() {
         long now = System.currentTimeMillis();
         for (PlayerRef p : Universe.get().getPlayers()) {

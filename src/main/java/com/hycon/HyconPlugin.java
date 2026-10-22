@@ -72,6 +72,7 @@ public final class HyconPlugin extends JavaPlugin {
     private Reports reports;
     private Ties ties;
     private ScheduledFuture<?> pingSampler;
+    private ScheduledFuture<?> positionSampler;
     private LogTap logTap;
     private Sessions sessions;
     private WebServer web;
@@ -178,10 +179,9 @@ public final class HyconPlugin extends JavaPlugin {
             Runtime rt = Runtime.getRuntime();
             samples.add(Universe.get().getPlayers().size(), (int) ((rt.totalMemory() - rt.freeMemory()) >> 20));
         }, 0, Samples.INTERVAL_MS, TimeUnit.MILLISECONDS);
-        pingSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
-            pingLog.sample();
-            positions.sample();
-        }, 1, 1, TimeUnit.MINUTES);
+        pingSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(pingLog::sample, 1, 1, TimeUnit.MINUTES);
+        positionSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(positions::sample,
+                PositionLog.SAMPLE_SECONDS, PositionLog.SAMPLE_SECONDS, TimeUnit.SECONDS);
         // Players saved before Hycon was installed, so they can be searched too.
         Path playersDir = Universe.get().getPath().resolve("players");
         Thread.ofVirtual().name("Hycon-PlayerImport").start(() -> known.importSaved(playersDir));
@@ -213,6 +213,9 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (pingSampler != null) {
             pingSampler.cancel(false);
+        }
+        if (positionSampler != null) {
+            positionSampler.cancel(false);
         }
         if (samples != null) {
             samples.close();
