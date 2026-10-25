@@ -20,6 +20,9 @@ import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
 import com.hycon.game.KillLog;
 import com.hycon.game.Reports;
+import com.hycon.game.BugReports;
+import com.hycon.commands.BugCommand;
+import com.hycon.web.BugRoutes;
 import com.hycon.game.Ties;
 import com.hycon.commands.ReportCommand;
 import com.hycon.web.IntelRoutes;
@@ -70,6 +73,7 @@ public final class HyconPlugin extends JavaPlugin {
     private PlayerActivity activity;
     private PositionLog positions;
     private Reports reports;
+    private BugReports bugs;
     private Ties ties;
     private ScheduledFuture<?> pingSampler;
     private ScheduledFuture<?> positionSampler;
@@ -112,6 +116,9 @@ public final class HyconPlugin extends JavaPlugin {
         reports = new Reports(dir);
         ties = new Ties(dir);
         getCommandRegistry().registerCommand(new ReportCommand(reports, known));
+        bugs = new BugReports(dir);
+        bugs.startLogCapture();
+        getCommandRegistry().registerCommand(new BugCommand(bugs));
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
             known.joined(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
@@ -136,6 +143,7 @@ public final class HyconPlugin extends JavaPlugin {
             sharing.load();
             killLog.open();
             reports.load();
+            bugs.load();
             ties.load();
             positions.load();
             if (created) {
@@ -156,6 +164,7 @@ public final class HyconPlugin extends JavaPlugin {
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
             new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
+            new BugRoutes(web, bugs, audit).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
@@ -202,6 +211,9 @@ public final class HyconPlugin extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (bugs != null) {
+            bugs.stopLogCapture();
+        }
         if (banSync != null) {
             banSync.stop();
         }

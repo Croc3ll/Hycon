@@ -53,6 +53,7 @@ async function boot() {
   if (S.me.mustChange) return showPassword(true);
   try { S.panels = (await api('GET', '/api/panels')).panels; } catch (e) { S.panels = []; }
   if (can('MODERATOR')) { try { S.openReports = (await api('GET', '/api/reports?status=open')).open; } catch (e) { S.openReports = 0; } }
+  if (can('MODERATOR')) { try { S.openBugs = (await api('GET', '/api/bugs?status=open')).open; } catch (e) { S.openBugs = 0; } }
   render();
 }
 
@@ -119,6 +120,7 @@ function tabs() {
   const list = [['players', 'Players', 'VIEWER']];
   for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
   list.push(['bans', 'Bans', 'VIEWER'], ['reports', S.openReports ? 'Reports (' + S.openReports + ')' : 'Reports', 'MODERATOR'],
+    ['bugs', S.openBugs ? 'Bugs (' + S.openBugs + ')' : 'Bugs', 'MODERATOR'],
     ['console', 'Console', 'MODERATOR']);
   list.push(['audit', 'Audit log', 'ADMIN'], ['sharing', 'Ban sharing', 'OWNER'], ['accounts', 'Accounts', 'OWNER']);
   return list.filter((t) => can(t[2]));
@@ -141,6 +143,7 @@ function render() {
   else if (tab === 'accounts') accounts(view);
   else if (tab === 'sharing') sharing(view);
   else if (tab === 'reports') reportsView(view);
+  else if (tab === 'bugs') bugsView(view);
   else if (tab.startsWith('panel:')) dashboard(view, tab.slice(6));
   else if (tab.startsWith('profile:')) profile(view, tab.slice(8));
 }
@@ -555,6 +558,46 @@ function reportsView(view) {
           el('button', { on: { click: () => close(r, 'handled') } }, 'Handled'),
           el('button', { on: { click: () => close(r, 'dismissed') } }, 'Dismiss')] : null))));
       if (!d.reports.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'muted' }, status === 'open' ? 'No open reports.' : 'Nothing here.')));
+    } catch (e) { toast(e.message, true); }
+  }
+  load();
+}
+
+// ---------- Bugs ----------
+
+function bugsView(view) {
+  let status = 'open';
+  const list = el('div');
+  const seg = el('div', { class: 'seg' });
+  const drawSeg = () => seg.replaceChildren(...[['open', 'Open'], ['fixed', 'Fixed'], ['dismissed', 'Dismissed'], ['all', 'All']]
+    .map(([k, t]) => el('button', { class: k === status ? 'on' : '', on: { click: () => { status = k; drawSeg(); load(); } } }, t)));
+  drawSeg();
+  view.append(el('div', { class: 'card' }, el('div', { class: 'spread' },
+    el('div', {}, el('h2', {}, 'Bugs'), el('span', { class: 'muted' }, 'Players report with /bug <what happened> (or the Report window). Each one has where they stood and the server warnings and errors from the 5 minutes before.')), seg)), list);
+  async function close(b, st) {
+    const note = st === 'fixed' ? prompt('What was fixed? (optional)', '') : '';
+    if (note === null) return;
+    try { toast((await api('POST', '/api/bugs/close', { id: b.id, status: st, note })).message); S.openBugs = Math.max(0, (S.openBugs || 1) - 1); render(); }
+    catch (e) { toast(e.message, true); }
+  }
+  async function load() {
+    try {
+      const d = await api('GET', '/api/bugs?status=' + status);
+      S.openBugs = d.open;
+      list.replaceChildren(...d.bugs.map((b) => el('div', { class: 'card' },
+        el('div', { class: 'spread' },
+          el('div', {}, el('b', {}, fmtTime(b.time)), ' · ', nameLink(b.reporterName, b.reporter), b.where ? el('span', { class: 'muted' }, ' · ' + b.where) : null,
+            ' ', el('span', { class: b.status === 'OPEN' ? 'badge' : 'badge dim' }, b.status.toLowerCase()),
+            b.closedBy ? el('span', { class: 'muted' }, ' ' + b.closedBy + (b.note ? ': ' + b.note : '')) : null),
+          b.status === 'OPEN' ? el('div', { class: 'actions' },
+            el('button', { on: { click: () => close(b, 'fixed') } }, 'Fixed'),
+            el('button', { on: { click: () => close(b, 'dismissed') } }, 'Dismiss')) : null),
+        el('p', {}, b.text),
+        b.serverLog ? el('details', {}, el('summary', {}, 'Server warnings and errors (' + b.serverLog.split('
+').length + ' lines)'),
+          el('pre', { class: 'mono', style: 'white-space:pre-wrap;max-height:320px;overflow:auto' }, b.serverLog))
+          : el('div', { class: 'muted' }, 'No server warnings or errors in the 5 minutes before.'))));
+      if (!d.bugs.length) list.replaceChildren(el('div', { class: 'card muted' }, status === 'open' ? 'No open bug reports.' : 'Nothing here.'));
     } catch (e) { toast(e.message, true); }
   }
   load();
