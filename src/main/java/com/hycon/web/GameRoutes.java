@@ -265,6 +265,15 @@ public final class GameRoutes {
             }
             j.endObject();
         }
+        com.hycon.analytics.RiskSection risk = com.hycon.analytics.RiskSection.get();
+        if (risk != null) {
+            var s = risk.score(t.uuid());
+            j.name("risk").beginObject().field("score", s.score()).field("level", s.level()).name("reasons").beginArray();
+            for (var x : s.factors()) {
+                j.beginObject().field("what", x.what()).field("points", x.points()).field("detail", x.detail()).endObject();
+            }
+            j.endArray().endObject();
+        }
         j.name("history").beginArray();
         for (PlayerRecords.Entry e : records.history(t.uuid())) {
             j.beginObject().field("time", e.time()).field("type", e.type().name()).field("by", e.by())

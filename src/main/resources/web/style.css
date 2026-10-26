@@ -289,3 +289,26 @@ input[type=color] { width: 42px; padding: 2px; height: 34px; }
 .tag.yes { color: #4fbf7a; border-color: #2c5e3e; } .tag.no { color: #e5534b; border-color: #6b2d2a; }
 @media (max-width: 800px) { .editor { grid-template-columns: 1fr; } .navbar { position: static; } }
 .panelform label:first-child { flex: 1 1 260px; }
+
+/* Profile risk: the page background glows in the risk colour (green -> red) and falls off down the
+   page; a card beside the header gives the score and its top reasons. */
+body.riskpage {
+  /* From the right edge, top to bottom, falling off toward the left. */
+  background: linear-gradient(270deg, color-mix(in srgb, var(--risk) var(--risk-a), var(--bg)) 0%,
+    color-mix(in srgb, var(--risk) calc(var(--risk-a) * 0.45), var(--bg)) 30%, var(--bg) 75%) fixed;
+  background-color: var(--bg);
+}
+.profiletop { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 16px; }
+@media (max-width: 900px) { .profiletop { grid-template-columns: 1fr; } }
+.riskcard { border-color: color-mix(in srgb, var(--risk) 60%, var(--line));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--risk) 22%, var(--panel)), var(--panel) 75%); }
+.risklabel { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; font-weight: 700; color: var(--risk); }
+.riskscore { font-size: 54px; font-weight: 800; line-height: 1.05; color: var(--risk); }
+.riskscore span { font-size: 18px; font-weight: 600; color: var(--muted); }
+.risklevel { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
+.riskbar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin-bottom: 12px; }
+.riskbar > div { height: 100%; border-radius: 4px; background: var(--risk); }
+.riskwhy { list-style: none; padding: 0; margin: 0 0 10px; }
+.riskwhy li { padding: 3px 0; border-bottom: 1px solid var(--line2); }
+.riskwhy b { color: var(--risk); display: inline-block; min-width: 34px; }
+.small { font-size: 12px; }

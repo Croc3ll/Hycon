@@ -23,7 +23,17 @@ import java.util.concurrent.TimeUnit;
  */
 public final class RiskSection implements HyconProfileSection {
 
-    private record Factor(String what, int points, String detail) {}
+    public record Factor(String what, int points, String detail) {}
+
+    /** A player's score: 0-100, its level, and every reason (most points first). */
+    public record Score(int score, String level, List<Factor> factors) {}
+
+    private static volatile RiskSection instance;
+
+    /** The running section (for the profile header), or null before Hycon starts. */
+    public static RiskSection get() {
+        return instance;
+    }
 
     private final KnownPlayers known;
     private final PlayerRecords records;
@@ -37,6 +47,7 @@ public final class RiskSection implements HyconProfileSection {
         this.reports = reports;
         this.ties = ties;
         this.moderation = moderation;
+        instance = this;
     }
 
     @Override
@@ -51,6 +62,17 @@ public final class RiskSection implements HyconProfileSection {
 
     @Override
     public void render(UUID player, String name, PanelData out) {
+        Score s = score(player);
+        out.stat("Risk", s.level(), s.score() + " / 100");
+        out.stat("Reasons", String.valueOf(s.factors().size()), s.factors().isEmpty() ? "nothing stands out" : "listed below");
+        PanelData.Table t = out.table("Why", "Reason", "Points", "Detail");
+        for (Factor x : s.factors()) {
+            t.row(x.what(), (x.points() > 0 ? "+" : "") + x.points(), x.detail());
+        }
+        out.note("A pointer for staff, not proof: check the reasons before acting.");
+    }
+
+    public Score score(UUID player) {
         List<Factor> f = new ArrayList<>();
         HyconRisk.Factors add = (what, points, detail) -> {
             if (points != 0) {
@@ -96,13 +118,7 @@ public final class RiskSection implements HyconProfileSection {
 
         int score = Math.max(0, Math.min(100, f.stream().mapToInt(Factor::points).sum()));
         String level = score >= 80 ? "Very high" : score >= 50 ? "High" : score >= 20 ? "Medium" : "Low";
-        out.stat("Risk", level, score + " / 100");
-        out.stat("Reasons", String.valueOf(f.size()), f.isEmpty() ? "nothing stands out" : "listed below");
-        PanelData.Table t = out.table("Why", "Reason", "Points", "Detail");
         f.sort((a, b) -> Integer.compare(b.points(), a.points()));
-        for (Factor x : f) {
-            t.row(x.what(), (x.points() > 0 ? "+" : "") + x.points(), x.detail());
-        }
-        out.note("A pointer for staff, not proof: check the reasons before acting.");
+        return new Score(score, level, f);
     }
 }

@@ -130,6 +130,7 @@ function tabs() {
 
 function render() {
   stop();
+  document.body.classList.remove('riskpage'); // only a profile tints the page
   renderMe();
   const list = tabs();
   if (!S.tab.startsWith('profile:') && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
@@ -331,8 +332,26 @@ function profile(view, uuid) {
       if (!confirm('Unban ' + p.name + '?')) return;
       try { toast((await api('POST', '/api/unban', { player: p.uuid })).message); render(); } catch (e) { toast(e.message, true); }
     };
+    // The whole page glows in the risk colour (green at 0 to red), fading off down the page,
+    // so the risk shows the moment a profile opens.
+    const risk = p.risk || { score: 0, level: 'Low', reasons: [] };
+    const sc = Math.min(100, Math.max(0, risk.score));
+    document.body.style.setProperty('--risk', 'hsl(' + Math.round(130 - sc * 1.3) + ' 75% 50%)');
+    document.body.style.setProperty('--risk-a', (8 + sc * 0.37).toFixed(0) + '%');
+    document.body.classList.add('riskpage');
+    const fill = el('div'); fill.style.width = Math.max(2, sc) + '%';
+    const riskCard = el('div', { class: 'card riskcard' },
+      el('div', { class: 'risklabel' }, 'Risk'),
+      el('div', { class: 'riskscore' }, String(risk.score), el('span', {}, ' / 100')),
+      el('div', { class: 'risklevel' }, risk.level),
+      el('div', { class: 'riskbar' }, fill),
+      el('ul', { class: 'riskwhy' }, risk.reasons.length
+        ? risk.reasons.slice(0, 6).map((x) => el('li', {}, el('b', {}, '+' + x.points), ' ' + x.what,
+          x.detail ? el('span', { class: 'muted' }, ' \u2013 ' + x.detail) : null))
+        : el('li', { class: 'muted' }, 'Nothing stands out.')),
+      el('div', { class: 'muted small' }, 'A pointer for staff, not proof.'));
     out.replaceChildren(
-      el('div', { class: 'card' },
+      el('div', { class: 'profiletop' }, el('div', { class: 'card' },
         el('div', { class: 'row' }, avatar(p.name, p.uuid, 56), el('h2', { class: 'big' }, p.name),
           el('span', { class: p.online ? 'good' : 'muted' }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline')),
         el('table', {}, el('tbody', {},
@@ -347,7 +366,7 @@ function profile(view, uuid) {
           el('button', { on: { click: () => modDialog('warn', p.uuid, p.name) } }, 'Warn'),
           p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
           p.ban ? el('button', { on: { click: unban } }, 'Unban')
-            : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null),
+            : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null), riskCard),
       profileSections(p.uuid),
       pingCard(p.uuid),
       can('MODERATOR') ? connectionMap(p.uuid) : null,
