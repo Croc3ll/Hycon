@@ -159,6 +159,7 @@ public final class HyconPlugin extends JavaPlugin {
         logTap = new LogTap(config.logLines());
         logTap.install();
         sessions = new Sessions(config.sessionIdleMs(), config.sessionMaxMs());
+        sessions.rememberIn(getDataDirectory());
         Moderation moderation = new Moderation(known);
         try {
             web = new WebServer(config, sessions, admins);

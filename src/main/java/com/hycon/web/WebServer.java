@@ -149,6 +149,15 @@ public final class WebServer {
         }
 
         r.session = sessions.get(cookie(ex));
+        if (r.session == null || r.session.admin == null) {
+            // Remember me: a saved login on this browser starts a logged-in session by itself.
+            Sessions.Session remembered = sessions.fromRemembered(cookie(ex, REMEMBER_COOKIE), r.ip);
+            if (remembered != null) {
+                sessions.remove(r.session);
+                r.session = remembered;
+                r.newSession = remembered;
+            }
+        }
         if (r.session == null) {
             // Only the bootstrap call may start a session; anything else means the old one expired.
             if (!path.equals("/api/session")) {
@@ -274,6 +283,22 @@ public final class WebServer {
     }
 
     private static String cookie(HttpExchange ex) {
+        return cookie(ex, COOKIE);
+    }
+
+    public static final String REMEMBER_COOKIE = "hycon_remember";
+
+    public String rememberCookie(Req r) {
+        return cookie(r.ex, REMEMBER_COOKIE);
+    }
+
+    /** Sets (or with null, clears) the remember-me cookie; call before responding. */
+    public void setRememberCookie(Req r, String token) {
+        r.ex.getResponseHeaders().add("Set-Cookie", REMEMBER_COOKIE + "=" + (token == null ? "" : token) + "; Path=/; HttpOnly; SameSite=Strict"
+                + "; Max-Age=" + (token == null ? 0 : Sessions.REMEMBER_MS / 1000) + (config.secureCookie() ? "; Secure" : ""));
+    }
+
+    private static String cookie(HttpExchange ex, String COOKIE) {
         List<String> headers = ex.getRequestHeaders().get("Cookie");
         if (headers == null) {
             return null;
@@ -290,7 +315,7 @@ public final class WebServer {
     }
 
     private void setCookie(HttpExchange ex, Sessions.Session s) {
-        ex.getResponseHeaders().set("Set-Cookie", COOKIE + "=" + s.id + "; Path=/; HttpOnly; SameSite=Strict"
+        ex.getResponseHeaders().add("Set-Cookie", COOKIE + "=" + s.id + "; Path=/; HttpOnly; SameSite=Strict"
                 + (config.secureCookie() ? "; Secure" : ""));
     }
 }

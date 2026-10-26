@@ -82,7 +82,12 @@ public final class AuthRoutes {
         // New session id at login, so an id an attacker planted or saw beforehand is useless.
         sessions.remove(r.session);
         web.issueCookie(r, sessions.create(a.name(), r.ip));
-        audit.record(a.name(), r.ip, "login", null, null, true);
+        boolean remember = "1".equals(r.str("remember"));
+        if (remember) {
+            sessions.forget(web.rememberCookie(r)); // replaces any older one on this browser
+            web.setRememberCookie(r, sessions.remember(a.name()));
+        }
+        audit.record(a.name(), r.ip, "login", null, remember ? "remember me on this browser (30 days)" : null, true);
         r.ok(new Json().beginObject().field("ok", true).field("csrf", r.session.csrf).endObject());
     }
 
@@ -91,6 +96,8 @@ public final class AuthRoutes {
             audit.record(r.admin.name(), r.ip, "logout", null, null, true);
         }
         sessions.remove(r.session);
+        sessions.forget(web.rememberCookie(r)); // logging out also stops this browser logging in by itself
+        web.setRememberCookie(r, null);
         r.ok(new Json().beginObject().field("ok", true).endObject());
     }
 

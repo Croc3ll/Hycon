@@ -66,11 +66,12 @@ function showLogin() {
   const name = el('input', { autocomplete: 'username', required: true });
   const pw = el('input', { type: 'password', autocomplete: 'current-password', required: true });
   const msg = el('p', { class: 'bad' });
+  const remember = el('input', { type: 'checkbox', checked: true });
   const form = el('form', { class: 'card narrow', on: { submit: async (e) => {
     e.preventDefault();
     msg.textContent = '';
     try {
-      const r = await api('POST', '/api/login', { name: name.value.trim(), password: pw.value });
+      const r = await api('POST', '/api/login', { name: name.value.trim(), password: pw.value, remember: remember.checked ? '1' : '' });
       S.csrf = r.csrf;
       await boot();
     } catch (err) { msg.textContent = err.message; pw.value = ''; }
@@ -79,6 +80,7 @@ function showLogin() {
     S.setup ? el('p', { class: 'secret' }, 'First start: log in as ', el('b', {}, S.setup[0]), ' with password ', el('b', { class: 'mono' }, S.setup[1]),
       ' from the server machine, then choose your own password.') : null,
     el('label', {}, 'Account'), name, el('label', {}, 'Password'), pw,
+    el('label', { class: 'remember' }, remember, ' Remember me on this browser (30 days; only on your own computer)'),
     el('p', {}, el('button', { class: 'primary', type: 'submit' }, 'Log in')), msg);
   $('view').replaceChildren(form);
   name.focus();

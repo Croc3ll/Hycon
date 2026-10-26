@@ -2,6 +2,12 @@ package com.hycon.auth;
 
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -90,6 +96,93 @@ public final class Sessions {
     /** Logs an account out everywhere (password changed, account removed or demoted). */
     public void removeAdmin(String admin) {
         sessions.values().removeIf(s -> s.admin != null && s.admin.equalsIgnoreCase(admin));
+        if (remembered.values().removeIf(r -> r.admin().equalsIgnoreCase(admin))) {
+            saveRemembered();
+        }
+    }
+
+    // ------------------------------------------------------------------ remember me
+    // "Remember me" logins outlive restarts: the browser keeps a random token in an HttpOnly cookie and
+    // remember.txt keeps only its SHA-256 hash, so a copy of the file can't be used to log in.
+
+    public static final long REMEMBER_MS = 30L * 24 * 60 * 60_000;
+
+    private record Remembered(String admin, long expires) {}
+
+    private final Map<String, Remembered> remembered = new ConcurrentHashMap<>();
+    private Path rememberFile;
+
+    /** Loads saved remember-me logins; call once at start. */
+    public synchronized void rememberIn(Path dir) {
+        rememberFile = dir.resolve("remember.txt");
+        try {
+            if (Files.exists(rememberFile)) {
+                long now = System.currentTimeMillis();
+                for (String line : Files.readAllLines(rememberFile, StandardCharsets.UTF_8)) {
+                    String[] p = line.split(" ", 3);
+                    if (p.length == 3 && Long.parseLong(p[1]) > now) {
+                        remembered.put(p[0], new Remembered(p[2], Long.parseLong(p[1])));
+                    }
+                }
+            }
+        } catch (IOException | NumberFormatException e) {
+            remembered.clear(); // unreadable: everyone just logs in again
+        }
+    }
+
+    /** A new remember-me token for this account (the cookie's value). */
+    public String remember(String admin) {
+        String token = Passwords.token();
+        remembered.put(hash(token), new Remembered(admin, System.currentTimeMillis() + REMEMBER_MS));
+        saveRemembered();
+        return token;
+    }
+
+    /** A logged-in session from a remember-me token, or null if it's unknown or expired. */
+    public Session fromRemembered(String token, String ip) {
+        if (token == null || token.isEmpty() || token.length() > 200) {
+            return null;
+        }
+        Remembered r = remembered.get(hash(token));
+        if (r == null) {
+            return null;
+        }
+        if (r.expires() < System.currentTimeMillis()) {
+            forget(token);
+            return null;
+        }
+        return create(r.admin(), ip);
+    }
+
+    public void forget(String token) {
+        if (token != null && remembered.remove(hash(token)) != null) {
+            saveRemembered();
+        }
+    }
+
+    private synchronized void saveRemembered() {
+        if (rememberFile == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        List<String> lines = new ArrayList<>();
+        remembered.entrySet().removeIf(e -> e.getValue().expires() < now);
+        remembered.forEach((h, r) -> lines.add(h + " " + r.expires() + " " + r.admin()));
+        try {
+            Path tmp = rememberFile.resolveSibling("remember.txt.tmp");
+            Files.write(tmp, lines, StandardCharsets.UTF_8);
+            Files.move(tmp, rememberFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ignored) {
+            // still works until the next restart
+        }
+    }
+
+    private static String hash(String token) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public void sweep() {
