@@ -80,9 +80,9 @@ td.num, th.num { text-align: right; font-family: var(--mono); }
 
 /* ---------- Dashboards ---------- */
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; min-width: 0; overflow: hidden; }
 .tile .h { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; }
-.tile .v { font: 700 30px/1.15 var(--mono); margin-top: 8px; color: var(--text); }
+.tile .v { font: 700 clamp(17px, 1.7vw, 30px)/1.15 var(--mono); margin-top: 8px; color: var(--text); overflow-wrap: anywhere; }
 .tile .s { color: var(--dim); font-size: 11px; margin-top: 4px; }
 .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
 .grid3 .card { margin: 0; }
@@ -134,7 +134,7 @@ a.who { display: inline-flex; align-items: center; gap: 8px; }
 .pill.good { color: var(--ok); border-color: rgba(79, 191, 122, .5); background: rgba(79, 191, 122, .1); }
 .pill.warn { color: var(--gold); border-color: var(--gold-dim); background: var(--gold-bg); }
 .chips-stat { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-.chip-stat { border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; min-width: 76px; background: #121418; }
+.chip-stat { overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; min-width: 76px; background: #121418; }
 .chip-stat .v { font: 700 20px/1.1 var(--mono); }
 .chip-stat .v span { font-size: 11px; color: var(--muted); margin-left: 2px; }
 .chip-stat .l { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
