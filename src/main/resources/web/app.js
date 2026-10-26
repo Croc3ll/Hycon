@@ -593,8 +593,7 @@ function bugsView(view) {
             el('button', { on: { click: () => close(b, 'fixed') } }, 'Fixed'),
             el('button', { on: { click: () => close(b, 'dismissed') } }, 'Dismiss')) : null),
         el('p', {}, b.text),
-        b.serverLog ? el('details', {}, el('summary', {}, 'Server warnings and errors (' + b.serverLog.split('
-').length + ' lines)'),
+        b.serverLog ? el('details', {}, el('summary', {}, 'Server warnings and errors (' + b.serverLog.split('\n').length + ' lines)'),
           el('pre', { class: 'mono', style: 'white-space:pre-wrap;max-height:320px;overflow:auto' }, b.serverLog))
           : el('div', { class: 'muted' }, 'No server warnings or errors in the 5 minutes before.'))));
       if (!d.bugs.length) list.replaceChildren(el('div', { class: 'card muted' }, status === 'open' ? 'No open bug reports.' : 'Nothing here.'));
