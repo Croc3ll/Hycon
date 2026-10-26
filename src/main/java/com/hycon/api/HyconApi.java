@@ -26,7 +26,7 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 5; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records
+    public static final int API_VERSION = 6; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();
@@ -41,6 +41,25 @@ public final class HyconApi {
     }
 
     private static volatile Recorder recorder;
+
+    private static final Map<String, HyconRisk> RISK = new ConcurrentHashMap<>();
+
+    /** Adds (or replaces, by id) reasons for the profile's risk score. Since API version 6. */
+    public static void registerRiskSource(String id, HyconRisk source) {
+        if (id != null && source != null) {
+            RISK.put(id, source);
+        }
+    }
+
+    public static void unregisterRiskSource(String id) {
+        if (id != null) {
+            RISK.remove(id);
+        }
+    }
+
+    public static List<HyconRisk> riskSources() {
+        return new ArrayList<>(RISK.values());
+    }
 
     /** Set by Hycon itself. */
     public static void setRecorder(Recorder r) {
@@ -110,5 +129,6 @@ public final class HyconApi {
         PANELS.clear();
         SECTIONS.clear();
         recorder = null;
+        RISK.clear();
     }
 }

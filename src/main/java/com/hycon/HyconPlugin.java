@@ -186,6 +186,7 @@ public final class HyconPlugin extends JavaPlugin {
         HyconApi.register(new AnalyticsPanel(samples, known, positions));
         HyconApi.registerProfileSection(new WorldSection(positions, activity));
         HyconApi.registerProfileSection(new ActivitySection(known, pingLog, killLog, records, reports));
+        HyconApi.registerProfileSection(new com.hycon.analytics.RiskSection(known, records, reports, ties, moderation));
         banSync.start();
         shareServer.update(); // opens the share port only if share keys exist
         if (shareServer.error() != null) {
