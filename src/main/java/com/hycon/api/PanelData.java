@@ -13,7 +13,10 @@ import java.util.List;
  *       the page can switch it to a table,</li>
  *   <li>{@link #bars} - labelled horizontal bars ("time per map"),</li>
  *   <li>{@link #columns} - a small column chart ("players by hour"),</li>
- *   <li>{@link #table} - rows and columns.</li>
+ *   <li>{@link #table} - rows and columns, optionally with a button per row,</li>
+ *   <li>{@link #form} - text boxes and a submit button, handled by {@link HyconPanel#action},</li>
+ *   <li>{@link #nav} - a side bar of sections and items; clicking one renders the tab again with
+ *       {@link #selected()} set to its id (an editor: pick a thing on the left, edit it on the right).</li>
  * </ul>
  * Consecutive {@code bars}, {@code columns} and {@code pie} blocks sit side by side.
  * All text is shown as plain text (never as HTML), so values can come straight from players.
@@ -28,14 +31,137 @@ public final class PanelData {
     private int points;
 
     private final boolean allTime;
+    private final int viewerLevel;
+    private final String selected;
 
     public PanelData(long rangeMillis) {
         this(rangeMillis, false);
     }
 
     public PanelData(long rangeMillis, boolean allTime) {
+        this(rangeMillis, allTime, HyconApi.VIEWER);
+    }
+
+    public PanelData(long rangeMillis, boolean allTime, int viewerLevel) {
+        this(rangeMillis, allTime, viewerLevel, null);
+    }
+
+    public PanelData(long rangeMillis, boolean allTime, int viewerLevel, String selected) {
         this.rangeMillis = rangeMillis;
         this.allTime = allTime;
+        this.viewerLevel = viewerLevel;
+        this.selected = selected == null || selected.isBlank() ? null : selected;
+    }
+
+    /** The id of the {@link #nav} item the user picked, or null. Since API version 4. */
+    public String selected() {
+        return selected;
+    }
+
+    /**
+     * A side bar (one per tab): sections of clickable items, shown left of the other blocks.
+     * Forms and row buttons also get the picked item's id as the value {@code "_selected"}. Since API version 4.
+     */
+    public Nav nav(String search) {
+        Nav n = new Nav(search);
+        add(n);
+        return n;
+    }
+
+    public static final class Nav {
+        final String search;
+        final List<NavSection> sections = new ArrayList<>();
+
+        Nav(String search) {
+            this.search = search;
+        }
+
+        public NavSection section(String title) {
+            NavSection s = new NavSection(title);
+            if (sections.size() < 10) {
+                sections.add(s);
+            }
+            return s;
+        }
+    }
+
+    public static final class NavSection {
+        final String title;
+        final List<String[]> items = new ArrayList<>();
+        String addForm, addPrompt, removeForm, removeConfirm;
+
+        NavSection(String title) {
+            this.title = title;
+        }
+
+        /** An item; {@code sub} is small text under the label, {@code badge} is shown on the right. */
+        public NavSection item(String id, String label, String sub, String badge) {
+            if (items.size() < MAX_ROWS) {
+                items.add(new String[] {id, label, sub == null ? "" : sub, badge == null ? "" : badge});
+            }
+            return this;
+        }
+
+        /** A + button: asks {@code prompt}, then calls the action {@code form} with the answer as {@code "name"}. */
+        public NavSection add(String form, String prompt) {
+            this.addForm = form;
+            this.addPrompt = prompt;
+            return this;
+        }
+
+        /** An x on each item: calls {@code form} with the item's id as {@code "id"}, after {@code confirm}. */
+        public NavSection remove(String form, String confirm) {
+            this.removeForm = form;
+            this.removeConfirm = confirm;
+            return this;
+        }
+    }
+
+    /** Level of the account looking at the tab, {@link HyconApi#VIEWER} etc.; e.g. leave out forms it may not use. Since API version 4. */
+    public int viewerLevel() {
+        return viewerLevel;
+    }
+
+    /**
+     * A form: text boxes (or drop-downs) and a submit button. Submitting calls
+     * {@link HyconPanel#action} with this id and the typed values. Since API version 4.
+     */
+    public Form form(String id, String title, String submit) {
+        Form f = new Form(id, title, submit);
+        add(f);
+        return f;
+    }
+
+    public static final class Form {
+        final String id, title, submit;
+        final List<String[]> fields = new ArrayList<>();
+
+        Form(String id, String title, String submit) {
+            this.id = id;
+            this.title = title;
+            this.submit = submit;
+        }
+
+        /** A text box; {@code hint} is the greyed-out example text. */
+        public Form field(String name, String label, String hint) {
+            if (fields.size() < 20) {
+                fields.add(new String[] {name, label, hint == null ? "" : hint});
+            }
+            return this;
+        }
+
+        /** A drop-down of fixed choices (the first is picked to start with). */
+        public Form choice(String name, String label, String... options) {
+            if (fields.size() < 20) {
+                String[] f = new String[3 + options.length];
+                f[0] = name;
+                f[1] = label;
+                f[2] = "";
+                System.arraycopy(options, 0, f, 3, options.length);
+                fields.add(f);
+            }
+            return this;
+        }
     }
 
     /** How far back the browser asked for chart data (the tab's 1h / 6h / 24h / 7d / 30d picker). */
@@ -176,10 +302,29 @@ public final class PanelData {
         final String title;
         final String[] columns;
         final List<String[]> rows = new ArrayList<>();
+        String buttonLabel, buttonForm, buttonConfirm;
+        final List<Integer> badges = new ArrayList<>();
 
         Table(String title, String[] columns) {
             this.title = title;
             this.columns = columns;
+        }
+
+        /**
+         * A button on every row that calls {@link HyconPanel#action} with {@code form} and the row's
+         * cells keyed by column title. {@code confirm} (optional) is asked first. Since API version 4.
+         */
+        /** Shows a column as coloured tags ("true" green, "false" red, anything else grey). Since API version 4. */
+        public Table badge(int column) {
+            badges.add(column);
+            return this;
+        }
+
+        public Table button(String label, String form, String confirm) {
+            this.buttonLabel = label;
+            this.buttonForm = form;
+            this.buttonConfirm = confirm;
+            return this;
         }
 
         public Table row(Object... cells) {
@@ -415,6 +560,43 @@ public final class PanelData {
                     for (String[] r : t.rows) {
                         j.beginArray();
                         for (String c : r) {
+                            j.value(c);
+                        }
+                        j.endArray();
+                    }
+                    j.endArray();
+                    if (t.buttonForm != null) {
+                        j.field("button", t.buttonLabel).field("form", t.buttonForm).field("confirm", t.buttonConfirm);
+                    }
+                    if (!t.badges.isEmpty()) {
+                        j.name("badges").beginArray();
+                        for (int c : t.badges) {
+                            j.value(c);
+                        }
+                        j.endArray();
+                    }
+                }
+                case Nav n -> {
+                    j.field("type", "nav").field("search", n.search).name("sections").beginArray();
+                    for (NavSection s : n.sections) {
+                        j.beginObject().field("title", s.title).field("add", s.addForm).field("addPrompt", s.addPrompt)
+                                .field("remove", s.removeForm).field("removeConfirm", s.removeConfirm).name("items").beginArray();
+                        for (String[] it : s.items) {
+                            j.beginArray();
+                            for (String c : it) {
+                                j.value(c);
+                            }
+                            j.endArray();
+                        }
+                        j.endArray().endObject();
+                    }
+                    j.endArray();
+                }
+                case Form f -> {
+                    j.field("type", "form").field("id", f.id).field("title", f.title).field("submit", f.submit).name("fields").beginArray();
+                    for (String[] fl : f.fields) {
+                        j.beginArray();
+                        for (String c : fl) {
                             j.value(c);
                         }
                         j.endArray();

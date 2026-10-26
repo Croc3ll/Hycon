@@ -25,7 +25,7 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 3; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies
+    public static final int API_VERSION = 4; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();

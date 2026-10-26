@@ -24,4 +24,20 @@ public interface HyconPanel {
 
     /** Fills in the tab's content. */
     void render(PanelData out);
+
+    /**
+     * Handles a submitted {@link PanelData#form} or a table row button. Since API version 4.
+     * Hycon only calls this for accounts that may see the tab and writes every call to the audit log;
+     * check {@code level} yourself for anything stricter.
+     *
+     * @param form   the form's id
+     * @param values field name to what was typed (row buttons send their row, keyed by column title)
+     * @param actor  the panel account's name
+     * @param level  the account's level, {@link HyconApi#VIEWER} etc.
+     * @return a short message shown to the user
+     * @throws IllegalArgumentException with a message to show when the input is wrong or not allowed
+     */
+    default String action(String form, java.util.Map<String, String> values, String actor, int level) {
+        throw new IllegalArgumentException("This tab has no actions");
+    }
 }
