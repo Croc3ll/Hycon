@@ -71,6 +71,7 @@ public final class GameRoutes {
         web.get("/api/audit", Level.ADMIN, this::audit);
         web.get("/api/panels", Level.VIEWER, this::panels);
         web.get("/api/panel", Level.VIEWER, this::panel);
+        web.post("/api/panel/action", Level.VIEWER, this::panelAction);
         web.get("/api/profile-sections", Level.VIEWER, this::profileSections);
         web.get("/api/worldmap", Level.VIEWER, this::worldMap);
     }
@@ -440,7 +441,7 @@ public final class GameRoutes {
             r.error(404, "No such dashboard");
             return;
         }
-        PanelData data = new PanelData(range(r.query("range")), "all".equals(r.query("range")));
+        PanelData data = new PanelData(range(r.query("range")), "all".equals(r.query("range")), r.admin.level().rank);
         try {
             p.render(data);
         } catch (RuntimeException | LinkageError e) {
@@ -450,6 +451,37 @@ public final class GameRoutes {
         Json j = new Json().beginObject().field("title", p.title()).name("blocks");
         data.write(j);
         r.ok(j.endObject());
+    }
+
+    /** A form or row button on a plugin's tab (API 4); the plugin checks anything stricter than seeing the tab. */
+    private void panelAction(Req r) throws IOException {
+        HyconPanel p = HyconApi.get(r.str("id"));
+        String form = r.str("form");
+        if (p == null || r.admin.level().rank < p.minLevel() || form == null || form.length() > 64) {
+            r.error(404, "No such dashboard");
+            return;
+        }
+        java.util.Map<String, String> values = new java.util.LinkedHashMap<>();
+        if (r.body.get("values") instanceof java.util.Map<?, ?> m) {
+            m.forEach((k, v) -> {
+                if (values.size() < 40 && k instanceof String key && v != null) {
+                    String text = String.valueOf(v);
+                    values.put(key, text.length() > 500 ? text.substring(0, 500) : text);
+                }
+            });
+        }
+        String detail = form + " " + values;
+        try {
+            String msg = p.action(form, values, r.admin.name(), r.admin.level().rank);
+            audit.record(r.who(), r.ip, "panel", p.id(), detail, true);
+            r.ok(new Json().beginObject().field("message", msg == null ? "Done" : msg).endObject());
+        } catch (IllegalArgumentException e) {
+            audit.record(r.who(), r.ip, "panel", p.id(), detail + ": " + e.getMessage(), false);
+            r.error(400, e.getMessage() == null ? "Not allowed" : e.getMessage());
+        } catch (RuntimeException | LinkageError e) {
+            audit.record(r.who(), r.ip, "panel", p.id(), detail + ": " + e, false);
+            r.error(500, p.title() + " failed: " + e);
+        }
     }
 
     private final com.hycon.game.WorldMapImages mapImages = new com.hycon.game.WorldMapImages();

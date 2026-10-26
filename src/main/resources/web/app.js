@@ -687,13 +687,13 @@ function dashboard(view, id) {
     try {
       const d = await api('GET', '/api/panel?id=' + encodeURIComponent(id) + '&range=' + range);
       title.textContent = d.title;
-      out.replaceChildren(...blocks(d.blocks, modes));
+      out.replaceChildren(...blocks(d.blocks, modes, { id, reload: load }));
     } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
   }
   every(15000, load);
 }
 
-function blocks(list, modes) {
+function blocks(list, modes, panel) {
   const nodes = []; let tiles = null; let grid = null; let notes = null;
   for (const b of list) {
     if (b.type !== 'note') notes = null;
@@ -723,17 +723,40 @@ function blocks(list, modes) {
       const last = nodes[nodes.length - 1];
       if (last && last.heatGroup) last.heatGroup.add(b); else nodes.push(heatGroup(b));
     }
-    else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows)));
+    else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows, b.form && panel ? b : null, panel)));
+    else if (b.type === 'form' && panel) nodes.push(formCard(b, panel));
   }
   return nodes;
 }
 
 const cell = (c) => (typeof c === 'string' && /^@\d{9,}$/.test(c) ? fmtTime(+c.slice(1)) : c);
 
-function tableBox(columns, rows) {
-  return el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, ...columns.map((c) => el('th', {}, c)))),
-    el('tbody', {}, rows.length ? rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, cell(c)))))
-      : el('tr', {}, el('td', { colspan: columns.length, class: 'muted' }, 'Nothing yet.')))));
+function tableBox(columns, rows, btn, panel) {
+  const rowButton = (r) => el('td', {}, el('button', { on: { click: async () => {
+    if (btn.confirm && !confirm(btn.confirm)) return;
+    const values = {}; columns.forEach((c, i) => { values[c] = r[i]; });
+    await panelAction(panel, btn.form, values);
+  } } }, btn.button));
+  const span = columns.length + (btn ? 1 : 0);
+  return el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, ...columns.map((c) => el('th', {}, c)), btn ? el('th', {}) : null)),
+    el('tbody', {}, rows.length ? rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, cell(c))), btn ? rowButton(r) : null))
+      : el('tr', {}, el('td', { colspan: span, class: 'muted' }, 'Nothing yet.')))));
+}
+
+// Plugin tab actions (API 4): forms and row buttons post here, then the tab reloads.
+async function panelAction(panel, form, values) {
+  try { toast((await api('POST', '/api/panel/action', { id: panel.id, form, values })).message); await panel.reload(); }
+  catch (err) { toast(err.message, true); }
+}
+
+function formCard(b, panel) {
+  const inputs = b.fields.map(([name, label, hint, ...options]) => ({ name, label,
+    input: options.length ? el('select', {}, ...options.map((o) => el('option', { value: o }, o))) : el('input', { maxlength: 500, placeholder: hint }) }));
+  return el('div', { class: 'card' }, el('h3', {}, b.title), el('form', { class: 'panelform', on: { submit: async (e) => {
+    e.preventDefault();
+    const values = {}; inputs.forEach((f) => { values[f.name] = f.input.value; });
+    await panelAction(panel, b.id, values);
+  } } }, ...inputs.map((f) => el('label', {}, el('span', { class: 'muted' }, f.label), f.input)), el('button', { type: 'submit' }, b.submit || 'Save')));
 }
 
 const COLORS = ['#e2b54b', '#4fa3f7', '#e5534b', '#4fbf7a', '#a98bf0', '#f0884f'];
