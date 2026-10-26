@@ -434,7 +434,70 @@ function consoleView(view) {
   input.addEventListener('blur', () => { picks.hidden = true; cycle = null; });
   const history = []; let hi = 0;
   S.logAfter = -1;
-  view.append(el('div', { class: 'card' }, el('h2', {}, 'Console'), box,
+
+  // Status bar: TPS, players, memory, uptime (and Stop for admins).
+  const stat = (label) => { const v = el('b', {}, '–'); return [el('span', { class: 'cs-item' }, el('span', { class: 'muted' }, label + ' '), v), v]; };
+  const [tpsI, tpsV] = stat('TPS'), [onI, onV] = stat('Players'), [memI, memV] = stat('Memory'), [upI, upV] = stat('Uptime');
+  const hm = (ms) => { const m = Math.floor(ms / 60000); return m >= 1440 ? Math.floor(m / 1440) + 'd ' + Math.floor(m % 1440 / 60) + 'h' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; };
+  async function loadStatus() {
+    try {
+      const d = await api('GET', '/api/status');
+      tpsV.textContent = d.tps < 0 ? '–' : d.tps + ' / ' + d.targetTps;
+      tpsV.className = d.tps >= 0 && d.tps < d.targetTps * 0.8 ? 'bad' : '';
+      onV.textContent = d.online;
+      memV.textContent = d.memoryMb + ' / ' + d.memoryMaxMb + ' MB';
+      memV.className = d.memoryMb > d.memoryMaxMb * 0.9 ? 'bad' : '';
+      upV.textContent = hm(d.uptimeMs);
+    } catch (e) { /* next poll */ }
+  }
+  const stopBtn = can('ADMIN') ? el('button', { class: 'danger', on: { click: async () => {
+    if (!confirm('Stop the server for everyone? It saves first. AMP starts it again only if its auto-restart is on.')) return;
+    if (prompt('Type STOP to confirm') !== 'STOP') { toast('Not stopped'); return; }
+    try { const r = await api('POST', '/api/server/stop', {}); toast(r.message); } catch (e) { toast(e.message, true); }
+  } } }, 'Stop server') : null;
+  const statusBar = el('div', { class: 'console-status' }, tpsI, onI, memI, upI, el('span', { style: 'flex:1' }), stopBtn);
+
+  // Tools: log downloads and alerts.
+  let alerts = false;
+  try { alerts = localStorage.getItem('hycon.alerts') === '1'; } catch (e) { /* no storage */ }
+  const alertBox = el('input', { type: 'checkbox', checked: alerts, on: { change: async () => {
+    alerts = alertBox.checked;
+    try { localStorage.setItem('hycon.alerts', alerts ? '1' : '0'); } catch (e) { /* no storage */ }
+    if (alerts && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+  } } });
+  let audio = null;
+  function beep() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + 0.18);
+    } catch (e) { /* no sound */ }
+  }
+  let lastAlert = 0;
+  function alertFor(text) {
+    const kind = /\[(SEVERE|ERROR)\]|Exception|crash/i.test(text) ? 'Error' : /\bbann?ed\b/i.test(text) ? 'Ban' : null;
+    if (!alerts || !kind || Date.now() - lastAlert < 10000) return;
+    lastAlert = Date.now();
+    beep();
+    if ('Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification('Hycon: ' + kind, { body: text.slice(0, 180) });
+  }
+  const tools = el('div', { class: 'row console-tools' },
+    el('a', { class: 'button', href: '/api/log/download?range=hour' }, 'Download last hour'),
+    el('a', { class: 'button', href: '/api/log/download?range=today' }, "Download today's log"),
+    el('label', { class: 'muted', title: 'A sound (and a notification while this tab is hidden) on errors, crashes and bans' }, alertBox, ' Alert me on errors and bans'));
+
+  // Broadcast: an announcement in every player's chat.
+  const bcText = el('input', { placeholder: 'Announcement to every player, e.g. Restart in 5 minutes!', maxlength: 300 });
+  const bcColor = el('input', { type: 'color', value: '#ffaa00', title: 'Colour of [Announcement]' });
+  const broadcast = el('form', { class: 'row', on: { submit: async (e) => {
+    e.preventDefault();
+    const message = bcText.value.trim();
+    if (!message) return;
+    try { const r = await api('POST', '/api/broadcast', { message, color: bcColor.value }); toast(r.message); bcText.value = ''; } catch (err) { toast(err.message, true); }
+  } } }, bcText, bcColor, el('button', { class: 'primary', type: 'submit' }, 'Announce'));
+
+  view.append(statusBar, el('div', { class: 'card' }, el('h2', {}, 'Console'), tools, box,
     can('ADMIN') ? el('form', { class: 'row', on: { submit: async (e) => {
       e.preventDefault();
       const cmd = input.value.trim();
@@ -448,7 +511,9 @@ function consoleView(view) {
       } catch (err) { toast(err.message, true); }
     } } }, el('div', { class: 'complete-box' }, input, picks), el('button', { class: 'primary', type: 'submit' }, 'Run'))
       : el('p', { class: 'muted' }, 'Running commands needs the ADMIN level.')),
-    can('ADMIN') ? el('p', { class: 'muted' }, 'Tab completes commands and player names; press it again to go through the choices.') : null);
+    can('ADMIN') ? el('p', { class: 'muted' }, 'Tab completes commands and player names; press it again to go through the choices.') : null),
+    el('div', { class: 'card' }, el('h2', {}, 'Announcement'), broadcast));
+  let firstPoll = true, polls = 0;
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') { e.preventDefault(); tabComplete(); return; }
     if (e.key !== 'Shift') { cycle = null; picks.hidden = true; }
@@ -457,17 +522,20 @@ function consoleView(view) {
     if (e.key === 'ArrowDown') { hi = Math.min(history.length, hi + 1); input.value = history[hi] || ''; e.preventDefault(); }
   });
   every(1500, async () => {
+    if (polls++ % 4 === 0) loadStatus(); // the status bar every ~6 s
     try {
       const d = await api('GET', '/api/log?after=' + S.logAfter);
-      if (!d.lines.length) return;
+      if (!d.lines.length) { firstPoll = false; return; }
       const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
       for (const [seq, text] of d.lines) {
         S.logAfter = seq;
         const cls = text.startsWith('[Hycon]') ? 'mine' : /\[(SEVERE|ERROR)\]/.test(text) ? 'err' : /\[WARN/.test(text) ? 'warn' : '';
         box.append(el('div', { class: cls }, text));
+        if (!firstPoll) alertFor(text);
       }
       while (box.childElementCount > 2000) box.firstChild.remove();
       if (stick) box.scrollTop = box.scrollHeight;
+      firstPoll = false;
     } catch (e) { /* shown by the next successful poll */ }
   });
   if (can('ADMIN')) input.focus();

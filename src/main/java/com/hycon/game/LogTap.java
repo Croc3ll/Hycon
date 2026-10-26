@@ -88,6 +88,26 @@ public final class LogTap extends CopyOnWriteArrayList<LogRecord> {
         return out;
     }
 
+    /** Every buffered line logged at or after {@code millis} (lines Hycon added itself are kept), oldest first. */
+    public List<String> sinceTime(long millis) {
+        List<LogRecord> recs = new ArrayList<>();
+        List<String> texts = new ArrayList<>();
+        synchronized (ring) {
+            for (long s = Math.max(0, next - ring.length); s < next; s++) {
+                int i = (int) (s % ring.length);
+                if (ring[i] == null || ring[i].getMillis() >= millis) {
+                    recs.add(ring[i]);
+                    texts.add(extra[i]);
+                }
+            }
+        }
+        List<String> out = new ArrayList<>(recs.size());
+        for (int k = 0; k < recs.size(); k++) {
+            out.add(recs.get(k) == null ? texts.get(k) : format(recs.get(k)));
+        }
+        return out;
+    }
+
     public long latest() {
         synchronized (ring) {
             return next - 1;

@@ -23,6 +23,7 @@ import com.hycon.game.Reports;
 import com.hycon.game.BugReports;
 import com.hycon.commands.BugCommand;
 import com.hycon.web.BugRoutes;
+import com.hycon.web.ConsoleRoutes;
 import com.hycon.game.Ties;
 import com.hycon.commands.ReportCommand;
 import com.hycon.web.IntelRoutes;
@@ -165,6 +166,7 @@ public final class HyconPlugin extends JavaPlugin {
             new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
             new BugRoutes(web, bugs, audit).register();
+            new ConsoleRoutes(web, logTap, audit).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
