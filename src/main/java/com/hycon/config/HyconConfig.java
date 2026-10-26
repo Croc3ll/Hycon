@@ -31,7 +31,10 @@ public record HyconConfig(
         Set<String> blockedCommands,
         int logLines,
         int sharePort,
-        String shareBindAddress) {
+        String shareBindAddress,
+        String ampUrl,
+        String ampUser,
+        String ampPassword) {
 
     public static HyconConfig load(Path dataDir) throws IOException {
         Path file = dataDir.resolve("hycon.json");
@@ -64,7 +67,10 @@ public record HyconConfig(
                 lowerSet(m, "BlockedCommands"),
                 (int) Math.max(100, Math.min(50_000, num(m, "LogLines", 2000))),
                 (int) num(m, "SharePort", 8097),
-                str(m, "ShareBindAddress", "0.0.0.0"));
+                str(m, "ShareBindAddress", "0.0.0.0"),
+                str(m, "AmpUrl", ""),
+                str(m, "AmpUser", ""),
+                str(m, "AmpPassword", ""));
     }
 
     /** True when only this machine can reach the panel. */

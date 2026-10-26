@@ -60,5 +60,15 @@
   // Players reach your game port, other Hycon servers reach this one, so
   // open it in your firewall / router if you share with servers elsewhere.
   "SharePort": 8097,
-  "ShareBindAddress": "0.0.0.0"
+  "ShareBindAddress": "0.0.0.0",
+
+  // AMP (CubeCoders) on this machine, for the console's Restart and Stop
+  // buttons. A plugin can't start its own server again, so Hycon asks AMP.
+  // AmpUrl: this server instance's own AMP address as seen from this
+  // machine, e.g. "http://127.0.0.1:8081" (not the ADS panel, unless the
+  // server runs there). Make an AMP user that may only start/stop/restart
+  // this instance and put its login here. "" = buttons off.
+  "AmpUrl": "",
+  "AmpUser": "",
+  "AmpPassword": ""
 }

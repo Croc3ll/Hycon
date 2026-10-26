@@ -2,6 +2,7 @@ package com.hycon.web;
 
 import com.hycon.audit.AuditLog;
 import com.hycon.auth.Level;
+import com.hycon.game.AmpClient;
 import com.hycon.game.ConsoleRunner;
 import com.hycon.game.LogTap;
 import com.hypixel.hytale.metrics.metric.HistoricMetric;
@@ -30,9 +31,11 @@ public final class ConsoleRoutes {
     private final LogTap log;
     private final AuditLog audit;
     private final ConsoleRunner console;
+    private final AmpClient amp;
 
-    public ConsoleRoutes(WebServer web, LogTap log, AuditLog audit, ConsoleRunner console) {
+    public ConsoleRoutes(WebServer web, LogTap log, AuditLog audit, ConsoleRunner console, AmpClient amp) {
         this.web = web;
+        this.amp = amp;
         this.console = console;
         this.log = log;
         this.audit = audit;
@@ -43,6 +46,7 @@ public final class ConsoleRoutes {
         web.get("/api/log/download", Level.MODERATOR, this::download);
         web.post("/api/broadcast", Level.MODERATOR, this::broadcast);
         web.post("/api/server/stop", Level.ADMIN, this::stop);
+        web.post("/api/server/restart", Level.ADMIN, this::restart);
     }
 
     /** TPS of the slowest world, players online, heap and uptime. */
@@ -67,6 +71,7 @@ public final class ConsoleRoutes {
                 .field("online", Universe.get().getPlayers().size())
                 .field("memoryMb", (rt.totalMemory() - rt.freeMemory()) >> 20).field("memoryMaxMb", rt.maxMemory() >> 20)
                 .field("uptimeMs", ManagementFactory.getRuntimeMXBean().getUptime())
+                .field("amp", amp.configured())
                 .endObject());
     }
 
@@ -112,15 +117,49 @@ public final class ConsoleRoutes {
         r.ok(new Json().beginObject().field("ok", true).field("message", "Announcement sent").endObject());
     }
 
-    /** Saves and stops the server (a host like AMP can start it again if set to). */
+    /**
+     * Saves and stops the server. Through AMP when it's set up in hycon.json (so AMP knows it was
+     * stopped on purpose and doesn't restart it), else Hytale's own shutdown.
+     */
     private void stop(Req r) throws IOException {
         if (console.isBlocked("stop")) {
             r.error(403, "stop is blocked in hycon.json");
+            return;
+        }
+        if (amp.configured()) {
+            String err = amp.run("Stop");
+            audit.record(r.who(), r.ip, "server.stop", "", err == null ? "via AMP" : err, err == null);
+            if (err != null) {
+                r.error(502, err);
+                return;
+            }
+            log.addText("[Hycon] " + r.who() + " stopped the server through AMP");
+            r.ok(new Json().beginObject().field("ok", true).field("message", "AMP is stopping the server").endObject());
             return;
         }
         audit.record(r.who(), r.ip, "server.stop", "", "", true);
         log.addText("[Hycon] " + r.who() + " stopped the server from the panel");
         r.ok(new Json().beginObject().field("ok", true).field("message", "Server is stopping").endObject());
         HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> HytaleServer.get().shutdownServer(), 1, TimeUnit.SECONDS);
+    }
+
+    /** Restarts the server through AMP (Hytale can't start itself again). */
+    private void restart(Req r) throws IOException {
+        if (console.isBlocked("stop") || console.isBlocked("restart")) {
+            r.error(403, "Restarting is blocked in hycon.json");
+            return;
+        }
+        if (!amp.configured()) {
+            r.error(400, "Set AmpUrl, AmpUser and AmpPassword in hycon.json to restart from the panel");
+            return;
+        }
+        String err = amp.run("Restart");
+        audit.record(r.who(), r.ip, "server.restart", "", err == null ? "via AMP" : err, err == null);
+        if (err != null) {
+            r.error(502, err);
+            return;
+        }
+        log.addText("[Hycon] " + r.who() + " restarted the server through AMP");
+        r.ok(new Json().beginObject().field("ok", true).field("message", "AMP is restarting the server: the panel is back in a minute or two").endObject());
     }
 }

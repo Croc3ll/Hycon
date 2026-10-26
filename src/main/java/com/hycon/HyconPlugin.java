@@ -167,7 +167,8 @@ public final class HyconPlugin extends JavaPlugin {
             new GameRoutes(web, moderation, consoleRunner, logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
             new BugRoutes(web, bugs, audit).register();
-            new ConsoleRoutes(web, logTap, audit, consoleRunner).register();
+            new ConsoleRoutes(web, logTap, audit, consoleRunner,
+                    new com.hycon.game.AmpClient(config.ampUrl(), config.ampUser(), config.ampPassword())).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());

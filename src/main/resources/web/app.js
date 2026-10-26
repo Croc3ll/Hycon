@@ -448,14 +448,19 @@ function consoleView(view) {
       memV.textContent = d.memoryMb + ' / ' + d.memoryMaxMb + ' MB';
       memV.className = d.memoryMb > d.memoryMaxMb * 0.9 ? 'bad' : '';
       upV.textContent = hm(d.uptimeMs);
+      if (restartBtn) restartBtn.hidden = !d.amp;
     } catch (e) { /* next poll */ }
   }
-  const stopBtn = can('ADMIN') ? el('button', { class: 'danger', on: { click: async () => {
-    if (!confirm('Stop the server for everyone? It saves first. AMP starts it again only if its auto-restart is on.')) return;
-    if (prompt('Type STOP to confirm') !== 'STOP') { toast('Not stopped'); return; }
-    try { const r = await api('POST', '/api/server/stop', {}); toast(r.message); } catch (e) { toast(e.message, true); }
-  } } }, 'Stop server') : null;
-  const statusBar = el('div', { class: 'console-status' }, tpsI, onI, memI, upI, el('span', { style: 'flex:1' }), stopBtn);
+  // Start can't live here: while the server is stopped, so is this panel (start it in AMP).
+  const power = (word, path, question) => can('ADMIN') ? el('button', { class: 'danger', on: { click: async () => {
+    if (!confirm(question)) return;
+    if ((prompt('Type ' + word + ' to confirm') || '').trim().toUpperCase() !== word) { toast('Cancelled'); return; }
+    try { const r = await api('POST', path, {}); toast(r.message); } catch (e) { toast(e.message, true); }
+  } } }, word.charAt(0) + word.slice(1).toLowerCase() + ' server') : null;
+  const restartBtn = power('RESTART', '/api/server/restart', 'Restart the server for everyone? It saves first and is back in a minute or two.');
+  const stopBtn = power('STOP', '/api/server/stop', 'Stop the server for everyone? It saves first. Start it again in AMP (this panel is offline while it is stopped).');
+  if (restartBtn) restartBtn.hidden = true; // shown once /api/status says AMP is set up
+  const statusBar = el('div', { class: 'console-status' }, tpsI, onI, memI, upI, el('span', { style: 'flex:1' }), restartBtn, stopBtn);
 
   // Tools: log downloads and alerts.
   let alerts = false;
