@@ -258,6 +258,11 @@ public final class WebServer {
 
     private String clientIp(HttpExchange ex) {
         if (config.trustProxy()) {
+            // Cloudflare (tunnel or proxy) sends the visitor's address here; clients can't set it.
+            String cf = ex.getRequestHeaders().getFirst("CF-Connecting-IP");
+            if (cf != null && !cf.isBlank()) {
+                return cf.trim();
+            }
             String fwd = ex.getRequestHeaders().getFirst("X-Forwarded-For");
             if (fwd != null && !fwd.isBlank()) {
                 // The last entry is the one our own proxy added; earlier ones are client-controlled.

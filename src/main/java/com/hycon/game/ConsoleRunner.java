@@ -26,8 +26,8 @@ public final class ConsoleRunner {
         if (c.startsWith("/")) {
             c = c.substring(1);
         }
-        int sp = c.indexOf(' ');
-        return (sp < 0 ? c : c.substring(0, sp)).toLowerCase(Locale.ROOT);
+        // Any whitespace ends the command name, so "stop<tab>" can't slip past BlockedCommands.
+        return c.split("\s", 2)[0].toLowerCase(Locale.ROOT);
     }
 
     public boolean isBlocked(String command) {

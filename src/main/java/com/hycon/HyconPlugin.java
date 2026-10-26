@@ -163,10 +163,11 @@ public final class HyconPlugin extends JavaPlugin {
         try {
             web = new WebServer(config, sessions, admins);
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
-            new GameRoutes(web, moderation, new ConsoleRunner(config.blockedCommands()), logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
+            ConsoleRunner consoleRunner = new ConsoleRunner(config.blockedCommands());
+            new GameRoutes(web, moderation, consoleRunner, logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
             new BugRoutes(web, bugs, audit).register();
-            new ConsoleRoutes(web, logTap, audit).register();
+            new ConsoleRoutes(web, logTap, audit, consoleRunner).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());

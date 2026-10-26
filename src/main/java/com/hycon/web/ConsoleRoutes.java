@@ -2,6 +2,7 @@ package com.hycon.web;
 
 import com.hycon.audit.AuditLog;
 import com.hycon.auth.Level;
+import com.hycon.game.ConsoleRunner;
 import com.hycon.game.LogTap;
 import com.hypixel.hytale.metrics.metric.HistoricMetric;
 import com.hypixel.hytale.server.core.HytaleServer;
@@ -28,9 +29,11 @@ public final class ConsoleRoutes {
     private final WebServer web;
     private final LogTap log;
     private final AuditLog audit;
+    private final ConsoleRunner console;
 
-    public ConsoleRoutes(WebServer web, LogTap log, AuditLog audit) {
+    public ConsoleRoutes(WebServer web, LogTap log, AuditLog audit, ConsoleRunner console) {
         this.web = web;
+        this.console = console;
         this.log = log;
         this.audit = audit;
     }
@@ -111,6 +114,10 @@ public final class ConsoleRoutes {
 
     /** Saves and stops the server (a host like AMP can start it again if set to). */
     private void stop(Req r) throws IOException {
+        if (console.isBlocked("stop")) {
+            r.error(403, "stop is blocked in hycon.json");
+            return;
+        }
         audit.record(r.who(), r.ip, "server.stop", "", "", true);
         log.addText("[Hycon] " + r.who() + " stopped the server from the panel");
         r.ok(new Json().beginObject().field("ok", true).field("message", "Server is stopping").endObject());
