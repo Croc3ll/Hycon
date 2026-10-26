@@ -680,13 +680,16 @@ function dashboard(view, id) {
   drawSeg();
   const title = el('h2', { class: 'big' });
   view.append(el('div', { class: 'spread' }, title, seg), out);
-  // Chart/table choices survive the 15 s refresh.
+  // Chart/table choices and the side bar pick survive the 15 s refresh.
   const modes = {};
-  async function load() {
+  const panel = { id, sel: '', open: {}, reload: () => load(true) };
+  async function load(force) {
+    // Don't wipe a form someone is filling in.
+    if (!force && [...out.querySelectorAll('input')].some((i) => i.value || i === document.activeElement)) return;
     try {
-      const d = await api('GET', '/api/panel?id=' + encodeURIComponent(id) + '&range=' + range);
+      const d = await api('GET', '/api/panel?id=' + encodeURIComponent(id) + '&range=' + range + '&sel=' + encodeURIComponent(panel.sel));
       title.textContent = d.title;
-      out.replaceChildren(...blocks(d.blocks, modes, { id, reload: load }));
+      out.replaceChildren(...blocks(d.blocks, modes, panel));
     } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
   }
   every(15000, load);
@@ -722,15 +725,51 @@ function blocks(list, modes, panel) {
       const last = nodes[nodes.length - 1];
       if (last && last.heatGroup) last.heatGroup.add(b); else nodes.push(heatGroup(b));
     }
-    else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows, b.form && panel ? b : null, panel)));
+    else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows, b.form && panel ? b : null, panel, b.badges || [])));
     else if (b.type === 'form' && panel) nodes.push(formCard(b, panel));
+    else if (b.type === 'nav' && panel) nodes.unshift(navBar(b, panel));
   }
+  // A side bar puts everything else in a column to its right.
+  if (nodes[0] && nodes[0].isNav) return [el('div', { class: 'editor' }, nodes[0], el('div', { class: 'editormain' }, ...nodes.slice(1)))];
   return nodes;
+}
+
+function navBar(b, panel) {
+  const search = el('input', { placeholder: b.search || 'Search', on: { input: () => draw() } });
+  const list = el('div');
+  const draw = () => {
+    const q = search.value.trim().toLowerCase();
+    list.replaceChildren(...b.sections.map((s) => {
+      const items = s.items.filter(([, label, sub]) => !q || (label + ' ' + sub).toLowerCase().includes(q));
+      const open = q || panel.open[s.title] !== false;
+      const head = el('div', { class: 'navhead', on: { click: () => { panel.open[s.title] = !open; draw(); } } },
+        el('span', { class: 'caret' }, open ? '\u25BE' : '\u25B8'), el('span', {}, s.title + ' '), el('span', { class: 'n' }, '(' + s.items.length + ')'),
+        s.add ? el('button', { class: 'navadd', title: s.addPrompt, on: { click: async (e) => {
+          e.stopPropagation();
+          const name = prompt(s.addPrompt || 'Name?', '');
+          if (name && name.trim()) await panelAction(panel, s.add, { name: name.trim() });
+        } } }, '+') : null);
+      return el('div', { class: 'navsec' }, head, open ? items.map(([id, label, sub, badge]) => el('div', {
+        class: 'navitem' + (panel.sel === id ? ' on' : ''), on: { click: () => { panel.sel = id; panel.reload(); } } },
+        el('div', {}, el('div', {}, label), sub ? el('div', { class: 'sub' }, sub) : null),
+        el('div', { class: 'navright' }, badge ? el('span', { class: 'n' }, badge) : null,
+          s.remove ? el('button', { class: 'navx', title: 'Remove', on: { click: async (e) => {
+            e.stopPropagation();
+            if (s.removeConfirm && !confirm(s.removeConfirm.replace('{}', label))) return;
+            if (panel.sel === id) panel.sel = '';
+            await panelAction(panel, s.remove, { id });
+          } } }, '\u00D7') : null))) : null);
+    }));
+  };
+  draw();
+  const node = el('div', { class: 'navbar' }, search, list);
+  node.isNav = true;
+  return node;
 }
 
 const cell = (c) => (typeof c === 'string' && /^@\d{9,}$/.test(c) ? fmtTime(+c.slice(1)) : c);
 
-function tableBox(columns, rows, btn, panel) {
+function tableBox(columns, rows, btn, panel, badges = []) {
   const rowButton = (r) => el('td', {}, el('button', { on: { click: async () => {
     if (btn.confirm && !confirm(btn.confirm)) return;
     const values = {}; columns.forEach((c, i) => { values[c] = r[i]; });
@@ -738,13 +777,14 @@ function tableBox(columns, rows, btn, panel) {
   } } }, btn.button));
   const span = columns.length + (btn ? 1 : 0);
   return el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, ...columns.map((c) => el('th', {}, c)), btn ? el('th', {}) : null)),
-    el('tbody', {}, rows.length ? rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, cell(c))), btn ? rowButton(r) : null))
+    el('tbody', {}, rows.length ? rows.map((r) => el('tr', {}, ...r.map((c, i) => el('td', {}, badges.includes(i) && c !== ''
+      ? el('span', { class: 'tag ' + (c === 'true' ? 'yes' : c === 'false' ? 'no' : '') }, c) : cell(c))), btn ? rowButton(r) : null))
       : el('tr', {}, el('td', { colspan: span, class: 'muted' }, 'Nothing yet.')))));
 }
 
 // Plugin tab actions (API 4): forms and row buttons post here, then the tab reloads.
 async function panelAction(panel, form, values) {
-  try { toast((await api('POST', '/api/panel/action', { id: panel.id, form, values })).message); await panel.reload(); }
+  try { toast((await api('POST', '/api/panel/action', { id: panel.id, form, values: { ...values, _selected: panel.sel || '' } })).message); await panel.reload(); }
   catch (err) { toast(err.message, true); }
 }
 

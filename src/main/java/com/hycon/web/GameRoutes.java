@@ -441,7 +441,7 @@ public final class GameRoutes {
             r.error(404, "No such dashboard");
             return;
         }
-        PanelData data = new PanelData(range(r.query("range")), "all".equals(r.query("range")), r.admin.level().rank);
+        PanelData data = new PanelData(range(r.query("range")), "all".equals(r.query("range")), r.admin.level().rank, r.query("sel"));
         try {
             p.render(data);
         } catch (RuntimeException | LinkageError e) {
