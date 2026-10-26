@@ -742,7 +742,7 @@ function sharing(view) {
 
 // ---------- Dashboards (HyconPanel API) ----------
 
-const RANGES = [['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days'], ['all', 'All time']];
+const RANGES = [['1h', 'Hour'], ['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days'], ['all', 'All time']];
 
 function dashboard(view, id) {
   let range = S.range || '24h';
