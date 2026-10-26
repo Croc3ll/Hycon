@@ -879,12 +879,50 @@ async function panelAction(panel, form, values) {
 
 function formCard(b, panel) {
   const inputs = b.fields.map(([name, label, hint, ...options]) => ({ name, label,
-    input: options.length ? el('select', {}, ...options.map((o) => el('option', { value: o }, o))) : el('input', { maxlength: 500, placeholder: hint }) }));
+    input: options.length ? el('select', {}, ...options.map((o) => el('option', { value: o }, o)))
+      : name === 'player' ? playerInput(hint) : el('input', { maxlength: 500, placeholder: hint }) }));
   return el('div', { class: 'card' }, el('h3', {}, b.title), el('form', { class: 'panelform', on: { submit: async (e) => {
     e.preventDefault();
     const values = {}; inputs.forEach((f) => { values[f.name] = f.input.value; });
     await panelAction(panel, b.id, values);
   } } }, ...inputs.map((f) => el('label', {}, el('span', { class: 'muted' }, f.label), f.input)), el('button', { type: 'submit' }, b.submit || 'Save')));
+}
+
+// A name box that suggests players (online or not) as you type: names starting with it first, then
+// names containing it, then near misses for typos.
+let playerListId = 0;
+function playerInput(hint) {
+  const list = el('datalist', { id: 'players-' + (++playerListId) });
+  document.body.append(list);
+  const input = el('input', { maxlength: 64, placeholder: hint, autocomplete: 'off', list: list.id });
+  const typos = (a, b) => { // edit distance
+    let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  };
+  let t = null, seq = 0;
+  input.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(async () => {
+      const q = input.value.trim().toLowerCase(), mine = ++seq;
+      if (!q) { list.replaceChildren(); return; }
+      try {
+        let ps = (await api('GET', '/api/directory?q=' + encodeURIComponent(q))).players;
+        if (!ps.length) { // no name contains it: closest spellings instead
+          ps = (await api('GET', '/api/directory')).players.map((p) => ({ ...p, miss: typos(q, p.name.toLowerCase().slice(0, q.length + 2)) }))
+            .filter((p) => p.miss <= Math.max(2, q.length / 3)).sort((a, b) => a.miss - b.miss);
+        } else {
+          ps.sort((a, b) => (b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) || (b.online - a.online));
+        }
+        if (mine === seq) list.replaceChildren(...ps.slice(0, 10).map((p) => el('option', { value: p.name }, p.online ? 'online' : 'offline')));
+      } catch (e) { /* suggestions are a nicety */ }
+    }, 150);
+  });
+  return input;
 }
 
 const COLORS = ['#e2b54b', '#4fa3f7', '#e5534b', '#4fbf7a', '#a98bf0', '#f0884f'];
