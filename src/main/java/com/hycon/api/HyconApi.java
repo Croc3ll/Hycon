@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -25,13 +26,36 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 4; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions
+    public static final int API_VERSION = 5; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();
     private static final Map<String, HyconProfileSection> SECTIONS = new ConcurrentHashMap<>();
 
     private HyconApi() {
+    }
+
+    /** Writes an entry to a player's record (their profile's history, beside warnings and bans). */
+    public interface Recorder {
+        void record(UUID player, String type, String by, String reason, String detail);
+    }
+
+    private static volatile Recorder recorder;
+
+    /** Set by Hycon itself. */
+    public static void setRecorder(Recorder r) {
+        recorder = r;
+    }
+
+    /**
+     * Adds an entry to a player's record, shown on their profile with Hycon's own warnings and bans.
+     * {@code type} is WARN or NOTE. Since API version 5.
+     */
+    public static void record(UUID player, String type, String by, String reason, String detail) {
+        Recorder r = recorder;
+        if (r != null && player != null) {
+            r.record(player, type, by, reason, detail);
+        }
     }
 
     /** Adds (or replaces, by id) a dashboard tab. */
@@ -85,5 +109,6 @@ public final class HyconApi {
     public static void clear() {
         PANELS.clear();
         SECTIONS.clear();
+        recorder = null;
     }
 }

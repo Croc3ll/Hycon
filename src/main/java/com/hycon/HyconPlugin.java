@@ -180,6 +180,8 @@ public final class HyconPlugin extends JavaPlugin {
             web = null;
             return;
         }
+        HyconApi.setRecorder((player, type, by, reason, detail) -> records.record(player,
+                "WARN".equalsIgnoreCase(type) ? PlayerRecords.Type.WARN : PlayerRecords.Type.NOTE, by, reason, detail));
         HyconApi.register(new AnalyticsPanel(samples, known, positions));
         HyconApi.registerProfileSection(new WorldSection(positions, activity));
         HyconApi.registerProfileSection(new ActivitySection(known, pingLog, killLog, records, reports));
