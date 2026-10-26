@@ -516,7 +516,7 @@ function consoleView(view) {
       } catch (err) { toast(err.message, true); }
     } } }, el('div', { class: 'complete-box' }, input, picks), el('button', { class: 'primary', type: 'submit' }, 'Run'))
       : el('p', { class: 'muted' }, 'Running commands needs the ADMIN level.')),
-    can('ADMIN') ? el('p', { class: 'muted' }, 'Tab completes commands and player names; press it again to go through the choices.') : null),
+    can('ADMIN') ? el('p', { class: 'muted' }, 'Tab completes commands and player names; press it again to go through the choices.') : null,
     el('div', { class: 'card' }, el('h2', {}, 'Announcement'), broadcast));
   let firstPoll = true, polls = 0;
   input.addEventListener('keydown', (e) => {
@@ -666,8 +666,7 @@ function bugsView(view) {
             el('button', { on: { click: () => close(b, 'fixed') } }, 'Fixed'),
             el('button', { on: { click: () => close(b, 'dismissed') } }, 'Dismiss')) : null),
         el('p', {}, b.text),
-        b.serverLog ? el('details', {}, el('summary', {}, 'Server warnings and errors (' + b.serverLog.split('
-').length + ' lines)'),
+        b.serverLog ? el('details', {}, el('summary', {}, 'Server warnings and errors (' + b.serverLog.split('\n').length + ' lines)'),
           el('pre', { class: 'mono', style: 'white-space:pre-wrap;max-height:320px;overflow:auto' }, b.serverLog))
           : el('div', { class: 'muted' }, 'No server warnings or errors in the 5 minutes before.'))));
       if (!d.bugs.length) list.replaceChildren(el('div', { class: 'card muted' }, status === 'open' ? 'No open bug reports.' : 'Nothing here.'));
