@@ -150,6 +150,22 @@ function render() {
 
 function every(ms, fn) { fn(); S.timer = setInterval(fn, ms); }
 
+// A new Hycon version (the server was updated): reload the page so nobody runs the old one.
+// Waits while someone is typing, so a half-filled form isn't lost.
+(function watchVersion() {
+  let first = null;
+  const check = async () => {
+    try {
+      const text = await (await fetch('app.js', { cache: 'no-store' })).text();
+      if (first === null) { first = text; return; }
+      const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+      if (text !== first && !typing) location.reload();
+    } catch (e) { /* server restarting: try again next time */ }
+  };
+  check();
+  setInterval(check, 60000);
+})();
+
 // ---------- Players / kick / ban ----------
 
 function players(view) {
@@ -1102,6 +1118,11 @@ function profileSections(uuid) {
     } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
   }
   load();
+  // Refreshes by itself every 30 s while the profile is open (stops once it's gone from the page).
+  const auto = setInterval(() => {
+    if (!out.isConnected) { clearInterval(auto); return; }
+    if (!document.hidden) load();
+  }, 30000);
   return el('div', {}, el('div', { class: 'spread' }, el('span', { class: 'muted' }, 'Player stats'),
     el('div', { class: 'row' }, el('button', { on: { click: load } }, '↻ Refresh'), seg)), out);
 }
