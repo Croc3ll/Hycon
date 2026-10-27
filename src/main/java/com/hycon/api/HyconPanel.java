@@ -11,7 +11,7 @@ package com.hycon.api;
  */
 public interface HyconPanel {
 
-    /** Unique id, e.g. {@code "prisoncore"}. Letters, digits, {@code - _ .} only. */
+    /** Unique id, e.g. {@code "myplugin"}. Letters, digits, {@code - _ .} only. */
     String id();
 
     /** Tab title shown in the panel. */

@@ -93,8 +93,8 @@ This history is kept in `moderation.log` and stays even after a ban ends.
   to show, with the time spent in each. The **Map / Heat / Path / Marks** buttons switch layers on and off, and **↻ Refresh** reloads the
   numbers without losing your zoom, and pie
   charts of the blocks they break, place and use and what they craft, plus the zones they found.
-- Other plugins can add their own sections here (PrisonCore adds what they mine and where their
-  money comes from and goes).
+- Other plugins can add their own sections here (for example, an economy plugin could show where their money
+  comes from and goes).
 
 Positions are noted every 15 seconds while players are online (kept 14 days per player); interactions
 are counted since this version of Hycon was installed. The **Analytics** tab shows the same kind

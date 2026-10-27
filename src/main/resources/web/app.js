@@ -1161,7 +1161,7 @@ function pieCard(p) {
     }))));
 }
 
-// Plugin sections on a profile (Hycon's own Activity, PrisonCore's Prison, ...), with a range picker.
+// Plugin sections on a profile (Hycon's own Activity, then any other plugin's), with a range picker.
 function profileSections(uuid) {
   const out = el('div');
   let range = S.range || '30d';

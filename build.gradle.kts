@@ -50,7 +50,7 @@ tasks.named<Jar>("jar") {
 
 // Copies the jar into a test server's mods folder after every build, so the next server start
 // uses it. Set the folder in your own ~/.gradle/gradle.properties (not in this repo), e.g.
-//     hyconTestMods=D:/Hytale_Plugins/HyPrison/HyPrisons/run/mods
+//     hyconTestMods=C:/MyServer/mods
 // Nothing happens when it isn't set.
 val deployToTestServer by tasks.registering {
     val target = providers.gradleProperty("hyconTestMods")

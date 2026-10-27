@@ -3,7 +3,7 @@ package com.hycon.api;
 import java.util.UUID;
 
 /**
- * A section another plugin adds to every player's profile page in Hycon, e.g. "Prison": what this
+ * A section another plugin adds to every player's profile page in Hycon, e.g. "Economy": what this
  * player mines, earns and spends. Register it with {@link HyconApi#registerProfileSection}. Like a
  * {@link HyconPanel}, it only fills in {@link PanelData}; Hycon draws it (stat tiles, charts, pie
  * charts, bars, tables), under the player's own heading.
@@ -14,7 +14,7 @@ import java.util.UUID;
  */
 public interface HyconProfileSection {
 
-    /** Unique id, e.g. {@code "prisoncore"}. Letters, digits, {@code - _ .} only. */
+    /** Unique id, e.g. {@code "myplugin"}. Letters, digits, {@code - _ .} only. */
     String id();
 
     /** Section heading on the profile. */

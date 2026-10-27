@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * A rough risk score (0-100) on every profile, from what's known about the player: their
  * moderation record, reports, accounts sharing their connection (and whether those are banned),
- * how new they are, plus whatever plugins add (PrisonCore: economy alerts and rebalances).
+ * how new they are, plus whatever other plugins add (for example, economy alerts).
  * It's a pointer for staff, not proof: every point is listed with its reason.
  */
 public final class RiskSection implements HyconProfileSection {
