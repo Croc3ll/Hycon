@@ -217,7 +217,7 @@ public final class HyconPlugin extends JavaPlugin {
             geoRefresh = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> Thread.ofVirtual().name("Hycon-GeoIp").start(() -> {
                 try {
                     geo.refresh();
-                } catch (Exception e) {
+                } catch (Exception | LinkageError e) {
                     log.at(Level.WARNING).log("Hycon: could not download the location database (%s); the globe stays empty until it can", e.getMessage());
                 }
             }), 0, 1, TimeUnit.DAYS);

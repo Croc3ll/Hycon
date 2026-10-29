@@ -55,11 +55,23 @@ function globe(opts) {
   function path(ctx, flat, close) {
     let pen = false;
     for (let i = 0; i < flat.length; i += 2) {
-      const [x, y, z] = project(flat[i], flat[i + 1]);
-      if (z < 0) { pen = false; continue; }
+      let [x, y, z] = project(flat[i], flat[i + 1]);
+      if (z < 0) {
+        if (!close) { pen = false; continue; }
+        if (!pen && !anyFront(flat)) return; // wholly on the back
+        // A filled shape running round the back: pin the hidden part to the rim, so it closes
+        // along the edge instead of cutting across the visible side.
+        const d = Math.hypot(x - cx, y - cy) || 1;
+        x = cx + (x - cx) / d * r; y = cy + (y - cy) / d * r;
+      }
       if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; }
     }
     if (close && pen) ctx.closePath();
+  }
+
+  function anyFront(flat) {
+    for (let i = 0; i < flat.length; i += 2) if (project(flat[i], flat[i + 1])[2] >= 0) return true;
+    return false;
   }
 
   function draw() {
@@ -194,11 +206,10 @@ function globe(opts) {
   return wrap;
 }
 
-// ---------- Globe tab ----------
+// ---------- Analytics section ----------
 
-function globeView(view) {
-  const out = el('div', {}, el('p', { class: 'muted' }, 'Loading…'));
-  view.append(out);
+function globeSection() {
+  const out = el('div', {}, el('p', { class: 'muted' }, 'Loading globe…'));
   (async () => {
     const d = await api('GET', '/api/geo');
     const list = d.players;
@@ -231,6 +242,7 @@ function globeView(view) {
               el('td', { class: pingClass(m) }, m >= 0 ? m + ' ms' : '–'), el('td', {}, String(c.n))); })
               : el('tr', {}, el('td', { colspan: 3, class: 'muted' }, 'Nobody yet.')))))));
   })().catch((e) => out.replaceChildren(el('p', { class: 'bad' }, e.message)));
+  return out;
 }
 
 // ---------- Profile card ----------
@@ -241,9 +253,10 @@ function locationCard(uuid) {
   (async () => {
     const d = await api('GET', '/api/geo/player?player=' + encodeURIComponent(uuid));
     const p = d.player;
-    if (!p) {
+    if (!p) { // still show the globe, so the card is easy to find; the dot comes on their next join
       body.replaceChildren(el('p', { class: 'muted' }, d.ready ? 'No location yet. It is looked up the next time they join.'
-        : 'The location database is still downloading; their location is looked up on their next join after that.'));
+        : 'The location database is still downloading; their location is looked up on their next join after that.'),
+        globe({ players: [], server: d.server, height: 360 }));
       return;
     }
     const km = d.server ? Math.round(6371 * Math.acos(Math.min(1, Math.sin(p.lat * RAD) * Math.sin(d.server.lat * RAD)

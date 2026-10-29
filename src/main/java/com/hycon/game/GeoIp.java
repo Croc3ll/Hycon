@@ -45,14 +45,15 @@ public final class GeoIp {
     private static final byte[] META = "«ÍïMaxMind.com".getBytes(StandardCharsets.ISO_8859_1);
 
     private final Path file;
-    private final Path db;
+    private final Path dir;
+    private volatile Path current;
     private final Map<UUID, Place> places = new ConcurrentHashMap<>();
     private volatile Reader reader;
     private volatile boolean dirty;
 
     public GeoIp(Path dataDir) {
         this.file = dataDir.resolve("geo.json");
-        this.db = dataDir.resolve("geoip").resolve("dbip-city-lite.mmdb");
+        this.dir = dataDir.resolve("geoip");
     }
 
     public void load() throws IOException {
@@ -64,27 +65,33 @@ public final class GeoIp {
                 }
             });
         }
-        if (Files.exists(db)) {
+        Path newest = newest();
+        if (newest != null) {
             try {
-                reader = new Reader(db);
+                reader = new Reader(newest);
+                current = newest;
             } catch (IOException | RuntimeException e) {
-                reader = null; // damaged download: fetched again below
+                reader = null; // damaged download: fetched again by refresh()
             }
         }
     }
 
     /** Downloads the database when missing or a month old. Slow (~60 MB); call off the game thread. */
     public void refresh() throws IOException, InterruptedException {
-        if (reader != null && System.currentTimeMillis() - Files.getLastModifiedTime(db).toMillis() < REFRESH_MS) {
+        if (reader != null && System.currentTimeMillis() - Files.getLastModifiedTime(current).toMillis() < REFRESH_MS) {
             return;
         }
-        Files.createDirectories(db.getParent());
+        Files.createDirectories(dir);
         HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build();
-        Path gz = db.resolveSibling("download.mmdb.gz");
-        Path tmp = db.resolveSibling("download.mmdb");
+        Path gz = dir.resolve("download.mmdb.gz");
         IOException last = null;
         // This month's file appears on the 1st; early in the month it may not be up yet.
         for (YearMonth m : List.of(YearMonth.now(), YearMonth.now().minusMonths(1))) {
+            Path target = dir.resolve("dbip-city-lite-" + m + ".mmdb");
+            if (target.equals(current)) {
+                Files.setLastModifiedTime(current, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis()));
+                return; // already the newest there is
+            }
             HttpRequest req = HttpRequest.newBuilder(URI.create("https://download.db-ip.com/free/dbip-city-lite-" + m + ".mmdb.gz"))
                     .timeout(Duration.ofMinutes(10)).header("User-Agent", "Hycon").build();
             HttpResponse<Path> res = http.send(req, HttpResponse.BodyHandlers.ofFile(gz));
@@ -92,22 +99,50 @@ public final class GeoIp {
                 last = new IOException("db-ip.com answered " + res.statusCode() + " for " + m);
                 continue;
             }
+            // Each month gets its own file name: on Windows a memory-mapped file can't be replaced or
+            // deleted while open, so the new one is opened beside it and older ones go on a later start.
+            Path tmp = dir.resolve("download.mmdb");
             try (InputStream in = new GZIPInputStream(Files.newInputStream(gz))) {
                 Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
             }
             Files.deleteIfExists(gz);
-            Reader fresh = new Reader(tmp); // checks it opens before replacing the old one
-            Reader old = reader;
-            reader = null;
-            if (old != null) {
-                old.close();
-            }
-            fresh.close();
-            Files.move(tmp, db, StandardCopyOption.REPLACE_EXISTING);
-            reader = new Reader(db);
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            reader = new Reader(target);
+            current = target;
+            cleanOld();
             return;
         }
         throw last;
+    }
+
+    private Path newest() throws IOException {
+        if (!Files.isDirectory(dir)) {
+            return null;
+        }
+        try (var files = Files.list(dir)) {
+            Path best = files.filter(f -> f.getFileName().toString().matches("dbip-city-lite-\\d{4}-\\d{2}\\.mmdb"))
+                    .max(java.util.Comparator.comparing(Path::toString)).orElse(null);
+            cleanOld(best);
+            return best;
+        }
+    }
+
+    private void cleanOld() {
+        cleanOld(current);
+    }
+
+    private void cleanOld(Path keep) {
+        try (var files = Files.list(dir)) {
+            files.filter(f -> !f.equals(keep) && f.getFileName().toString().endsWith(".mmdb")).forEach(f -> {
+                try {
+                    Files.deleteIfExists(f);
+                } catch (IOException ignored) {
+                    // still mapped by the old reader (Windows): removed on the next start
+                }
+            });
+        } catch (IOException ignored) {
+            // nothing to tidy
+        }
     }
 
     public boolean ready() {

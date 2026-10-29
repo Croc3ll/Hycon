@@ -123,7 +123,7 @@ function tabs() {
   for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
   list.push(['bans', 'Bans', 'VIEWER'], ['reports', S.openReports ? 'Reports (' + S.openReports + ')' : 'Reports', 'MODERATOR'],
     ['bugs', S.openBugs ? 'Bugs (' + S.openBugs + ')' : 'Bugs', 'MODERATOR'],
-    ['globe', 'Globe', 'MODERATOR'], ['console', 'Console', 'MODERATOR']);
+    ['console', 'Console', 'MODERATOR']);
   list.push(['audit', 'Audit log', 'ADMIN'], ['sharing', 'Ban sharing', 'OWNER'], ['accounts', 'Accounts', 'OWNER']);
   return list.filter((t) => can(t[2]));
 }
@@ -147,7 +147,6 @@ function render() {
   else if (tab === 'sharing') sharing(view);
   else if (tab === 'reports') reportsView(view);
   else if (tab === 'bugs') bugsView(view);
-  else if (tab === 'globe') globeView(view);
   else if (tab.startsWith('panel:')) dashboard(view, tab.slice(6));
   else if (tab.startsWith('profile:')) profile(view, tab.slice(8));
 }
@@ -792,6 +791,8 @@ function dashboard(view, id) {
   drawSeg();
   const title = el('h2', { class: 'big' });
   view.append(el('div', { class: 'spread' }, title, seg), out);
+  // Hycon's own Analytics also carries the player globe, built once so the refresh doesn't reset it.
+  if (id === 'analytics' && can('MODERATOR')) view.append(globeSection());
   // Chart/table choices and the side bar pick survive the 15 s refresh.
   const modes = {};
   const panel = { id, sel: '', open: {}, reload: () => load(true) };
