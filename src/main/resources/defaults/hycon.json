@@ -70,5 +70,17 @@
   // this instance and put its login here. "" = buttons off.
   "AmpUrl": "",
   "AmpUser": "",
-  "AmpPassword": ""
+  "AmpPassword": "",
+
+  // Player globe (Globe tab and each profile). Each join's address is
+  // looked up in DB-IP's free city database (CC BY 4.0, db-ip.com), which
+  // Hycon downloads (~60 MB) and refreshes monthly. The lookup runs on this
+  // machine: no player address is sent anywhere and only the rough city is
+  // saved. VPNs and mobile networks move the dot. false = off.
+  "GeoIp": true,
+
+  // Where this server is, as "latitude, longitude" (e.g. "41.88, -87.63"
+  // for Chicago), so the globe can draw each player's line to it with
+  // their ping. "" = no server marker.
+  "ServerLocation": ""
 }

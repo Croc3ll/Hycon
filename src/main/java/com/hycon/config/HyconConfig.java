@@ -34,7 +34,9 @@ public record HyconConfig(
         String shareBindAddress,
         String ampUrl,
         String ampUser,
-        String ampPassword) {
+        String ampPassword,
+        boolean geoIp,
+        String serverLocation) {
 
     public static HyconConfig load(Path dataDir) throws IOException {
         Path file = dataDir.resolve("hycon.json");
@@ -70,7 +72,9 @@ public record HyconConfig(
                 str(m, "ShareBindAddress", "0.0.0.0"),
                 str(m, "AmpUrl", ""),
                 str(m, "AmpUser", ""),
-                str(m, "AmpPassword", ""));
+                str(m, "AmpPassword", ""),
+                bool(m, "GeoIp", true),
+                str(m, "ServerLocation", ""));
     }
 
     /** True when only this machine can reach the panel. */

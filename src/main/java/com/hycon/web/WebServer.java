@@ -50,7 +50,8 @@ public final class WebServer {
     private static final int MAX_BODY = 16 * 1024;
     private static final Map<String, String> STATIC = Map.of(
             "/", "web/index.html", "/index.html", "web/index.html",
-            "/app.js", "web/app.js", "/style.css", "web/style.css", "/logo.svg", "web/logo.svg", "/graph.js", "web/graph.js", "/heatmap.js", "web/heatmap.js");
+            "/app.js", "web/app.js", "/style.css", "web/style.css", "/logo.svg", "web/logo.svg", "/graph.js", "web/graph.js", "/heatmap.js", "web/heatmap.js",
+            "/world.js", "web/world.js", "/globe.js", "web/globe.js");
 
     private final HyconConfig config;
     private final Sessions sessions;

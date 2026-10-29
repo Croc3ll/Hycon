@@ -312,3 +312,14 @@ body.riskpage {
 .riskwhy li { padding: 3px 0; border-bottom: 1px solid var(--line2); }
 .riskwhy b { color: var(--risk); display: inline-block; min-width: 34px; }
 .small { font-size: 12px; }
+
+/* ---------- Player globe ---------- */
+.globegrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.globegrid > .card { margin-bottom: 0; }
+.globewrap { position: relative; min-width: 0; background: radial-gradient(ellipse at center, #121419 0%, #0a0b0e 70%); border: 1px solid var(--line2); border-radius: 4px; overflow: hidden; }
+.globe { display: block; cursor: grab; touch-action: none; }
+.globetip { position: absolute; pointer-events: none; background: rgba(10, 11, 14, .94); border: 1px solid var(--gold-dim); border-radius: 4px; padding: 6px 9px; font-size: 12px; max-width: 260px; }
+.globetip b { color: var(--gold2); }
+.lg.pg-good { background: #4fbf7a; } .lg.pg-mid { background: #e2b54b; } .lg.pg-bad { background: #e5534b; }
+td.pg-good { color: #4fbf7a; } td.pg-mid { color: #e2b54b; } td.pg-bad { color: #e5534b; } td.pg-none { color: var(--muted); }
+@media (max-width: 900px) { .globegrid { grid-template-columns: 1fr; } }

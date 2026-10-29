@@ -23,7 +23,9 @@ import com.hycon.game.Reports;
 import com.hycon.game.BugReports;
 import com.hycon.commands.BugCommand;
 import com.hycon.web.BugRoutes;
+import com.hycon.web.GeoRoutes;
 import com.hycon.web.ConsoleRoutes;
+import com.hycon.game.GeoIp;
 import com.hycon.game.Ties;
 import com.hycon.commands.ReportCommand;
 import com.hycon.web.IntelRoutes;
@@ -76,12 +78,14 @@ public final class HyconPlugin extends JavaPlugin {
     private Reports reports;
     private BugReports bugs;
     private Ties ties;
+    private GeoIp geo;
     private ScheduledFuture<?> pingSampler;
     private ScheduledFuture<?> positionSampler;
     private LogTap logTap;
     private Sessions sessions;
     private WebServer web;
     private ScheduledFuture<?> housekeeping;
+    private ScheduledFuture<?> geoRefresh;
 
     public HyconPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -116,6 +120,7 @@ public final class HyconPlugin extends JavaPlugin {
         getCommandRegistry().registerCommand(new HyconCommand());
         reports = new Reports(dir);
         ties = new Ties(dir);
+        geo = new GeoIp(dir);
         getCommandRegistry().registerCommand(new ReportCommand(reports, known));
         bugs = new BugReports(dir);
         bugs.startLogCapture();
@@ -124,6 +129,9 @@ public final class HyconPlugin extends JavaPlugin {
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
             known.joined(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
             ties.joined(e.getPlayerRef().getUuid(), address(e.getPlayerRef()));
+            if (config.geoIp()) {
+                geo.joined(e.getPlayerRef().getUuid(), address(e.getPlayerRef()));
+            }
             return e;
         }));
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.left(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername()));
@@ -146,6 +154,7 @@ public final class HyconPlugin extends JavaPlugin {
             reports.load();
             bugs.load();
             ties.load();
+            geo.load();
             positions.load();
             if (created) {
                 log.at(Level.WARNING).log("Hycon first start: log in at %s as '%s' with password '%s' (from this machine) and choose a new password.",
@@ -167,6 +176,7 @@ public final class HyconPlugin extends JavaPlugin {
             ConsoleRunner consoleRunner = new ConsoleRunner(config.blockedCommands());
             new GameRoutes(web, moderation, consoleRunner, logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
+            new GeoRoutes(web, geo, known, moderation, pingLog, config.serverLocation()).register();
             new BugRoutes(web, bugs, audit).register();
             new ConsoleRoutes(web, logTap, audit, consoleRunner,
                     new com.hycon.game.AmpClient(config.ampUrl(), config.ampUser(), config.ampPassword())).register();
@@ -202,10 +212,21 @@ public final class HyconPlugin extends JavaPlugin {
         // Players saved before Hycon was installed, so they can be searched too.
         Path playersDir = Universe.get().getPath().resolve("players");
         Thread.ofVirtual().name("Hycon-PlayerImport").start(() -> known.importSaved(playersDir));
+        if (config.geoIp()) {
+            // The location database is a ~60 MB download, fetched once a month in the background.
+            geoRefresh = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> Thread.ofVirtual().name("Hycon-GeoIp").start(() -> {
+                try {
+                    geo.refresh();
+                } catch (Exception e) {
+                    log.at(Level.WARNING).log("Hycon: could not download the location database (%s); the globe stays empty until it can", e.getMessage());
+                }
+            }), 0, 1, TimeUnit.DAYS);
+        }
         housekeeping = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             sessions.sweep();
             known.saveIfChanged();
             ties.saveIfChanged();
+            geo.saveIfChanged();
             positions.saveIfChanged();
             activity.save(onlineIds());
         }, 1, 1, TimeUnit.MINUTES);
@@ -252,6 +273,12 @@ public final class HyconPlugin extends JavaPlugin {
         HyconApi.clear();
         if (ties != null) {
             ties.saveIfChanged();
+        }
+        if (geo != null) {
+            geo.saveIfChanged();
+        }
+        if (geoRefresh != null) {
+            geoRefresh.cancel(false);
         }
         if (positions != null) {
             positions.saveIfChanged();

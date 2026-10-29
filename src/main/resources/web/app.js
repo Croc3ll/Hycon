@@ -123,7 +123,7 @@ function tabs() {
   for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
   list.push(['bans', 'Bans', 'VIEWER'], ['reports', S.openReports ? 'Reports (' + S.openReports + ')' : 'Reports', 'MODERATOR'],
     ['bugs', S.openBugs ? 'Bugs (' + S.openBugs + ')' : 'Bugs', 'MODERATOR'],
-    ['console', 'Console', 'MODERATOR']);
+    ['globe', 'Globe', 'MODERATOR'], ['console', 'Console', 'MODERATOR']);
   list.push(['audit', 'Audit log', 'ADMIN'], ['sharing', 'Ban sharing', 'OWNER'], ['accounts', 'Accounts', 'OWNER']);
   return list.filter((t) => can(t[2]));
 }
@@ -147,6 +147,7 @@ function render() {
   else if (tab === 'sharing') sharing(view);
   else if (tab === 'reports') reportsView(view);
   else if (tab === 'bugs') bugsView(view);
+  else if (tab === 'globe') globeView(view);
   else if (tab.startsWith('panel:')) dashboard(view, tab.slice(6));
   else if (tab.startsWith('profile:')) profile(view, tab.slice(8));
 }
@@ -369,6 +370,7 @@ function profile(view, uuid) {
             : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null), riskCard),
       profileSections(p.uuid),
       pingCard(p.uuid),
+      can('MODERATOR') ? locationCard(p.uuid) : null,
       can('MODERATOR') ? connectionMap(p.uuid) : null,
       el('div', { class: 'card' }, el('h2', {}, 'History'),
         can('MODERATOR') ? el('form', { class: 'row', on: { submit: async (e) => {
