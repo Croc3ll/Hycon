@@ -791,8 +791,8 @@ function dashboard(view, id) {
   drawSeg();
   const title = el('h2', { class: 'big' });
   view.append(el('div', { class: 'spread' }, title, seg), out);
-  // Hycon's own Analytics also carries the player globe, built once so the refresh doesn't reset it.
-  if (id === 'analytics' && can('MODERATOR')) view.append(globeSection());
+  // Hycon's own Analytics gets its own layout and the player globe, built once so the refresh doesn't reset it.
+  const globeNode = id === 'analytics' && can('MODERATOR') ? globeSection() : null;
   // Chart/table choices and the side bar pick survive the 15 s refresh.
   const modes = {};
   const panel = { id, sel: '', open: {}, reload: () => load(true) };
@@ -802,10 +802,51 @@ function dashboard(view, id) {
     try {
       const d = await api('GET', '/api/panel?id=' + encodeURIComponent(id) + '&range=' + range + '&sel=' + encodeURIComponent(panel.sel));
       title.textContent = d.title;
-      out.replaceChildren(...blocks(d.blocks, modes, panel));
+      out.replaceChildren(...(id === 'analytics' ? analyticsLayout(d.blocks, modes, panel, globeNode) : blocks(d.blocks, modes, panel)));
     } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
   }
   every(15000, load);
+}
+
+// Hycon's Analytics tab: headline numbers grouped into three cards, then numbered sections with
+// related charts side by side. Blocks it doesn't know (added later) still show, at the end.
+const KPI = [['Players', ['Online now', 'Unique players', 'Peak', 'Average']],
+  ['Growth', ['New players', 'Returning', 'Came back']], ['Server', ['Uptime', 'Memory']]];
+
+function analyticsLayout(list, modes, panel, globeNode) {
+  const used = new Set();
+  const take = (test) => { const b = list.find((x) => !used.has(x) && test(x)); if (b) used.add(b); return b; };
+  const one = (b) => (b ? blocks([b], modes, panel) : []);
+  const stats = new Map(list.filter((b) => b.type === 'stat').map((b) => [b.label, b]));
+  const kpis = el('div', { class: 'kpis' }, ...KPI.map(([title, labels]) => el('div', { class: 'kpigroup' },
+    el('div', { class: 'kpihead' }, title),
+    el('div', { class: 'kpirow' }, ...labels.filter((l) => stats.has(l)).map((l) => {
+      const b = stats.get(l); used.add(b);
+      return el('div', { class: 'kpi' + (l === 'Online now' ? ' live' : '') }, el('div', { class: 'h' }, b.label), el('div', { class: 'v' }, b.value),
+        b.hint ? el('div', { class: 's' }, b.hint) : null);
+    })))));
+  let n = 0;
+  const section = (title, ...kids) => {
+    kids = kids.flat().filter(Boolean);
+    if (!kids.length) return null;
+    n++;
+    return el('section', { class: 'asec' }, el('div', { class: 'eyebrow' }, el('b', {}, String(n).padStart(2, '0')), ' — ' + title), ...kids);
+  };
+  const pair = (cls, ...nodes) => { nodes = nodes.flat().filter(Boolean); return nodes.length ? el('div', { class: cls }, ...nodes) : null; };
+  const playersSeries = take((b) => b.type === 'series' && /players/i.test(b.title));
+  const memorySeries = take((b) => b.type === 'series' && /memory/i.test(b.title));
+  const hours = take((b) => b.type === 'columns');
+  const topBars = take((b) => b.type === 'bars');
+  const active = take((b) => b.type === 'table' && /most active/i.test(b.title));
+  const regulars = take((b) => b.type === 'table' && /stick around/i.test(b.title));
+  const heat = list.filter((b) => b.type === 'heatmap' && !used.has(b));
+  heat.forEach((b) => used.add(b));
+  return [kpis,
+    section('Activity', one(playersSeries), pair('acols', one(hours), one(memorySeries))),
+    globeNode ? section('Where players are', globeNode) : null,
+    section('Players', pair('acols wide-right', one(topBars), one(active)), one(regulars)),
+    section('World', blocks(heat, modes, panel)),
+    section('More', blocks(list.filter((b) => !used.has(b) && b.type !== 'stat'), modes, panel))].filter(Boolean);
 }
 
 function blocks(list, modes, panel) {

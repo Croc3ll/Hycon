@@ -1,6 +1,6 @@
 // The player globe: an orthographic canvas globe (no libraries; the panel loads nothing from other
 // sites) with a dot where each player roughly connects from, coloured by ping, and a line to the
-// server when hycon.json has ServerLocation. Drag to turn, scroll to zoom, click a dot for the profile.
+// server when hycon.json has ServerLocation. Drag to turn, Ctrl + scroll to zoom, click a dot for the profile.
 'use strict';
 
 const RAD = Math.PI / 180;
@@ -197,7 +197,9 @@ function globe(opts) {
     if (p && p !== focus) { S.tab = 'profile:' + p.uuid; render(); }
   });
   canvas.addEventListener('pointerleave', () => { hover = null; tipEl.hidden = true; });
+  // Plain scrolling moves the page past the globe; Ctrl (or pinch) + scroll zooms it.
   canvas.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
     view.zoom = Math.max(0.8, Math.min(12, view.zoom * Math.exp(-e.deltaY * 0.0015)));
   }, { passive: false });
@@ -233,7 +235,7 @@ function globeSection() {
               el('span', {}, el('i', { class: 'lg pg-mid' }), '80–150'), el('span', {}, el('i', { class: 'lg pg-bad' }), '150+'))),
           note ? el('p', { class: 'muted' }, note) : null,
           globe({ players: list, server: d.server }),
-          el('p', { class: 'muted small' }, 'Location comes from each player’s last join address (city level at best) and may be off, especially on a VPN or mobile network. '
+          el('p', { class: 'muted small' }, 'Drag to turn, Ctrl + scroll to zoom. Location comes from each player’s last join address (city level at best) and may be off, especially on a VPN or mobile network. '
             + (d.server ? 'Hover a player for their line to the server.' : 'Set ServerLocation in hycon.json to draw lines to the server.')
             + ' Data: DB-IP (db-ip.com, CC BY 4.0).')),
         el('div', { class: 'card' }, el('h2', {}, 'Countries'),
