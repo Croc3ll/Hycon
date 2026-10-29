@@ -139,6 +139,8 @@ function render() {
   const view = $('view');
   view.replaceChildren();
   const tab = S.tab;
+  const head = PAGES[tab];
+  if (head) view.append(el('div', { class: 'pagehead' }, el('h1', {}, head[0]), el('p', {}, head[1])));
   if (tab === 'players') players(view);
   else if (tab === 'bans') bans(view);
   else if (tab === 'console') consoleView(view);
@@ -150,6 +152,18 @@ function render() {
   else if (tab.startsWith('panel:')) dashboard(view, tab.slice(6));
   else if (tab.startsWith('profile:')) profile(view, tab.slice(8));
 }
+
+// Title and one line for each built-in tab (plugin tabs and profiles bring their own).
+const PAGES = {
+  players: ['Players', 'Who is online now, and everyone who has ever played here.'],
+  bans: ['Bans', 'Ban a player, and every ban that is still active.'],
+  reports: ['Reports', 'What players reported with /report, newest first.'],
+  bugs: ['Bugs', 'Bugs players sent with /bug, with the server log from that moment.'],
+  console: ['Console', 'The live server log, server health and console commands.'],
+  audit: ['Audit log', 'Everything staff did in this panel, and every login.'],
+  sharing: ['Ban sharing', 'Share your ban list with other Hycon servers and import theirs.'],
+  accounts: ['Accounts', 'Who can log in to this panel, and what each person may do.'],
+};
 
 function every(ms, fn) { fn(); S.timer = setInterval(fn, ms); }
 
@@ -717,7 +731,7 @@ function bugsView(view) {
 
 function sharing(view) {
   const out = el('div');
-  view.append(el('h2', { class: 'big' }, 'Ban sharing'),
+  view.append(
     el('p', { class: 'muted' }, 'Share bans with other servers running Hycon. You swap one share code each way; '
       + 'nobody needs your panel address. For a global ban list, every server follows every other (or all follow one main server).'), out);
   const secret = el('div');
@@ -789,8 +803,8 @@ function dashboard(view, id) {
   const drawSeg = () => seg.replaceChildren(...RANGES.map(([r, t]) => el('button', { class: r === range ? 'on' : '',
     on: { click: () => { range = S.range = r; drawSeg(); load(); } } }, t)));
   drawSeg();
-  const title = el('h2', { class: 'big' });
-  view.append(el('div', { class: 'spread' }, title, seg), out);
+  const title = el('h1');
+  view.append(el('div', { class: 'spread pagehead' }, title, seg), out);
   // Hycon's own Analytics gets its own layout and the player globe, built once so the refresh doesn't reset it.
   const globeNode = id === 'analytics' && can('MODERATOR') ? globeSection() : null;
   // Chart/table choices and the side bar pick survive the 15 s refresh.
@@ -853,10 +867,10 @@ function blocks(list, modes, panel) {
   const nodes = []; let tiles = null; let grid = null; let notes = null;
   for (const b of list) {
     if (b.type !== 'note') notes = null;
-    if (b.type === 'stat') {
+    if (b.type === 'stat') { // a run of numbers: one card, laid out like Analytics' headline cards
       grid = null;
-      if (!tiles) { tiles = el('div', { class: 'tiles' }); nodes.push(tiles); }
-      tiles.append(el('div', { class: 'tile' }, el('div', { class: 'h' }, b.label), el('div', { class: 'v' }, b.value), b.hint ? el('div', { class: 's' }, b.hint) : null));
+      if (!tiles) { tiles = el('div', { class: 'kpirow wrap' }); nodes.push(el('div', { class: 'kpigroup solo' }, tiles)); }
+      tiles.append(el('div', { class: 'kpi' }, el('div', { class: 'h' }, b.label), el('div', { class: 'v' }, b.value), b.hint ? el('div', { class: 's' }, b.hint) : null));
       continue;
     }
     tiles = null;
