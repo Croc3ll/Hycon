@@ -179,6 +179,18 @@ memory, for the last 24 hours, 7 days or 30 days (buttons at the top right). Bel
 - **Players who stick around**: most days played in the last 7 days (or the chosen range), with
   sessions, playtime and average session length.
 
+**Player globe** (MODERATOR and up), under "Where players are": every player who has joined is a dot
+on a 3D globe, green under 80 ms ping, yellow up to 150, red above; online players are brighter.
+Drag to turn it, scroll to zoom, hover a dot for the player's place and ping, click it to open their
+profile. Next to it, **Countries** lists players and median ping per country. Set `ServerLocation`
+to draw a line from every player to the server. Each **profile** also has a **Location** card: a globe
+zoomed in on the player, their place, country, median ping and distance to the server, and a warning
+when the ping is too low for that distance (they're probably on a VPN or proxy).
+
+Locations come from each player's last join address, looked up in the free DB-IP city database
+(db-ip.com, CC BY 4.0), which Hycon downloads once a month (about 60 MB). They're city-level at best
+and can be wrong. Addresses themselves aren't shown. Set `GeoIp` to `false` to turn it off.
+
 Hycon samples every 30 seconds and keeps 31 days (`samples.log`). Playtime counts from when Hycon
 was installed. Other plugins can add their own tabs next to Analytics.
 
@@ -286,6 +298,8 @@ Changes need a **server restart**.
 | `LoginWindowMinutes` | `10`          | ...within this many minutes. After that, logins wait until the window has passed.                 |
 | `BlockedCommands`    | `[]`          | Commands the panel refuses even for ADMIN, e.g. `["stop", "op"]`.                                 |
 | `LogLines`           | `2000`        | How many recent log lines the Console tab keeps.                                                  |
+| `GeoIp`              | `true`        | Look up players' rough location for the globe (downloads the DB-IP database once a month).       |
+| `ServerLocation`     | `""`          | The server's `"lat,lon"`, e.g. `"50.11,8.68"`, so the globe draws lines to it and shows distances. |
 
 ## 6. Opening the panel from another computer
 
@@ -352,6 +366,8 @@ All in Hycon's data folder:
 | `positions/`      | Per player: where they were each minute, kept 14 days.                                        |
 | `heat.json`       | Server-wide minutes per 16-block square, for the Analytics heatmap.                           |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
+| `geo.json`        | Each player's looked-up place (city, country, coordinates) for the globe.                       |
+| `geoip/`          | The downloaded DB-IP location database.                                                         |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 
 Back up `admins.json` and `audit.log` with the rest of your server.

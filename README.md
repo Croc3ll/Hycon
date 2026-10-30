@@ -24,6 +24,9 @@ staff accounts, all settings, remote access over HTTPS, troubleshooting).
 - **Bug reports**: players send them in game with `/bug`; staff read and close them in the panel.
 - **Console**: the live server log, and console commands for admins (with a blocked-commands list).
 - **Analytics**: player counts, ping, activity and other charts, plus dashboards from other plugins.
+- **Player globe**: a spinning 3D globe on Analytics with a dot for every player (coloured by ping) and
+  a per-country table; each profile shows that player's rough location, distance to the server, and a
+  warning when their ping is too low for the distance (likely a VPN). Click a dot to open the profile.
 - **Ban sharing** between servers (below) and a full **audit log** of staff actions.
 - **Remember me**: tick it at login and the browser logs you in by itself for 30 days, even across
   server restarts. Logging out, a password change or losing the account ends it.
