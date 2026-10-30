@@ -54,8 +54,28 @@ async function boot() {
   try { S.panels = (await api('GET', '/api/panels')).panels; } catch (e) { S.panels = []; }
   if (can('MODERATOR')) { try { S.openReports = (await api('GET', '/api/reports?status=open')).open; } catch (e) { S.openReports = 0; } }
   if (can('MODERATOR')) { try { S.openBugs = (await api('GET', '/api/bugs?status=open')).open; } catch (e) { S.openBugs = 0; } }
+  const start = decodeURIComponent(location.hash.slice(1));
+  if (start) S.tab = start; // a reload or a shared link opens the same page
+  history.replaceState({ tab: S.tab, back: S.back }, '', '#' + S.tab);
   render();
 }
+
+// Every page has its own address (#players, #bans, #profile:<uuid>...), so the browser's Back and
+// Forward buttons move between pages and a reload stays on the same one.
+function go(tab) {
+  if (tab === S.tab) return render();
+  S.tab = tab;
+  history.pushState({ tab, back: S.back }, '', '#' + tab);
+  render();
+}
+
+window.addEventListener('popstate', (e) => {
+  if (!S.me) return;
+  const tab = (e.state && e.state.tab) || decodeURIComponent(location.hash.slice(1)) || 'players';
+  if (e.state && e.state.back) S.back = e.state.back;
+  S.tab = tab;
+  render();
+});
 
 function stop() { clearInterval(S.timer); S.timer = null; }
 
@@ -135,7 +155,7 @@ function render() {
   const list = tabs();
   if (!S.tab.startsWith('profile:') && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
   $('tabs').replaceChildren(...list.map(([id, title]) =>
-    el('button', { class: id === S.tab ? 'active' : '', on: { click: () => { S.tab = id; render(); } } }, title)));
+    el('button', { class: id === S.tab ? 'active' : '', on: { click: () => go(id) } }, title)));
   const view = $('view');
   view.replaceChildren();
   const tab = S.tab;
@@ -322,7 +342,7 @@ function nameLink(name, uuid) {
 // profile keeps the first one's way back).
 function openProfile(uuid) {
   if (!S.tab.startsWith('profile:')) S.back = S.tab;
-  S.tab = 'profile:' + uuid; render();
+  go('profile:' + uuid);
 }
 
 // A player's emblem: their initial in a gold-rimmed diamond, coloured from their UUID, so each
@@ -345,7 +365,7 @@ function avatar(name, uuid, size) {
 function profile(view, uuid) {
   const out = el('div');
   const back = tabs().find((t) => t[0] === S.back) || tabs()[0];
-  view.append(el('p', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); S.tab = back[0]; render(); } } }, '\u2190 ' + back[1])), out);
+  view.append(el('p', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); go(back[0]); } } }, '\u2190 ' + back[1])), out);
   const TYPE = { WARN: 'Warning', KICK: 'Kick', BAN: 'Ban', UNBAN: 'Unban', NOTE: 'Note' };
   (async () => {
     const p = await api('GET', '/api/profile?player=' + encodeURIComponent(uuid));
