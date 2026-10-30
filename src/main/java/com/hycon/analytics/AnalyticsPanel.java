@@ -80,7 +80,7 @@ public final class AnalyticsPanel implements HyconPanel {
         out.stat("Online now", String.valueOf(online))
                 .stat("Unique players", String.valueOf(unique))
                 .stat("Peak", String.valueOf(Math.max(peak, online)))
-                .stat("Average", list.isEmpty() ? "-" : String.format("%.1f", sum / (double) list.size()))
+                .stat("Average", list.isEmpty() ? "-" : String.valueOf(Math.round(sum / (double) list.size())))
                 .stat("Uptime", String.format("%.1f%%", uptime), "running " + duration((System.nanoTime() - HytaleServer.get().getBootStart()) / 1_000_000)) // boot time is System.nanoTime()
                 .stat("Memory", usedMb + " MB", "of " + (rt.maxMemory() >> 20) + " MB");
 
