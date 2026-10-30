@@ -1,6 +1,6 @@
 // The player globe: an orthographic canvas globe (no libraries; the panel loads nothing from other
 // sites) with a dot where each player roughly connects from, coloured by ping, and a line to the
-// server when hycon.json has ServerLocation. Drag to turn, Ctrl + scroll to zoom, click a dot for the profile.
+// server when hycon.json has ServerLocation. Drag to turn, scroll to zoom, click a dot for the profile.
 'use strict';
 
 const RAD = Math.PI / 180;
@@ -97,12 +97,23 @@ function globe(opts) {
     ctx.strokeStyle = 'rgba(226,181,75,.45)'; ctx.lineWidth = 0.7; ctx.beginPath();
     for (const line of WORLD.lines) path(ctx, line);
     ctx.stroke();
-    // Lines to the server: every player on the overview is too busy, so only the focused or hovered one.
+    // Lines to the server: faint ones from everyone so they meet at the server, the focused or hovered one bright.
     const lineTo = focus || hover;
+    if (opts.server) {
+      ctx.lineWidth = 1; ctx.globalAlpha = 0.22;
+      for (const p of players) if (p !== lineTo) {
+        ctx.strokeStyle = pingColour(p.ping); ctx.beginPath(); path(ctx, arc(p, opts.server, 32).flat()); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
     if (opts.server && lineTo) {
       const pts = arc(lineTo, opts.server, 48);
       ctx.strokeStyle = pingColour(lineTo.ping); ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85; ctx.beginPath();
       path(ctx, pts.flat()); ctx.stroke(); ctx.globalAlpha = 1;
+      // a spark running along the line towards the server
+      const q = pts[Math.floor(((performance.now() / 1400) % 1) * (pts.length - 1))];
+      const [sx, sy, sz] = project(q[0], q[1]);
+      if (sz > 0) { ctx.fillStyle = '#fff3c4'; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 7); ctx.fill(); }
     }
     if (focus) { // the lookup is city-level at best: a soft ~150 km circle says "around here"
       const c = []; const k = 150 / 111;
@@ -131,6 +142,17 @@ function globe(opts) {
     if (opts.server) {
       const [x, y, z] = project(opts.server.lon, opts.server.lat);
       if (z > 0) {
+        // the glow where every connection meets the server, with rings pulsing out
+        const gr = 26 * Math.min(1.8, Math.sqrt(view.zoom));
+        const g = ctx.createRadialGradient(x, y, 0, x, y, gr);
+        g.addColorStop(0, 'rgba(243,210,124,.55)'); g.addColorStop(1, 'rgba(243,210,124,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, gr, 0, 7); ctx.fill();
+        for (let i = 0; i < 2; i++) {
+          const ph = (t * 0.6 + i / 2) % 1;
+          ctx.strokeStyle = '#f3d27c'; ctx.globalAlpha = 0.8 * (1 - ph); ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(x, y, 8 + ph * gr, 0, 7); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
         ctx.fillStyle = '#f3d27c'; ctx.strokeStyle = '#0b0c10'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 7, y); ctx.closePath(); ctx.fill(); ctx.stroke();
         label(ctx, x, y, 'SERVER', '');
@@ -197,9 +219,8 @@ function globe(opts) {
     if (p && p !== focus) { S.tab = 'profile:' + p.uuid; render(); }
   });
   canvas.addEventListener('pointerleave', () => { hover = null; tipEl.hidden = true; });
-  // Plain scrolling moves the page past the globe; Ctrl (or pinch) + scroll zooms it.
+  // Scrolling over the globe zooms it.
   canvas.addEventListener('wheel', (e) => {
-    if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
     view.zoom = Math.max(0.8, Math.min(12, view.zoom * Math.exp(-e.deltaY * 0.0015)));
   }, { passive: false });
@@ -235,7 +256,7 @@ function globeSection() {
               el('span', {}, el('i', { class: 'lg pg-mid' }), '80–150'), el('span', {}, el('i', { class: 'lg pg-bad' }), '150+'))),
           note ? el('p', { class: 'muted' }, note) : null,
           globe({ players: list, server: d.server }),
-          el('p', { class: 'muted small' }, 'Drag to turn, Ctrl + scroll to zoom. Location comes from each player’s last join address (city level at best) and may be off, especially on a VPN or mobile network. '
+          el('p', { class: 'muted small' }, 'Drag to turn, scroll to zoom. Location comes from each player’s last join address (city level at best) and may be off, especially on a VPN or mobile network. '
             + (d.server ? 'Hover a player for their line to the server.' : 'Set ServerLocation in hycon.json to draw lines to the server.')
             + ' Data: DB-IP (db-ip.com, CC BY 4.0).')),
         el('div', { class: 'card' }, el('h2', {}, 'Countries'),
