@@ -25,7 +25,7 @@ function globe(opts) {
   const focus = opts.focus || null;
   const start = focus || opts.server || { lat: 30, lon: -40 };
   const view = { lon: -start.lon, lat: Math.max(-60, Math.min(60, start.lat)), zoom: focus ? 2.6 : 1 };
-  let spin = !focus, hover = null, drag = null, raf = 0, w = 0, h = 0, r = 0, cx = 0, cy = 0;
+  let shown = false, waits = 0, spin = !focus, hover = null, drag = null, raf = 0, w = 0, h = 0, r = 0, cx = 0, cy = 0;
   const dpr = window.devicePixelRatio || 1;
 
   // Rotate (lon, lat) by the view and return screen x, y and z (z > 0 is the visible side).
@@ -175,7 +175,13 @@ function globe(opts) {
   }
 
   function frame() {
-    if (!wrap.isConnected) { cancelAnimationFrame(raf); return; } // the tab changed: stop
+    // Not on the page yet (built before its card was added, e.g. when coming back to Analytics):
+    // keep waiting a while. Once shown and then removed, the tab changed: stop.
+    if (!wrap.isConnected) {
+      if (shown || ++waits > 600) { cancelAnimationFrame(raf); return; }
+      raf = requestAnimationFrame(frame); return;
+    }
+    if (!shown) { shown = true; size(); }
     if (spin) view.lon = (view.lon + 0.04) % 360;
     r = Math.min(w, h) * 0.42 * view.zoom;
     draw();
