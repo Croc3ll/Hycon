@@ -187,7 +187,7 @@ function connectionMap(uuid) {
         n.reports ? n.reports + ' report' + (n.reports > 1 ? 's' : '') : null].filter(Boolean).join(' · ')),
       el('p', { class: 'row' },
         el('button', { class: 'primary', on: { click: () => load(n.id, 1).catch((e) => toast(e.message, true)) } }, 'Expand'),
-        el('button', { on: { click: () => { S.tab = 'profile:' + n.id; render(); } } }, 'Open profile')),
+        el('button', { on: { click: () => { openProfile(n.id); } } }, 'Open profile')),
       el('div', { class: 'map-ties' }, ties.length ? ties.map((e) => {
         const other = e.a === n.id ? e.b : e.a;
         const dir = e.type === 'report' ? (e.a === n.id ? 'reported ' : 'reported by ') : e.type === 'kill' ? (e.a === n.id ? 'killed ' : 'killed by ') : '';

@@ -216,7 +216,7 @@ function globe(opts) {
     const click = drag && !drag.moved;
     drag = null;
     const p = click && nearest(e);
-    if (p && p !== focus) { S.tab = 'profile:' + p.uuid; render(); }
+    if (p && p !== focus) { openProfile(p.uuid); }
   });
   canvas.addEventListener('pointerleave', () => { hover = null; tipEl.hidden = true; });
   // Scrolling over the globe zooms it.

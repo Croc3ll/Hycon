@@ -314,8 +314,15 @@ function bans(view) {
 // ---------- Player profile ("dossier") ----------
 
 function nameLink(name, uuid) {
-  return el('a', { href: '#', class: 'who', on: { click: (e) => { e.preventDefault(); S.tab = 'profile:' + uuid; render(); } } },
+  return el('a', { href: '#', class: 'who', on: { click: (e) => { e.preventDefault(); openProfile(uuid); } } },
     avatar(name, uuid, 22), name);
+}
+
+// A profile's back link returns to the tab it was opened from (a profile opened from another
+// profile keeps the first one's way back).
+function openProfile(uuid) {
+  if (!S.tab.startsWith('profile:')) S.back = S.tab;
+  S.tab = 'profile:' + uuid; render();
 }
 
 // A player's emblem: their initial in a gold-rimmed diamond, coloured from their UUID, so each
@@ -337,7 +344,8 @@ function avatar(name, uuid, size) {
 
 function profile(view, uuid) {
   const out = el('div');
-  view.append(el('p', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); S.tab = 'players'; render(); } } }, '\u2190 Players')), out);
+  const back = tabs().find((t) => t[0] === S.back) || tabs()[0];
+  view.append(el('p', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); S.tab = back[0]; render(); } } }, '\u2190 ' + back[1])), out);
   const TYPE = { WARN: 'Warning', KICK: 'Kick', BAN: 'Ban', UNBAN: 'Unban', NOTE: 'Note' };
   (async () => {
     const p = await api('GET', '/api/profile?player=' + encodeURIComponent(uuid));
