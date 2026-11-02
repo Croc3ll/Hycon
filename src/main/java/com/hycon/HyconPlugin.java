@@ -2,6 +2,7 @@ package com.hycon;
 
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -59,6 +60,8 @@ import java.util.logging.Level;
  */
 public final class HyconPlugin extends JavaPlugin {
 
+    /** Who hears about new Hycon releases on join. Operators have every permission. */
+    private static final String UPDATE_NOTICE_PERMISSION = "hycon.updates.notify";
     private static HyconPlugin instance;
 
     private HyconConfig config;
@@ -86,6 +89,7 @@ public final class HyconPlugin extends JavaPlugin {
     private WebServer web;
     private ScheduledFuture<?> housekeeping;
     private ScheduledFuture<?> geoRefresh;
+    private UpdateCheck updates;
 
     public HyconPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -134,12 +138,20 @@ public final class HyconPlugin extends JavaPlugin {
             }
             return e;
         }));
+        getEventRegistry().registerGlobal(PlayerConnectEvent.class, e -> {
+            String update = updates == null ? null : updates.notice();
+            if (update != null && e.getPlayerRef().hasPermission(UPDATE_NOTICE_PERMISSION)) {
+                e.getPlayerRef().sendMessage(Message.raw(update).color("#FFAA00"));
+            }
+        });
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.left(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername()));
     }
 
     @Override
     protected void start() {
         HytaleLogger log = getLogger();
+        updates = new UpdateCheck(String.valueOf(getManifest().getVersion()), log);
+        updates.start();
         if (!config.enabled()) {
             log.at(Level.INFO).log("Hycon panel is turned off in hycon.json");
             return;
@@ -240,6 +252,9 @@ public final class HyconPlugin extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (updates != null) {
+            updates.stop();
+        }
         if (bugs != null) {
             bugs.stopLogCapture();
         }

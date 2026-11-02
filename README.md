@@ -48,6 +48,10 @@ only works from the server machine itself. Then add accounts for your staff in t
 Locked out? In the server console: `/hycon resetpassword <name>` writes a new password to
 `FIRST-LOGIN.txt` (and creates the account as OWNER if it doesn't exist).
 
+## Updates
+
+Hycon checks GitHub for a newer release at start and every 6 hours. When one is out it logs a warning in the console, and admins (operators, or anyone with `hycon.updates.notify`) get a chat line with the release link when they join.
+
 ## Ban sharing
 
 Owners can share ban lists between servers running Hycon (for example a network-wide ban list).
