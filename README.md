@@ -45,6 +45,9 @@ Open `http://127.0.0.1:8096/` **on the server machine**, log in with those, and 
 password; the panel allows nothing else until you do. Until it's changed, the default password
 only works from the server machine itself. Then add accounts for your staff in the **Accounts** tab.
 
+Rented server without access to the machine? [docs/WEB-PANEL.md](docs/WEB-PANEL.md) shows how to put
+the panel on your own domain with HTTPS.
+
 Locked out? In the server console: `/hycon resetpassword <name>` writes a new password to
 `FIRST-LOGIN.txt` (and creates the account as OWNER if it doesn't exist).
 

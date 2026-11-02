@@ -305,6 +305,9 @@ Changes need a **server restart**.
 
 The panel can ban players and run commands, so think of it like your server's console password.
 
+Renting your server from a host? See [WEB-PANEL.md](WEB-PANEL.md) for putting the panel on your own
+domain without access to the machine.
+
 **Simplest and safest: an SSH tunnel** (see [section 2](#2-first-login)). Nothing to configure.
 
 **Permanent web address: HTTPS reverse proxy.** Keep `BindAddress` at `127.0.0.1` and put a web
