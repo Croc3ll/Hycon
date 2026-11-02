@@ -1132,6 +1132,8 @@ function drawChart(s, win) {
   if (win) { t0 = win[0]; t1 = win[1]; }
   if (t1 === t0) t1 = t0 + 1;
   v1 = v1 <= 0 ? 1 : v1 * 1.1;
+  // Whole-number data (players, matches) gets whole-number grid lines, never 0.3 of a player.
+  if (s.points.every((p) => Number.isInteger(p[2]))) v1 = Math.max(1, Math.ceil(v1 / 4)) * 4;
   // Threshold lines (e.g. 150 / 250 ms) stay in view even when the data is far below them.
   for (const [v] of s.thresholds || []) v1 = Math.max(v1, v * 1.15);
   const x = (t) => L + (t - t0) / (t1 - t0) * (W - L - R);

@@ -88,42 +88,41 @@ public final class AnalyticsPanel implements HyconPanel {
 
         long bucket = bucketFor(range);
         PanelData.Series players = out.series("Players online", "players").area()
-                .subtitle("average per " + duration(bucket) + " · red bands are outages").line("Players");
+                .subtitle("most online per " + duration(bucket) + " · red bands are outages").line("Players");
         PanelData.Series memory = out.series("Memory used", "MB").subtitle("average per " + duration(bucket)).line("Memory");
-        long start = -1, last = -1, n = 0, sumOn = 0, sumMem = 0;
+        // Players are the most online in each bucket: an average reads as 0.4 of a player.
+        long start = -1, last = -1, n = 0, peakOn = 0, sumMem = 0;
         for (Samples.Sample s : list) {
             if (last >= 0 && s.time() - last > 3 * Samples.INTERVAL_MS) {
                 players.gap(last, s.time()); // no samples for a while: the server was off
             }
             long b = s.time() / bucket * bucket;
             if (b != start && n > 0) {
-                players.point(start + bucket / 2, sumOn / (double) n);
+                players.point(start + bucket / 2, peakOn);
                 memory.point(start + bucket / 2, sumMem / (double) n);
-                n = sumOn = sumMem = 0;
+                n = peakOn = sumMem = 0;
             }
             start = b;
             n++;
-            sumOn += s.online();
+            peakOn = Math.max(peakOn, s.online());
             sumMem += s.memoryMb();
             last = s.time();
         }
         if (n > 0) {
-            players.point(start + bucket / 2, sumOn / (double) n);
+            players.point(start + bucket / 2, peakOn);
             memory.point(start + bucket / 2, sumMem / (double) n);
         }
 
-        // Average players per hour of the day, in the server's time zone.
-        double[] hourSum = new double[24];
-        int[] hourCount = new int[24];
+        // Most players seen in each hour of the day, in the server's time zone.
+        int[] hourPeak = new int[24];
         ZoneId zone = ZoneId.systemDefault();
         for (Samples.Sample s : list) {
             int h = Instant.ofEpochMilli(s.time()).atZone(zone).getHour();
-            hourSum[h] += s.online();
-            hourCount[h]++;
+            hourPeak[h] = Math.max(hourPeak[h], s.online());
         }
-        PanelData.Columns hours = out.columns("Average players by hour (" + zone.getId() + ")");
+        PanelData.Columns hours = out.columns("Most players by hour (" + zone.getId() + ")");
         for (int h = 0; h < 24; h++) {
-            hours.column(String.format("%02d", h), hourCount[h] == 0 ? 0 : hourSum[h] / hourCount[h]);
+            hours.column(String.format("%02d", h), hourPeak[h]);
         }
 
         // Top playtime as bars next to the hour chart, then the full table below.

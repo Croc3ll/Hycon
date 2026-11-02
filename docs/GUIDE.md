@@ -169,10 +169,10 @@ the log. If a command takes longer than 5 seconds, the panel stops waiting but t
 **Analytics** shows players online now, unique players, peak and average players, uptime and
 memory, for the last 24 hours, 7 days or 30 days (buttons at the top right). Below that:
 
-- **Players online** over time; red bands are times the server was off. Hover for exact values,
+- **Players online** over time (the most online in each step); red bands are times the server was off. Hover for exact values,
   or switch to **Table** for the raw numbers.
 - **Memory used** over time.
-- **Average players by hour** of the day, and **Most playtime**.
+- **Most players by hour** of the day, and **Most playtime**.
 - **Most active players**: playtime, sessions, first and last seen.
 - **New players**, **Returning** players (here before this period) and **Came back**: the share
   of players who played again on a later day.
