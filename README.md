@@ -4,6 +4,9 @@ A web admin panel (RCON-style) for Hytale servers, running as a server plugin. O
 on the same machine: see who's online, kick, ban and unban (temporary or permanent, with a reason),
 run console commands, watch the live log, and view dashboards other plugins add.
 
+**Rented server?** Put the panel on your own domain (`https://panel.yourdomain.com`) and open it from
+any browser: [docs/WEB-PANEL.md](docs/WEB-PANEL.md).
+
 **Full setup and usage guide: [docs/GUIDE.md](docs/GUIDE.md)** (install, first login, every tab,
 staff accounts, all settings, remote access over HTTPS, troubleshooting).
 
@@ -27,6 +30,8 @@ staff accounts, all settings, remote access over HTTPS, troubleshooting).
 - **Player globe**: a spinning 3D globe on Analytics with a dot for every player (coloured by ping) and
   a per-country table; each profile shows that player's rough location, distance to the server, and a
   warning when their ping is too low for the distance (likely a VPN). Click a dot to open the profile.
+- **Web panel on your own domain**: open it from anywhere over HTTPS, even when you rent the server
+  and can't reach its machine (Cloudflare Tunnel or a small VPS in front). See [docs/WEB-PANEL.md](docs/WEB-PANEL.md).
 - **Ban sharing** between servers (below) and a full **audit log** of staff actions.
 - **Remember me**: tick it at login and the browser logs you in by itself for 30 days, even across
   server restarts. Logging out, a password change or losing the account ends it.
