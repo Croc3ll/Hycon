@@ -172,6 +172,69 @@ function tabIcon(id) {
   return svg;
 }
 
+// ---------- Motion ----------
+// Only a freshly opened tab animates: dashboard refreshes inside it stay still.
+const INTRO_MS = 1800;
+const COUNT_MS = 700;
+const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+let introTimer = null;
+
+function playIntro(view) {
+  clearTimeout(introTimer);
+  view.classList.remove('intro');
+  if (calm()) return;
+  void view.offsetWidth; // restart the CSS animations
+  view.classList.add('intro');
+  introTimer = setTimeout(() => view.classList.remove('intro'), INTRO_MS);
+}
+
+// The gold pill glides from the last tab to the new one.
+let tabMarkAt = null;
+function slideTabMark() {
+  const nav = $('tabs'), on = nav.querySelector('button.active');
+  if (!on) { tabMarkAt = null; return; }
+  const mark = el('span', { class: 'tabmark' });
+  nav.prepend(mark);
+  const place = (b) => { mark.style.left = b.offsetLeft + 'px'; mark.style.top = b.offsetTop + 'px';
+    mark.style.width = b.offsetWidth + 'px'; mark.style.height = b.offsetHeight + 'px'; };
+  const to = { offsetLeft: on.offsetLeft, offsetTop: on.offsetTop, offsetWidth: on.offsetWidth, offsetHeight: on.offsetHeight };
+  place(tabMarkAt && !calm() ? tabMarkAt : to);
+  requestAnimationFrame(() => { mark.classList.add('glide'); place(to); });
+  tabMarkAt = to;
+}
+
+// Big numbers count up when they first show, and tick to the new value (with a gold flash) when it changes.
+const shownValues = new Map();
+function countUp(v) {
+  const label = v.parentElement?.querySelector('.h, .l')?.textContent;
+  const text = v.firstChild?.nodeType === 3 ? v.firstChild : null;
+  if (!label || !text) return;
+  const key = S.tab + '|' + label, now = text.textContent, before = shownValues.get(key);
+  shownValues.set(key, now);
+  const m = /^(\D*?)(-?\d[\d,]*\.?\d*)(.*)$/.exec(now);
+  if (!m || before === now || calm()) return;
+  const end = parseFloat(m[2].replace(/,/g, '')), dec = (m[2].split('.')[1] || '').length, comma = m[2].includes(',');
+  const pb = before && /^(\D*?)(-?\d[\d,]*\.?\d*)(.*)$/.exec(before);
+  const start = pb && pb[1] === m[1] && pb[3] === m[3] ? parseFloat(pb[2].replace(/,/g, '')) : 0;
+  if (before !== undefined) { v.classList.remove('flash'); void v.offsetWidth; v.classList.add('flash'); }
+  const fmt = (n) => comma ? n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : n.toFixed(dec);
+  const t0 = performance.now();
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / COUNT_MS), e = 1 - Math.pow(1 - k, 3);
+    text.textContent = k < 1 ? m[1] + fmt(start + (end - start) * e) + m[3] : now;
+    if (k < 1 && text.isConnected) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+new MutationObserver((muts) => {
+  for (const mu of muts) for (const n of mu.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    if (n.matches('.kpi .v, .tile .v, .chip-stat .v')) countUp(n);
+    n.querySelectorAll('.kpi .v, .tile .v, .chip-stat .v').forEach(countUp);
+  }
+}).observe(document.getElementById('view'), { childList: true, subtree: true });
+
 function render() {
   stop();
   document.body.classList.remove('riskpage'); // only a profile tints the page
@@ -180,8 +243,10 @@ function render() {
   if (!S.tab.startsWith('profile:') && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
   $('tabs').replaceChildren(...list.map(([id, title]) =>
     el('button', { class: id === S.tab ? 'active' : '', on: { click: () => go(id) } }, tabIcon(id), title)));
+  slideTabMark();
   const view = $('view');
   view.replaceChildren();
+  playIntro(view);
   const tab = S.tab;
   const head = PAGES[tab];
   if (head) view.append(el('div', { class: 'pagehead' }, el('h1', {}, head[0]), el('p', {}, head[1])));
