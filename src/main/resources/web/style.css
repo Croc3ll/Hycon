@@ -431,3 +431,56 @@ nav button.active { background: transparent; border-color: transparent; }
 .v.flash { animation: flash 1s ease-out; }
 @keyframes flash { 0% { color: var(--gold2); text-shadow: 0 0 12px rgba(243, 210, 124, .6); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- Console colours (logLine in app.js) ---------- */
+#console .lt { color: var(--dim); } #console .li { color: #6aa9e9; } #console .lw { color: #e8c15a; }
+#console .le { color: #ff7b7b; font-weight: 700; } #console .lg { color: #b48ef0; }
+#console > div { padding: 1px 0; border-radius: 3px; }
+#console > div:hover { background: rgba(255, 255, 255, .03); }
+#console > div.err { background: rgba(229, 83, 75, .07); }
+
+/* ---------- Profile header ---------- */
+.herotop { display: flex; gap: 18px; align-items: center; margin-bottom: 18px; }
+/* The avatar is a gold diamond, so it gets a glow rather than a frame. */
+.heroav { position: relative; flex: none; filter: drop-shadow(0 0 14px rgba(226, 181, 75, .35)); }
+.heroav .avatar { display: block; }
+.heroav.on::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--ok); border: 3px solid var(--panel); animation: livepulse 2s infinite; }
+.heroname { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.heroname h2.big { margin: 0; font-size: 28px; color: var(--text); }
+.heroname .mono { overflow-wrap: anywhere; }
+.pill.dim { color: var(--muted); border-color: var(--line); background: rgba(255, 255, 255, .03); }
+.herostats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.herostat { background: rgba(0, 0, 0, .22); border: 1px solid var(--line2); border-radius: var(--radius-sm); padding: 10px 12px; min-width: 0; }
+.herostat .l { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.herostat .t { margin-top: 4px; font-weight: 600; overflow-wrap: anywhere; }
+/* Text values (a name, "Other (quests, ...)") wrap inside their column instead of running into the next one. */
+.kpi .v { white-space: normal; overflow-wrap: anywhere; }
+
+/* ---------- Fixes from a click-through (2026-11-10) ---------- */
+/* Fourteen tabs wrap to two rows: the header grows instead of the second row spilling out. */
+header { height: auto; min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+/* The login title sits under the logo, not on the left. */
+.login-word .brand { justify-content: center; }
+/* Checkboxes sit beside their text instead of being stretched like a text box. */
+input[type=checkbox] { width: auto; accent-color: var(--gold); margin: 0; }
+label:has(> input[type=checkbox]) { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13px;
+  letter-spacing: 0; text-transform: none; cursor: pointer; }
+/* Table rows hold selects and buttons: keep their text in line with them. */
+td { vertical-align: middle; }
+/* A plugin note with only a title is a section label, not an empty box. */
+.notebox:has(> h3:only-child) { background: none; border: 0; border-bottom: 1px solid var(--line2); border-radius: 0; box-shadow: none;
+  padding: 4px 0 10px; margin: 26px 0 14px; }
+.notebox:has(> h3:only-child) > h3 { margin: 0; font: 600 11px/1 var(--mono); letter-spacing: 2px; color: var(--gold); }
+/* Analytics numbers its own sections, so cards inside them don't restart at 01. */
+.asec .card > h2:first-child::before, .asec .card > .row:first-child > h2:first-child::before,
+.asec .card > .spread:first-child > h2:first-child::before { content: none; }
+/* ".row input" stretches inputs to fill a row; checkboxes and colour swatches keep their own size. */
+.row input[type=checkbox], .row input[type=color] { flex: none; min-width: 0; }
+.row input[type=color] { width: 42px; }
+/* Money like "$1,299,843.00" stays on one line: smaller numbers in wide grids, no breaks inside a number. */
+.kpi .v { overflow-wrap: break-word; }
+.kpirow.wrap { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.kpirow.wrap .kpi .v { font-size: 19px; }
+/* On a phone a wide table scrolls inside its card instead of pushing the whole page sideways. */
+@media (max-width: 720px) { .card { overflow-x: auto; } main { padding: 16px 12px 60px; } }

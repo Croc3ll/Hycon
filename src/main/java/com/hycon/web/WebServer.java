@@ -76,6 +76,23 @@ public final class WebServer {
                 files.put(res, in.readAllBytes()); // read once; they never change while running
             }
         }
+        stampAssetLinks();
+    }
+
+    /**
+     * Adds "?v=<hash of every file>" to the page's script and style links. Some browsers keep
+     * an old style.css despite no-store, so after an update they'd mix the new page with old
+     * styles; a new link is always fetched fresh.
+     */
+    private void stampAssetLinks() {
+        int hash = 1;
+        for (String res : new java.util.TreeSet<>(files.keySet())) {
+            hash = 31 * hash + java.util.Arrays.hashCode(files.get(res));
+        }
+        String stamp = "?v=" + Integer.toHexString(hash);
+        String page = new String(files.get("web/index.html"), StandardCharsets.UTF_8);
+        page = page.replaceAll("(href|src)=\"([a-z]+\\.(?:css|js|svg))\"", "$1=\"$2" + stamp + "\"");
+        files.put("web/index.html", page.getBytes(StandardCharsets.UTF_8));
     }
 
     public void get(String path, Level min, Handler h) {

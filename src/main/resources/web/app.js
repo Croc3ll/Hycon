@@ -212,7 +212,8 @@ function countUp(v) {
   const key = S.tab + '|' + label, now = text.textContent, before = shownValues.get(key);
   shownValues.set(key, now);
   const m = /^(\D*?)(-?\d[\d,]*\.?\d*)(.*)$/.exec(now);
-  if (!m || before === now || calm()) return;
+  // Only numbers count ("141B", "$5", "99%"): a name with a number in it ("test13, 99%") stays put.
+  if (!m || m[1].length > 2 || /[a-z]{2}/i.test(m[3]) || before === now || calm()) return;
   const end = parseFloat(m[2].replace(/,/g, '')), dec = (m[2].split('.')[1] || '').length, comma = m[2].includes(',');
   const pb = before && /^(\D*?)(-?\d[\d,]*\.?\d*)(.*)$/.exec(before);
   const start = pb && pb[1] === m[1] && pb[3] === m[3] ? parseFloat(pb[2].replace(/,/g, '')) : 0;
@@ -451,6 +452,8 @@ function avatar(name, uuid, size) {
   return svg;
 }
 
+const heroStat = (label, value) => el('div', { class: 'herostat' }, el('div', { class: 'l' }, label), el('div', { class: 't' }, value));
+
 function profile(view, uuid) {
   const out = el('div');
   const back = tabs().find((t) => t[0] === S.back) || tabs()[0];
@@ -482,15 +485,17 @@ function profile(view, uuid) {
         : el('li', { class: 'muted' }, 'Nothing stands out.')),
       el('div', { class: 'muted small' }, 'A pointer for staff, not proof.'));
     out.replaceChildren(
-      el('div', { class: 'profiletop' }, el('div', { class: 'card' },
-        el('div', { class: 'row' }, avatar(p.name, p.uuid, 56), el('h2', { class: 'big' }, p.name),
-          el('span', { class: p.online ? 'good' : 'muted' }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline')),
-        el('table', {}, el('tbody', {},
-          el('tr', {}, el('th', {}, 'UUID'), el('td', { class: 'mono' }, p.uuid)),
-          el('tr', {}, el('th', {}, 'First seen'), el('td', {}, p.first ? fmtTime(p.first) : 'unknown')),
-          el('tr', {}, el('th', {}, 'Last seen'), el('td', {}, p.online ? 'now' : p.last ? fmtTime(p.last) : 'unknown')),
-          el('tr', {}, el('th', {}, 'Last world'), el('td', {}, p.world || '')),
-          el('tr', {}, el('th', {}, 'Record'), el('td', {}, p.warnings + ' warnings, ' + p.kicks + ' kicks, ' + p.bans + ' bans')))),
+      el('div', { class: 'profiletop' }, el('div', { class: 'card profilehero' },
+        el('div', { class: 'herotop' }, el('div', { class: 'heroav' + (p.online ? ' on' : '') }, avatar(p.name, p.uuid, 72)),
+          el('div', { class: 'heroname' }, el('h2', { class: 'big' }, p.name),
+            el('div', { class: 'row' }, el('span', { class: 'pill ' + (p.online ? 'good' : 'dim') }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline'),
+              p.ban ? el('span', { class: 'badge red' }, 'Banned') : null),
+            el('div', { class: 'mono muted small' }, p.uuid))),
+        el('div', { class: 'herostats' },
+          heroStat('First seen', p.first ? fmtTime(p.first) : 'unknown'),
+          heroStat('Last seen', p.online ? 'now' : p.last ? fmtTime(p.last) : 'unknown'),
+          heroStat('Last world', p.world || '—'),
+          heroStat('Record', p.warnings + ' warns · ' + p.kicks + ' kicks · ' + p.bans + ' bans')),
         p.ban ? el('p', { class: 'secret bad' }, 'Banned ' + (p.ban.expires ? 'until ' + fmtTime(p.ban.expires) : 'permanently')
           + ' by ' + p.ban.by + ': ' + (p.ban.reason || '')) : null,
         can('MODERATOR') ? el('p', { class: 'row' },
@@ -569,6 +574,24 @@ function pingCard(uuid) {
 }
 
 // ---------- Live console ----------
+
+// A console line with its leading [tags] coloured: the time dim, the level by severity, the logger blue.
+function logLine(text, cls) {
+  const line = el('div', { class: cls });
+  let rest = text;
+  // Hytale starts a line with a bare "17:45:18" before its [LEVEL] [Source] tags.
+  const time = /^\s*\d{1,2}:\d{2}:\d{2}(\.\d+)?/.exec(rest);
+  if (time) { line.append(el('span', { class: 'lt' }, time[0])); rest = rest.slice(time[0].length); }
+  for (let m; (m = /^\s*\[[^\]]*\]/.exec(rest));) {
+    const tag = m[0], inner = tag.trim().slice(1, -1).trim();
+    const kind = /^\d{2,4}[/:-]/.test(inner) ? 'lt' : /^(INFO|FINE|CONFIG)$/i.test(inner) ? 'li'
+      : /^WARN/i.test(inner) ? 'lw' : /^(SEVERE|ERROR)$/i.test(inner) ? 'le' : 'lg';
+    line.append(el('span', { class: kind }, tag));
+    rest = rest.slice(tag.length);
+  }
+  line.append(rest);
+  return line;
+}
 
 function consoleView(view) {
   const box = el('div', { id: 'console', class: 'mono' });
@@ -704,7 +727,7 @@ function consoleView(view) {
       for (const [seq, text] of d.lines) {
         S.logAfter = seq;
         const cls = text.startsWith('[Hycon]') ? 'mine' : /\[(SEVERE|ERROR)\]/.test(text) ? 'err' : /\[WARN/.test(text) ? 'warn' : '';
-        box.append(el('div', { class: cls }, text));
+        box.append(logLine(text, cls));
         if (!firstPoll) alertFor(text);
       }
       while (box.childElementCount > 2000) box.firstChild.remove();
