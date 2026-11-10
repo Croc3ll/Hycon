@@ -148,6 +148,30 @@ function tabs() {
   return list.filter((t) => can(t[2]));
 }
 
+// Line icons for the tab bar (24x24 paths, drawn with the text colour). Plugin tabs share one.
+const TAB_ICONS = {
+  players: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  bans: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M4.9 4.9l14.2 14.2',
+  reports: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  bugs: 'M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 0 1 6 0v1.1M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6M12 20v-9M6 13H2M22 13h-4M3 21l3-3M21 21l-3-3',
+  console: 'M4 17l6-6-6-6M12 19h8',
+  audit: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8',
+  sharing: 'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6M6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6M8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
+  accounts: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10',
+  panel: 'M3 3v18h18M7 16l4-4 4 4 6-6',
+};
+
+function tabIcon(id) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'tabicon');
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', TAB_ICONS[id.startsWith('panel:') ? 'panel' : id] || TAB_ICONS.panel);
+  svg.append(path);
+  return svg;
+}
+
 function render() {
   stop();
   document.body.classList.remove('riskpage'); // only a profile tints the page
@@ -155,7 +179,7 @@ function render() {
   const list = tabs();
   if (!S.tab.startsWith('profile:') && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
   $('tabs').replaceChildren(...list.map(([id, title]) =>
-    el('button', { class: id === S.tab ? 'active' : '', on: { click: () => go(id) } }, title)));
+    el('button', { class: id === S.tab ? 'active' : '', on: { click: () => go(id) } }, tabIcon(id), title)));
   const view = $('view');
   view.replaceChildren();
   const tab = S.tab;
