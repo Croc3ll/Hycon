@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Hycon emblem, promo version: a faceted gold diamond around a glowing sapphire with a
+       chrome-gold H. The small favicon (web/logo.svg) stays simple; this one is for art. -->
+  <defs>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset=".35" stop-color="#ffcf5a" stop-opacity=".55"/>
+      <stop offset=".7" stop-color="#e2a53b" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#e2a53b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldLight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff6d2"/>
+      <stop offset=".45" stop-color="#ffd66b"/>
+      <stop offset="1" stop-color="#c48b22"/>
+    </linearGradient>
+    <linearGradient id="goldDark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d79e2e"/>
+      <stop offset="1" stop-color="#6b4710"/>
+    </linearGradient>
+    <linearGradient id="goldMid" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#8d6116"/>
+      <stop offset="1" stop-color="#f2c45a"/>
+    </linearGradient>
+    <radialGradient id="gem" cx="42%" cy="34%" r="75%">
+      <stop offset="0" stop-color="#7fd0ff"/>
+      <stop offset=".28" stop-color="#2a7fe0"/>
+      <stop offset=".65" stop-color="#123a86"/>
+      <stop offset="1" stop-color="#070f2a"/>
+    </radialGradient>
+    <linearGradient id="hFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset=".42" stop-color="#ffe08a"/>
+      <stop offset=".5" stop-color="#d9a032"/>
+      <stop offset="1" stop-color="#fff0b8"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".55"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="drop" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+    <clipPath id="gemClip"><path d="M256 118 L394 256 L256 394 L118 256 Z"/></clipPath>
+  </defs>
+
+  <!-- warm aura and light rays -->
+  <circle cx="256" cy="256" r="250" fill="url(#aura)"/>
+  <g stroke="#ffe39a" stroke-linecap="round" opacity=".55">
+    <path d="M256 6 V60 M256 452 V506 M6 256 H60 M452 256 H506" stroke-width="5"/>
+    <path d="M80 80 L118 118 M432 80 L394 118 M80 432 L118 394 M432 432 L394 394" stroke-width="3" opacity=".7"/>
+  </g>
+
+  <!-- faceted outer diamond: light facets top-left, dark facets bottom-right -->
+  <g filter="url(#drop)">
+    <path d="M256 30 L482 256 L256 482 L30 256 Z" fill="#3a2706"/>
+    <path d="M256 30 L256 92 L92 256 L30 256 Z" fill="url(#goldLight)"/>
+    <path d="M256 30 L482 256 L420 256 L256 92 Z" fill="url(#goldMid)"/>
+    <path d="M482 256 L256 482 L256 420 L420 256 Z" fill="url(#goldDark)"/>
+    <path d="M256 482 L30 256 L92 256 L256 420 Z" fill="url(#goldMid)"/>
+    <path d="M256 92 L420 256 L256 420 L92 256 Z" fill="#120d05"/>
+    <path d="M256 104 L408 256 L256 408 L104 256 Z" fill="none" stroke="url(#goldLight)" stroke-width="5"/>
+  </g>
+
+  <!-- sapphire with facets and a soft inner glow -->
+  <path d="M256 118 L394 256 L256 394 L118 256 Z" fill="url(#gem)"/>
+  <g clip-path="url(#gemClip)" opacity=".5">
+    <path d="M256 118 L256 256 L118 256 Z" fill="#9fdcff" opacity=".35"/>
+    <path d="M256 118 L394 256 L256 256 Z" fill="#5fb2ff" opacity=".18"/>
+    <path d="M118 256 L256 394 L256 256 Z" fill="#000" opacity=".25"/>
+    <path d="M140 160 L330 120 L120 330 Z" fill="url(#shine)"/>
+  </g>
+  <path d="M256 118 L394 256 L256 394 L118 256 Z" fill="none" stroke="#ffe7a3" stroke-opacity=".7" stroke-width="3"/>
+
+  <!-- the H: dark backing for depth, then the chrome-gold face -->
+  <path d="M196 170 h40 v66 h40 v-66 h40 v176 h-40 v-70 h-40 v70 h-40 Z" fill="#2a1a03" transform="translate(4 7)"/>
+  <path d="M196 170 h40 v66 h40 v-66 h40 v176 h-40 v-70 h-40 v70 h-40 Z" fill="url(#hFace)" stroke="#fff4cf" stroke-width="2.5" filter="url(#glow)"/>
+  <path d="M200 174 h32 v8 h-32 Z M280 174 h32 v8 h-32 Z" fill="#fff" opacity=".7"/>
+
+  <!-- sparkles -->
+  <g fill="#fffbe8" filter="url(#glow)">
+    <path d="M256 14 L264 30 L280 38 L264 46 L256 62 L248 46 L232 38 L248 30 Z"/>
+    <path d="M384 150 L388 160 L398 164 L388 168 L384 178 L380 168 L370 164 L380 160 Z" opacity=".9"/>
+    <path d="M150 360 L153 367 L160 370 L153 373 L150 380 L147 373 L140 370 L147 367 Z" opacity=".7"/>
+  </g>
+</svg>

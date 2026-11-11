@@ -472,9 +472,9 @@ td { vertical-align: middle; }
 .notebox:has(> h3:only-child) { background: none; border: 0; border-bottom: 1px solid var(--line2); border-radius: 0; box-shadow: none;
   padding: 4px 0 10px; margin: 26px 0 14px; }
 .notebox:has(> h3:only-child) > h3 { margin: 0; font: 600 11px/1 var(--mono); letter-spacing: 2px; color: var(--gold); }
-/* Analytics numbers its own sections, so cards inside them don't restart at 01. */
-.asec .card > h2:first-child::before, .asec .card > .row:first-child > h2:first-child::before,
-.asec .card > .spread:first-child > h2:first-child::before { content: none; }
+/* Analytics numbers its own sections, so cards inside them don't restart at 01 (#view outranks the numbering rule). */
+#view .asec .card > h2:first-child::before, #view .asec .card > .row:first-child > h2:first-child::before,
+#view .asec .card > .spread:first-child > h2:first-child::before { content: none; }
 /* ".row input" stretches inputs to fill a row; checkboxes and colour swatches keep their own size. */
 .row input[type=checkbox], .row input[type=color] { flex: none; min-width: 0; }
 .row input[type=color] { width: 42px; }
@@ -484,3 +484,7 @@ td { vertical-align: middle; }
 .kpirow.wrap .kpi .v { font-size: 19px; }
 /* On a phone a wide table scrolls inside its card instead of pushing the whole page sideways. */
 @media (max-width: 720px) { .card { overflow-x: auto; } main { padding: 16px 12px 60px; } }
+/* A ping like "103 ms" never splits over two lines. */
+td.pg-good, td.pg-mid, td.pg-bad, td.pg-none { white-space: nowrap; }
+/* The globe sits inside an Analytics section, so its cards aren't numbered either. */
+#view .globegrid .card > h2:first-child::before, #view .globegrid .card > .spread:first-child > h2:first-child::before { content: none; }

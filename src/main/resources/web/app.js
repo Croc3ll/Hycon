@@ -95,7 +95,7 @@ function showLogin() {
       S.csrf = r.csrf;
       await boot();
     } catch (err) { msg.textContent = err.message; pw.value = ''; }
-  } } }, el('img', { src: 'logo.svg', class: 'login-logo', alt: '' }),
+  } } }, el('img', { src: 'emblem.svg', class: 'login-logo', alt: '' }),
     el('div', { class: 'login-word' }, el('span', { class: 'brand' }, el('span', { class: 'word' }, 'Hycon'))),
     S.setup ? el('p', { class: 'secret' }, 'First start: log in as ', el('b', {}, S.setup[0]), ' with password ', el('b', { class: 'mono' }, S.setup[1]),
       ' from the server machine, then choose your own password.') : null,
@@ -1411,4 +1411,7 @@ function columnsCard(c) {
   return el('div', { class: 'card' }, el('h3', {}, c.title), svg);
 }
 
-boot().catch((e) => { $('view').replaceChildren(el('p', { class: 'bad' }, 'Could not reach the server: ' + e.message)); });
+// Start once every deferred script has run: the globe, map and chart helpers live in the files
+// after app.js, and a quick server answer used to reach them before they existed.
+addEventListener('DOMContentLoaded', () => boot()
+  .catch((e) => { $('view').replaceChildren(el('p', { class: 'bad' }, 'Could not reach the server: ' + e.message)); }));

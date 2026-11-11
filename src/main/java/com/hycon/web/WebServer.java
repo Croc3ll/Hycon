@@ -48,10 +48,13 @@ public final class WebServer {
 
     private static final String COOKIE = "hycon_sid";
     private static final int MAX_BODY = 16 * 1024;
-    private static final Map<String, String> STATIC = Map.of(
-            "/", "web/index.html", "/index.html", "web/index.html",
-            "/app.js", "web/app.js", "/style.css", "web/style.css", "/logo.svg", "web/logo.svg", "/graph.js", "web/graph.js", "/heatmap.js", "web/heatmap.js",
-            "/world.js", "web/world.js", "/globe.js", "web/globe.js");
+    // Map.of stops at ten pairs, so the files are listed as entries.
+    private static final Map<String, String> STATIC = Map.ofEntries(
+            Map.entry("/", "web/index.html"), Map.entry("/index.html", "web/index.html"),
+            Map.entry("/app.js", "web/app.js"), Map.entry("/style.css", "web/style.css"),
+            Map.entry("/logo.svg", "web/logo.svg"), Map.entry("/emblem.svg", "web/emblem.svg"),
+            Map.entry("/graph.js", "web/graph.js"), Map.entry("/heatmap.js", "web/heatmap.js"),
+            Map.entry("/world.js", "web/world.js"), Map.entry("/globe.js", "web/globe.js"));
 
     private final HyconConfig config;
     private final Sessions sessions;

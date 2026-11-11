@@ -1,4 +1,8 @@
+<p align="center"><img src="docs/promo/logo/hycon-emblem-256.png" width="128" alt="Hycon logo"></p>
+
 # Hycon
+
+![Hycon: run your server from anywhere](docs/promo/hycon-banner.png)
 
 A web admin panel (RCON-style) for Hytale servers, running as a server plugin. Open it in a browser
 on the same machine: see who's online, kick, ban and unban (temporary or permanent, with a reason),
@@ -9,6 +13,17 @@ any browser: [docs/WEB-PANEL.md](docs/WEB-PANEL.md).
 
 **Full setup and usage guide: [docs/GUIDE.md](docs/GUIDE.md)** (install, first login, every tab,
 staff accounts, all settings, remote access over HTTPS, troubleshooting).
+
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Analytics](docs/promo/hycon-analytics.png) | ![Player globe](docs/promo/hycon-globe.png) |
+| ![Player profiles](docs/promo/hycon-profile.png) | ![Live console](docs/promo/hycon-console.png) |
+| ![Moderation](docs/promo/hycon-players.png) | |
+
+These are made with demo data by `py tools/promo/make_promo.py` (no real players).
 
 ## Features
 

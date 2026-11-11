@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hycon promo card</title>
+<!-- Rendered at 1600x900 by make_promo.py; ?card=<name> picks the layout and text. -->
+<style>
+  :root { --gold: #e2b54b; --gold2: #f3d27c; --text: #ece8de; --muted: #9aa0ab; --bg: #0a0b0e; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; }
+  body { background: radial-gradient(900px 600px at 78% 40%, rgba(226, 181, 75, .16), transparent 70%),
+    radial-gradient(700px 500px at 0% 100%, rgba(79, 163, 247, .07), transparent 70%), var(--bg);
+    color: var(--text); font-family: Inter, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; position: relative; }
+  body::before { content: ''; position: absolute; inset: 0; opacity: .5;
+    background: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 48px 48px,
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 48px 48px;
+    mask-image: radial-gradient(ellipse at 70% 50%, #000 20%, transparent 75%); }
+  .brand { position: absolute; top: 56px; left: 72px; display: flex; align-items: center; gap: 14px; }
+  .brand img { width: 68px; height: 68px; filter: drop-shadow(0 0 14px rgba(226, 181, 75, .45)); }
+  .brand b { font: 800 26px/1 inherit; letter-spacing: 3px; text-transform: uppercase;
+    background: linear-gradient(#ffe29a, #e2b54b 55%, #a07a2a); -webkit-background-clip: text; color: transparent; }
+  .copy { position: absolute; left: 72px; top: 210px; width: 470px; }
+  .eyebrow { font: 700 14px/1 Consolas, monospace; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); margin-bottom: 22px; }
+  h1 { font-size: 56px; line-height: 1.05; font-weight: 800; letter-spacing: -.03em; }
+  h1 em { font-style: normal; background: linear-gradient(90deg, var(--gold2), var(--gold)); -webkit-background-clip: text; color: transparent; }
+  p.lead { margin-top: 22px; font-size: 21px; line-height: 1.5; color: var(--muted); }
+  ul { list-style: none; padding: 0; margin-top: 30px; display: grid; gap: 14px; }
+  li { display: flex; gap: 12px; align-items: center; font-size: 18px; font-weight: 500; }
+  li::before { content: ''; width: 22px; height: 22px; flex: none; border-radius: 7px; background: rgba(226, 181, 75, .15)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f3d27c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / 14px no-repeat;
+    border: 1px solid rgba(226, 181, 75, .35); }
+  .frame { position: absolute; border-radius: 16px; overflow: hidden; background: #0d0f13; border: 1px solid rgba(255, 255, 255, .09);
+    box-shadow: 0 50px 120px -30px rgba(0, 0, 0, .9), 0 0 0 1px rgba(226, 181, 75, .08), 0 0 80px -20px rgba(226, 181, 75, .25); }
+  .frame .bar { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #121419; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .frame .bar i { width: 11px; height: 11px; border-radius: 50%; background: #2c3039; }
+  .frame .bar span { margin-left: 14px; flex: 1; max-width: 320px; height: 20px; border-radius: 6px; background: #1a1d24;
+    font: 12px/20px Consolas, monospace; color: #6b717c; padding-left: 10px; }
+  .frame img { display: block; width: 100%; }
+  .single { right: -60px; top: 120px; width: 1000px; transform: perspective(2400px) rotateY(-8deg) rotateX(2deg); transform-origin: left center; }
+  .badge { position: absolute; left: 72px; bottom: 56px; font-size: 15px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+  .badge b { color: var(--text); }
+  .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #4fbf7a; box-shadow: 0 0 10px #4fbf7a; }
+  /* Banner: three shots fanned out behind the title. */
+  .banner .copy { top: 250px; width: 620px; }
+  .banner h1 { font-size: 76px; }
+  /* The fan stays right of the headline (which ends near x=780). */
+  .fan { width: 660px; }
+  .fan.a { right: 150px; top: 300px; transform: perspective(2400px) rotateY(-14deg) rotateZ(-3deg); opacity: .35; }
+  .fan.b { right: 30px; top: 210px; transform: perspective(2400px) rotateY(-12deg) rotateZ(-1deg); opacity: .7; }
+  .fan.c { right: -110px; top: 120px; transform: perspective(2400px) rotateY(-10deg) rotateZ(1deg); }
+</style>
+</head>
+<body>
+<div class="brand"><img src="emblem.svg" alt=""><b>Hycon</b></div>
+<div class="copy">
+  <div class="eyebrow" id="eyebrow"></div>
+  <h1 id="title"></h1>
+  <p class="lead" id="lead"></p>
+  <ul id="points"></ul>
+</div>
+<div class="badge"><span class="dot"></span><span>Plugin for <b>Hytale</b> servers · runs in your browser</span></div>
+<script>
+const CARDS = {
+  banner: { eyebrow: 'Server panel for Hytale', title: 'Run your server<br>from <em>anywhere</em>.',
+    lead: 'Live stats, a player globe, moderation and a full console, in one fast web panel.', points: [], shots: ['console', 'profile', 'analytics'] },
+  analytics: { eyebrow: '01 · Analytics', title: 'Your server <em>at a glance</em>.',
+    lead: 'Players, peaks, uptime and memory, live. Outages show up in red.',
+    points: ['Online now, peak and average', 'New vs returning players', 'Busiest hours and top players', 'Heatmaps of where people play'], shot: 'analytics' },
+  globe: { eyebrow: '02 · Player globe', title: 'See <em>where</em> they play from.',
+    lead: 'A 3D globe of every player, coloured by ping, with a country list beside it.',
+    points: ['Drag to spin, scroll to zoom', 'Green, gold or red by ping', 'Median ping per country', 'Spots VPNs that look too fast'], shot: 'globe' },
+  profile: { eyebrow: '03 · Player profiles', title: 'Know <em>every</em> player.',
+    lead: 'Playtime, risk score, history and ping on one page.',
+    points: ['Risk score with its reasons', 'Warnings, kicks, bans and notes', 'Ping history and lag check', 'Who they play and fight with'], shot: 'profile' },
+  console: { eyebrow: '04 · Live console', title: 'The console, <em>in your browser</em>.',
+    lead: 'Colour-coded server log, commands with tab completion, and alerts.',
+    points: ['Errors and warnings stand out', 'Tab completes commands and names', 'Sound alert on errors and bans', 'TPS, memory and uptime on top'], shot: 'console' },
+  players: { eyebrow: '05 · Moderation', title: 'Moderate in <em>two clicks</em>.',
+    lead: 'Everyone who ever joined, searchable, with warn, kick and ban right there.',
+    points: ['Search by name or UUID', 'Reports and bug reports from /report and /bug', 'Share bans with other servers', 'Staff levels and an audit log'], shot: 'players' },
+};
+const c = CARDS[new URLSearchParams(location.search).get('card')] || CARDS.banner;
+document.getElementById('eyebrow').textContent = c.eyebrow;
+document.getElementById('title').innerHTML = c.title;
+document.getElementById('lead').textContent = c.lead;
+document.getElementById('points').append(...c.points.map((t) => Object.assign(document.createElement('li'), { textContent: t })));
+const frame = (shot, cls) => {
+  const f = document.createElement('div');
+  f.className = 'frame ' + cls;
+  f.innerHTML = '<div class="bar"><i></i><i></i><i></i><span>your-server.com/hycon</span></div><img src="shots/' + shot + '.png" alt="">';
+  document.body.append(f);
+};
+if (c.shots) { document.body.classList.add('banner'); frame(c.shots[0], 'fan a'); frame(c.shots[1], 'fan b'); frame(c.shots[2], 'fan c'); }
+else frame(c.shot, 'single');
+</script>
+</body>
+</html>
