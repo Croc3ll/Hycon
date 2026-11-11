@@ -400,7 +400,7 @@ cd Hycon
 gradlew build
 ```
 
-The jar is in `build/libs/`. `test-server.bat` (or `gradlew runServer`) builds it and starts a
+The jar is in `build/libs/`. `gradlew runServer` builds it and starts a
 local test server in `run/` with Hycon loaded; the panel's data folder then links to
 `src/main/resources` (those runtime files are git-ignored).
 

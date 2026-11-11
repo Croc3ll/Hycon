@@ -145,7 +145,7 @@ Hycon is installed. See [docs/ADDING-A-PANEL.md](docs/ADDING-A-PANEL.md) for a f
 
 ## Develop
 
-`test-server.bat` (or `gradlew runServer`) builds the plugin and starts a local server in `run/`.
+`gradlew runServer` builds the plugin and starts a local server in `run/`.
 
 To test inside another server too, add `hyconTestMods=<that server>/mods` to your own
 `~/.gradle/gradle.properties`; every `gradlew build` then copies the jar there (stop that server first,
