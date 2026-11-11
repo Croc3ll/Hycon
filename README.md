@@ -2,6 +2,8 @@
 
 # Hycon
 
+[![Join the Discord](https://img.shields.io/badge/Discord-Crocell's%20Workshop-5865F2?logo=discord&logoColor=white)](https://discord.gg/maZTJbSs2h)
+
 ![Hycon: run your server from anywhere](docs/promo/hycon-banner.png)
 
 A web admin panel (RCON-style) for Hytale servers, running as a server plugin. Open it in a browser
