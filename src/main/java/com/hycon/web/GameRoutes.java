@@ -1,6 +1,7 @@
 package com.hycon.web;
 
 import com.hycon.api.HyconApi;
+import com.hycon.api.HyconBlocks;
 import com.hycon.api.HyconPanel;
 import com.hycon.api.PanelData;
 import com.hycon.audit.AuditLog;
@@ -17,7 +18,10 @@ import com.hycon.sync.SharingStore;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -72,6 +76,7 @@ public final class GameRoutes {
         web.get("/api/panels", Level.VIEWER, this::panels);
         web.get("/api/panel", Level.VIEWER, this::panel);
         web.post("/api/panel/action", Level.VIEWER, this::panelAction);
+        web.get("/api/blocks", Level.VIEWER, this::blocks);
         web.get("/api/profile-sections", Level.VIEWER, this::profileSections);
         web.get("/api/worldmap", Level.VIEWER, this::worldMap);
     }
@@ -460,6 +465,58 @@ public final class GameRoutes {
         Json j = new Json().beginObject().field("title", p.title()).name("blocks");
         data.write(j);
         r.ok(j.endObject());
+    }
+
+    /** Biggest tile a browser may ask for, in columns per side. */
+    private static final int MAX_TILE = 32;
+    /** Tallest height band a browser may ask for. */
+    private static final int MAX_BAND = 64;
+
+    /** One tile of a replay's blocks from a plugin's block source (API 14): colours, then x, y, z, colour index each. */
+    private void blocks(Req r) throws IOException {
+        HyconBlocks src = HyconApi.blockSource(r.query("src"));
+        String key = r.query("key");
+        int x0, z0, size, yMin, yMax;
+        try {
+            x0 = Integer.parseInt(r.query("x"));
+            z0 = Integer.parseInt(r.query("z"));
+            size = Integer.parseInt(r.query("s"));
+            yMin = Integer.parseInt(r.query("y0"));
+            yMax = Integer.parseInt(r.query("y1"));
+        } catch (NumberFormatException | NullPointerException e) {
+            r.error(400, "Bad tile");
+            return;
+        }
+        if (src == null || key == null || key.length() > 120 || size < 1 || size > MAX_TILE || yMax < yMin || yMax - yMin > MAX_BAND
+                || r.admin.level().rank < src.minLevel()) {
+            r.error(404, "No such blocks");
+            return;
+        }
+        Map<String, Integer> colours = new LinkedHashMap<>();
+        List<Integer> list = new ArrayList<>();
+        try {
+            src.tile(key, x0, z0, size, yMin, yMax, (x, y, z, colour) -> {
+                if (x < x0 || z < z0 || x >= x0 + size || z >= z0 + size || y < yMin || y > yMax || list.size() >= 40_000) {
+                    return;
+                }
+                list.add(x);
+                list.add(y);
+                list.add(z);
+                list.add(colours.computeIfAbsent(colour == null ? "#9a8f80" : colour, c -> colours.size()));
+            });
+        } catch (RuntimeException | LinkageError e) {
+            r.error(500, "Blocks failed: " + e);
+            return;
+        }
+        Json j = new Json().beginObject().name("colours").beginArray();
+        for (String c : colours.keySet()) {
+            j.value(c);
+        }
+        j.endArray().name("list").beginArray();
+        for (int v : list) {
+            j.value(v);
+        }
+        r.ok(j.endArray().endObject());
     }
 
     /** A form or row button on a plugin's tab (API 4); the plugin checks anything stricter than seeing the tab. */

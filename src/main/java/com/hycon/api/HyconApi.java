@@ -27,7 +27,7 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 13; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts
+    public static final int API_VERSION = 14; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts; 14: block sources
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();
@@ -68,6 +68,26 @@ public final class HyconApi {
     }
 
     private static volatile Links links;
+
+    private static final Map<String, HyconBlocks> BLOCKS = new ConcurrentHashMap<>();
+
+    /** Adds (or replaces, by id) a source of replay blocks fetched a tile at a time. Since API version 14. */
+    public static void registerBlockSource(String id, HyconBlocks source) {
+        if (id == null || !ID.matcher(id).matches() || source == null) {
+            throw new IllegalArgumentException("Block source id must be 1-40 letters, digits, - _ or .");
+        }
+        BLOCKS.put(id, source);
+    }
+
+    public static void unregisterBlockSource(String id) {
+        if (id != null) {
+            BLOCKS.remove(id);
+        }
+    }
+
+    public static HyconBlocks blockSource(String id) {
+        return id == null ? null : BLOCKS.get(id);
+    }
 
     /** Set by Hycon itself. */
     public static void setLinks(Links l) {
@@ -152,6 +172,7 @@ public final class HyconApi {
         SECTIONS.clear();
         recorder = null;
         links = null;
+        BLOCKS.clear();
         RISK.clear();
     }
 }

@@ -446,6 +446,17 @@ public final class PanelData {
 
         int[] blocks;
         String[] blockColours;
+        String blockSource, blockKey;
+
+        /**
+         * The blocks come from a {@link HyconBlocks} source, a tile at a time around the camera, instead of all at
+         * once in the page. Use this for anything bigger than a small area. Since API version 14.
+         */
+        public Replay blockSource(String sourceId, String key) {
+            blockSource = sourceId;
+            blockKey = key;
+            return this;
+        }
         /** Most blocks one replay may carry. */
         static final int MAX_BLOCKS = 25_000;
 
@@ -743,6 +754,9 @@ public final class PanelData {
                             }
                         }
                         j.endArray().endObject();
+                    }
+                    if (r.blockSource != null) {
+                        j.name("blockSource").beginObject().field("src", r.blockSource).field("key", r.blockKey).endObject();
                     }
                     if (r.blocks != null) {
                         j.name("blocks").beginObject().name("colours").beginArray();

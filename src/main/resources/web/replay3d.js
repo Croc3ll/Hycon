@@ -66,35 +66,42 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       const floor = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshLambertMaterial({ map: tex }));
       floor.rotation.x = -Math.PI / 2;
       // Under real terrain the flat map sits a little lower, filling in past the terrain's edge.
-      floor.position.set(cx0 * 32 + w / 2, groundY - (r.terrain || r.blocks ? 1.5 : 0.02), cz0 * 32 + d / 2);
+      floor.position.set(cx0 * 32 + w / 2, groundY - (r.terrain || r.blocks || r.blockSource ? 1.5 : 0.02), cz0 * 32 + d / 2);
       scene.add(floor);
     }
     // The real ground, as blocks: each column is a stack up to its top block, deep enough to close cliffs.
-    let terrain = null, blocksMesh = null, ghost = null;
+    let terrain = null;
     // The see-through hole's rings: up to this far from the camera-player line (blocks), drawn at this opacity.
     const HOLE_RINGS = [[1.4, 0.06], [2.3, 0.28], [3.1, 0.6]];
-    if (r.blocks && r.blocks.list && r.blocks.list.length) {
-      blocksMesh = buildBlocks(r.blocks);
-      scene.add(blocksMesh);
+    // Blocks come in tiles: all at once in the page (r.blocks, one tile), or a tile at a time from the plugin around
+    // the watched player (r.blockSource), in a height band that follows them, so a small area is ever loaded.
+    const TILE = 16, TILE_REACH = 2, BAND_STEP = 8, BAND_DOWN = 8, BAND_UP = 24, MAX_LOADING = 4, BAND_SLACK = 2;
+    const boxGeometry = new T.BoxGeometry(1, 1, 1);
+    const tiles = new Map(), loading = new Set();
+    let ghost = null;
+    const streaming = !!(r.blockSource && r.blockSource.src);
+    if (streaming || (r.blocks && r.blocks.list && r.blocks.list.length)) {
       // See-through copies of the blocks between the camera and the watched player, in rings that fade: nearly
       // gone in the middle, half there around it, a little faded at the edge, so the hole has soft edges.
       ghost = HOLE_RINGS.map(([, opacity], i) => {
-        const g = new T.InstancedMesh(blocksMesh.geometry, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true,
-          opacity, depthWrite: false }), Math.min(4000, blocksMesh.count));
+        const g = new T.InstancedMesh(boxGeometry, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true,
+          opacity, depthWrite: false }), 6000);
         g.count = 0;
         g.renderOrder = 5 + i;
         scene.add(g);
         return g;
       });
+      if (!streaming) addTile('all', r.blocks);
     } else if (r.terrain && r.terrain.top) {
       terrain = buildTerrain(r.terrain);
       scene.add(terrain.mesh);
     }
 
     // The real blocks, each in its kind's colour, a little lighter or darker block by block so surfaces read.
-    function buildBlocks(b) {
+    function addTile(key, b) {
       const list = b.list, count = list.length / 4;
-      const mesh = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0xffffff }), count);
+      if (!count) { tiles.set(key, { mesh: null, list, hidden: new Map() }); return; }
+      const mesh = new T.InstancedMesh(boxGeometry, new T.MeshLambertMaterial({ color: 0xffffff }), count);
       const m = new T.Matrix4(), base = b.colours.map((c) => new T.Color(c)), c = new T.Color();
       for (let i = 0; i < count; i++) {
         const x = list[i * 4], y = list[i * 4 + 1], z = list[i * 4 + 2], k = list[i * 4 + 3];
@@ -106,8 +113,52 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       }
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      return mesh;
+      scene.add(mesh);
+      tiles.set(key, { mesh, list, hidden: new Map() });
     }
+
+    function dropTile(key) {
+      const t = tiles.get(key);
+      if (t && t.mesh) { scene.remove(t.mesh); t.mesh.material.dispose(); t.mesh.dispose(); }
+      tiles.delete(key);
+    }
+
+    // Loads the tiles around the watched player in their height band and lets go of the rest.
+    function stream(px, py, pz) {
+      if (!streaming) return;
+      lastAt = [px, py, pz];
+      // The band only moves once the player is clearly past its edge, so bobbing on the edge doesn't reload it all.
+      if (band === null || py < band - BAND_SLACK || py >= band + BAND_STEP + BAND_SLACK) band = Math.floor(py / BAND_STEP) * BAND_STEP;
+      const tx0 = Math.floor(px / TILE), tz0 = Math.floor(pz / TILE);
+      const want = new Set();
+      for (let dz = -TILE_REACH; dz <= TILE_REACH; dz++) for (let dx = -TILE_REACH; dx <= TILE_REACH; dx++) {
+        want.add((tx0 + dx) + ',' + (tz0 + dz) + ',' + band);
+      }
+      for (const key of [...tiles.keys()]) if (!want.has(key)) dropTile(key);
+      // Nearest first, a few at a time.
+      const missing = [...want].filter((k) => !tiles.has(k) && !loading.has(k)).sort((a, b) => {
+        const [ax, az] = a.split(',').map(Number), [bx, bz] = b.split(',').map(Number);
+        return Math.hypot(ax - tx0, az - tz0) - Math.hypot(bx - tx0, bz - tz0);
+      });
+      for (const key of missing) {
+        if (loading.size >= MAX_LOADING) break;
+        const [tx, tz, by] = key.split(',').map(Number);
+        loading.add(key);
+        api('GET', '/api/blocks?src=' + encodeURIComponent(r.blockSource.src) + '&key=' + encodeURIComponent(r.blockSource.key)
+          + '&x=' + tx * TILE + '&z=' + tz * TILE + '&s=' + TILE + '&y0=' + (by - BAND_DOWN) + '&y1=' + (by + BAND_UP))
+          .then((b) => {
+            loading.delete(key);
+            if (!latestWant.has(key)) return;
+            addTile(key, b);
+            stream(...lastAt); // the next tiles, also while paused
+            if (followed) clearView(followed);
+            renderer.render(scene, camera);
+          })
+          .catch(() => loading.delete(key));
+      }
+      latestWant = want;
+    }
+    let latestWant = new Set(), lastAt = [0, 0, 0], band = null;
 
     function buildTerrain(tr) {
       const top = (x, z) => (x < 0 || z < 0 || x >= tr.w || z >= tr.d ? null : tr.top[z * tr.w + x]);
@@ -169,7 +220,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     grid.position.set((x0 + x1) / 2, groundY, (z0 + z1) / 2);
     grid.material.transparent = true;
     grid.material.opacity = r.world ? 0.25 : 0.8;
-    if (!r.terrain && !r.blocks) scene.add(grid);
+    if (!r.terrain && !r.blocks && !r.blockSource) scene.add(grid);
 
     function textSprite(text, colour) {
       const c = document.createElement('canvas'), g = c.getContext('2d'), size = 48;
@@ -260,42 +311,45 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     const CHEST = P3.legH + P3.bodyH * 0.6;
     let followed = null;
 
-    // Blocks hidden because they stand between the camera and the watched player: id -> their real matrix. They
-    // are drawn faintly by the ghost mesh instead, so you see inside a house without losing its walls.
-    const hidden = new Map(), ZERO = new T.Matrix4().makeScale(0, 0, 0), tmpC = new T.Color();
+    // Blocks hidden because they stand between the camera and the watched player (each tile keeps its own, id ->
+    // real matrix and ring). They are drawn faintly by the ghost meshes instead, so you see inside a house.
+    const ZERO = new T.Matrix4().makeScale(0, 0, 0), tmpC = new T.Color();
     function clearView(target) {
-      if (!blocksMesh) return;
-      const list = r.blocks.list, count = list.length / 4, outer = HOLE_RINGS[HOLE_RINGS.length - 1][0];
+      if (!ghost) return;
+      const outer = HOLE_RINGS[HOLE_RINGS.length - 1][0];
       const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
       // The line runs to the player's chest; the last bit by the player stays solid so the floor under them shows.
       const dx = target.x - cx, dy = target.y - cy, dz = target.z - cz, len2 = dx * dx + dy * dy + dz * dz;
-      const want = new Map(), stop = Math.max(0, 1 - 1.2 / Math.sqrt(len2 || 1));
-      for (let i = 0; i < count; i++) {
-        const bx = list[i * 4] + 0.5 - cx, by = list[i * 4 + 1] + 0.5 - cy, bz = list[i * 4 + 2] + 0.5 - cz;
-        const t = (bx * dx + by * dy + bz * dz) / (len2 || 1);
-        if (t <= 0 || t >= stop) continue;
-        const ex = bx - dx * t, ey = by - dy * t, ez = bz - dz * t, d = Math.sqrt(ex * ex + ey * ey + ez * ez);
-        if (d >= outer) continue;
-        want.set(i, HOLE_RINGS.findIndex(([edge]) => d < edge));
-      }
-      for (const [id, h] of hidden) if (!want.has(id)) { blocksMesh.setMatrixAt(id, h.m); hidden.delete(id); }
-      for (const [id, ring] of want) {
-        const h = hidden.get(id);
-        if (h) { h.ring = ring; continue; }
-        const m = new T.Matrix4();
-        blocksMesh.getMatrixAt(id, m);
-        hidden.set(id, { m, ring });
-        blocksMesh.setMatrixAt(id, ZERO);
-      }
-      blocksMesh.instanceMatrix.needsUpdate = true;
+      const stop = Math.max(0, 1 - 1.2 / Math.sqrt(len2 || 1));
       const n = ghost.map(() => 0);
-      for (const [id, h] of hidden) {
-        const g = ghost[h.ring];
-        if (n[h.ring] >= g.instanceMatrix.count) continue;
-        g.setMatrixAt(n[h.ring], h.m);
-        blocksMesh.getColorAt(id, tmpC);
-        g.setColorAt(n[h.ring], tmpC);
-        n[h.ring]++;
+      for (const t of tiles.values()) {
+        if (!t.mesh) continue;
+        const list = t.list, count = list.length / 4, want = new Map();
+        for (let i = 0; i < count; i++) {
+          const bx = list[i * 4] + 0.5 - cx, by = list[i * 4 + 1] + 0.5 - cy, bz = list[i * 4 + 2] + 0.5 - cz;
+          const k = (bx * dx + by * dy + bz * dz) / (len2 || 1);
+          if (k <= 0 || k >= stop) continue;
+          const ex = bx - dx * k, ey = by - dy * k, ez = bz - dz * k, d = Math.sqrt(ex * ex + ey * ey + ez * ez);
+          if (d < outer) want.set(i, HOLE_RINGS.findIndex(([edge]) => d < edge));
+        }
+        for (const [id, h] of t.hidden) if (!want.has(id)) { t.mesh.setMatrixAt(id, h.m); t.hidden.delete(id); }
+        for (const [id, ring] of want) {
+          const h = t.hidden.get(id);
+          if (h) { h.ring = ring; continue; }
+          const m = new T.Matrix4();
+          t.mesh.getMatrixAt(id, m);
+          t.hidden.set(id, { m, ring });
+          t.mesh.setMatrixAt(id, ZERO);
+        }
+        t.mesh.instanceMatrix.needsUpdate = true;
+        for (const [id, h] of t.hidden) {
+          const g = ghost[h.ring];
+          if (n[h.ring] >= g.instanceMatrix.count) continue;
+          g.setMatrixAt(n[h.ring], h.m);
+          t.mesh.getColorAt(id, tmpC);
+          g.setColorAt(n[h.ring], tmpC);
+          n[h.ring]++;
+        }
       }
       ghost.forEach((g, i) => {
         g.count = n[i];
@@ -379,6 +433,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
         controls.target.add(moved);
       }
       followed = target;
+      stream(m[1], m[2], m[3]);
       controls.update();
       clearView(target);
       renderer.render(scene, camera);

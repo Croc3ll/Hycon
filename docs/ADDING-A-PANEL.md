@@ -148,7 +148,7 @@ The JVM only loads `ShopPanel` the first time it's used, so when Hycon is missin
 | `pie(title).unit(u).slice(label, value)` | A donut chart with a legend (shares in %). Sits side by side with bars and columns. |
 | `prompt(id, title, popup).text(line).button(label, value, primary)` | A question pinned at the top of the tab as a highlighted card (API 11); with `popup` it also opens as a popup until answered ("Not now" hides it for the browser session). Buttons call `action(id, {choice: value})`. Lines starting with "- " are bullets. |
 | `heatmap(title, cellSize, unit).cell(cx, cz, value).pin(label, x, z)` | A top-down world map, coloured by value per square. |
-| `replay(title).world(name).actor(name, main).at(time, x, y, z, yaw)`, `.event(time, from, to, bad, label)`, `.shot(...)` (API 9, dashed), `.terrain(x0, z0, w, d, topY[])` (API 10: the ground as blocks in 3D, up to 96 x 96), `.blocks(xyzc[], colours[])` (API 12: the real visible blocks, each x, y, z and a colour index, up to 25,000; drawn instead of the columns) | An animated replay (API 7; `world` and its map from API 8): people moving over time, seen from above over the world map with the camera on the `main` person, their height below, arrowheads for where they looked, and events such as hits as arrows with their distance (red when `bad`). Play, pause, speed and a time slider. Up to 8 people, 1,500 samples each, 300 events. |
+| `replay(title).world(name).actor(name, main).at(time, x, y, z, yaw)`, `.event(time, from, to, bad, label)`, `.shot(...)` (API 9, dashed), `.terrain(x0, z0, w, d, topY[])` (API 10: the ground as blocks in 3D, up to 96 x 96), `.blocks(xyzc[], colours[])` (API 12: the real visible blocks, each x, y, z and a colour index, up to 25,000; drawn instead of the columns), `.blockSource(sourceId, key)` (API 14: the blocks come a tile at a time from a block source, see below) | An animated replay (API 7; `world` and its map from API 8): people moving over time, seen from above over the world map with the camera on the `main` person, their height below, arrowheads for where they looked, and events such as hits as arrows with their distance (red when `bad`). Play, pause, speed and a time slider. Up to 8 people, 1,500 samples each, 300 events. |
 | `note(text)`                          | A line of text. Notes in a row share one boxed panel; a short line with no full stop (e.g. "Summary") becomes the box's heading. |
 
 All text is shown as plain text, never as HTML, so player names and item names are safe to pass
@@ -168,6 +168,14 @@ fills in that one player's numbers and charts. Register it with
 `HyconApi.registerProfileSection(...)` and remove it with `HyconApi.unregisterProfileSection(id)`.
 It appears under the player's profile with the same range picker.
 
+
+## Block sources for 3D replays (API 14)
+
+A replay with many blocks makes a big page, rebuilt on every refresh. Instead, register a `HyconBlocks` with
+`HyconApi.registerBlockSource(id, source)` and call `.blockSource(id, key)` on the replay. The browser then asks
+`/api/blocks` for 16 x 16 tiles around the player it follows, in a height band around them (8 below, 24 above), and
+drops tiles once they are out of reach. So the ground under a player only loads when they go down there.
+`tile(key, x0, z0, size, yMin, yMax, out)` runs on a web thread: read thread-safe data only. Unregister on shutdown.
 
 ## Linked accounts (API 13)
 
