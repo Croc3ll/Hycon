@@ -207,6 +207,47 @@ public final class PanelData {
      * (block coordinate / cellSize, rounded down). Since API 3.
      */
     /**
+     * A question for the staff, pinned at the top of the tab as a highlighted card: a title, a few paragraphs and
+     * buttons. Each button calls {@link HyconPanel#action} with this prompt's id and {@code choice} = its value.
+     * With {@code popup}, it also opens as a popup the first time the tab is shown (until a button is pressed, or
+     * "Not now" for this browser session). Show it only while the question is open. Since API version 11.
+     */
+    public Prompt prompt(String id, String title, boolean popup) {
+        Prompt p = new Prompt(id, title, popup);
+        add(p);
+        return p;
+    }
+
+    public static final class Prompt {
+        final String id, title;
+        final boolean popup;
+        final List<String> lines = new ArrayList<>();
+        final List<String[]> buttons = new ArrayList<>();
+
+        Prompt(String id, String title, boolean popup) {
+            this.id = id;
+            this.title = title;
+            this.popup = popup;
+        }
+
+        /** A paragraph; one starting with "- " is shown as a bullet point. */
+        public Prompt text(String line) {
+            if (lines.size() < 30) {
+                lines.add(line);
+            }
+            return this;
+        }
+
+        /** A button; {@code primary} draws it highlighted (the recommended answer). */
+        public Prompt button(String label, String value, boolean primary) {
+            if (buttons.size() < 4) {
+                buttons.add(new String[]{label, value, String.valueOf(primary)});
+            }
+            return this;
+        }
+    }
+
+    /**
      * An animated replay: players moving through a stretch of time (top view, with height below), where they
      * looked, and events such as hits between them. Hycon draws play, pause and a time slider. Since API version 7.
      */
@@ -646,6 +687,17 @@ public final class PanelData {
                     j.field("type", "pie").field("title", p.title).field("unit", p.unit).name("items").beginArray();
                     for (int i = 0; i < p.labels.size(); i++) {
                         j.beginArray().value(p.labels.get(i)).value(p.values.get(i)).endArray();
+                    }
+                    j.endArray();
+                }
+                case Prompt pr -> {
+                    j.field("type", "prompt").field("id", pr.id).field("title", pr.title).field("popup", pr.popup).name("lines").beginArray();
+                    for (String l : pr.lines) {
+                        j.value(l);
+                    }
+                    j.endArray().name("buttons").beginArray();
+                    for (String[] btn : pr.buttons) {
+                        j.beginArray().value(btn[0]).value(btn[1]).value(Boolean.parseBoolean(btn[2])).endArray();
                     }
                     j.endArray();
                 }

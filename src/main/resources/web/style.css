@@ -501,3 +501,12 @@ canvas.replay.side { margin-top: 6px; }
 .replay3d-box canvas.replay3d:active { cursor: grabbing; }
 .replay-help { font-size: 12px; margin: 4px 0 0; }
 canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
+
+/* Plugin prompts (app.js promptCard / promptPopup) */
+.prompt-card { border: 2px solid var(--gold); }
+.prompt-card ul, .prompt-modal ul { margin: 4px 0 8px 18px; padding: 0; }
+.prompt-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.btn.primary { background: var(--gold); color: #1a1406; border-color: transparent; font-weight: 600; }
+.prompt-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.prompt-modal { background: var(--panel); color: var(--text); border: 1px solid var(--gold-dim); border-radius: 10px; padding: 20px 22px; max-width: 560px; max-height: 85vh; overflow: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+.prompt-modal h2 { margin: 0 0 8px; }

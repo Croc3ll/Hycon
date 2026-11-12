@@ -1034,6 +1034,10 @@ function blocks(list, modes, panel) {
       if (last && last.heatGroup) last.heatGroup.add(b); else nodes.push(heatGroup(b));
     }
     else if (b.type === 'replay') nodes.push(replayCard(b));
+    else if (b.type === 'prompt' && panel) {
+      nodes.unshift(promptCard(b, panel, false)); // always at the top of the tab
+      if (b.popup) promptPopup(b, panel);
+    }
     else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows, b.form && panel ? b : null, panel, b.badges || [])));
     else if (b.type === 'form' && panel) nodes.push(formCard(b, panel));
     else if (b.type === 'nav' && panel) nodes.unshift(navBar(b, panel));
@@ -1095,6 +1099,47 @@ function tableBox(columns, rows, btn, panel, badges = []) {
 async function panelAction(panel, form, values) {
   try { toast((await api('POST', '/api/panel/action', { id: panel.id, form, values: { ...values, _selected: panel.sel || '' } })).message); await panel.reload(); }
   catch (err) { toast(err.message, true); }
+}
+
+// A plugin's question for staff: a highlighted card pinned at the top, and once as a popup if asked for.
+// Each button sends { choice: value } to the plugin's action, like a form.
+const PROMPTS_OPEN = new Set();
+function promptBody(b, panel, onDone) {
+  const paras = b.lines.map((l) => (l.startsWith('- ') ? el('li', {}, l.slice(2)) : el('p', {}, l)));
+  const body = [];
+  let list = null;
+  for (const p of paras) {
+    if (p.tagName === 'LI') { if (!list) { list = el('ul'); body.push(list); } list.append(p); } else { list = null; body.push(p); }
+  }
+  const buttons = b.buttons.map(([label, value, primary]) => el('button', { class: primary ? 'btn primary' : 'btn', on: { click: async () => {
+    await panelAction(panel, b.id, { choice: value });
+    if (onDone) onDone();
+  } } }, label));
+  return [...body, el('div', { class: 'prompt-buttons' }, buttons)];
+}
+
+function promptCard(b, panel) {
+  return el('div', { class: 'card prompt-card' }, el('h3', {}, b.title), ...promptBody(b, panel, null));
+}
+
+function promptPopup(b, panel) {
+  const key = 'prompt-later:' + panel + ':' + b.id;
+  let later = false;
+  try { later = sessionStorage.getItem(key) === '1'; } catch (e) { /* storage off: show it */ }
+  if (later || PROMPTS_OPEN.has(key)) return;
+  PROMPTS_OPEN.add(key);
+  const close = () => { overlay.remove(); PROMPTS_OPEN.delete(key); };
+  const notNow = el('button', { class: 'btn', on: { click: () => {
+    try { sessionStorage.setItem(key, '1'); } catch (e) { /* just close */ }
+    close();
+  } } }, 'Not now');
+  const box = el('div', { class: 'prompt-modal', role: 'dialog', 'aria-modal': 'true' }, el('h2', {}, b.title), ...promptBody(b, panel, () => {
+    try { sessionStorage.setItem(key, '1'); } catch (e) { /* closing is enough */ }
+    close();
+  }));
+  box.querySelector('.prompt-buttons').append(notNow);
+  const overlay = el('div', { class: 'prompt-overlay', on: { click: (e) => { if (e.target === overlay) notNow.click(); } } }, box);
+  document.body.append(overlay);
 }
 
 function formCard(b, panel) {
