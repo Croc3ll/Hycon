@@ -147,6 +147,7 @@ The JVM only loads `ShopPanel` the first time it's used, so when Hycon is missin
 | `table(title, columns...).row(cells...)` | A table; use `PanelData.time(ms)` for dates.                        |
 | `pie(title).unit(u).slice(label, value)` | A donut chart with a legend (shares in %). Sits side by side with bars and columns. |
 | `heatmap(title, cellSize, unit).cell(cx, cz, value).pin(label, x, z)` | A top-down world map, coloured by value per square. |
+| `replay(title).actor(name, main).at(time, x, y, z, yaw)`, `.event(time, from, to, bad, label)` | An animated replay (API 7): people moving over time, seen from above with their height below, where they looked, and events such as hits drawn as lines (red when `bad`). Play, pause, speed and a time slider. Up to 8 people, 1,500 samples each, 300 events. |
 | `note(text)`                          | A line of text. Notes in a row share one boxed panel; a short line with no full stop (e.g. "Summary") becomes the box's heading. |
 
 All text is shown as plain text, never as HTML, so player names and item names are safe to pass

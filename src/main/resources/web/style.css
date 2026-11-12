@@ -488,3 +488,12 @@ td { vertical-align: middle; }
 td.pg-good, td.pg-mid, td.pg-bad, td.pg-none { white-space: nowrap; }
 /* The globe sits inside an Analytics section, so its cards aren't numbered either. */
 #view .globegrid .card > h2:first-child::before, #view .globegrid .card > .spread:first-child > h2:first-child::before { content: none; }
+
+/* Replays (replay.js) */
+canvas.replay { width: 100%; display: block; border: 1px solid var(--line); border-radius: 4px; background: #0b0c0f; }
+canvas.replay.side { margin-top: 6px; }
+.replay-controls { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.replay-slider { flex: 1; min-width: 160px; }
+.replay-clock { font-variant-numeric: tabular-nums; }
+.replay-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; }
+.replay-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }

@@ -206,6 +206,16 @@ public final class PanelData {
      * coloured by its value (e.g. minutes spent there). Cells are given in cell coordinates
      * (block coordinate / cellSize, rounded down). Since API 3.
      */
+    /**
+     * An animated replay: players moving through a stretch of time (top view, with height below), where they
+     * looked, and events such as hits between them. Hycon draws play, pause and a time slider. Since API version 7.
+     */
+    public Replay replay(String title) {
+        Replay r = new Replay(title);
+        add(r);
+        return r;
+    }
+
     public Heatmap heatmap(String title, int cellSize, String unit) {
         Heatmap h = new Heatmap(title, cellSize, unit);
         add(h);
@@ -355,6 +365,64 @@ public final class PanelData {
                 values.add(value);
             }
             return this;
+        }
+    }
+
+    public static final class Replay {
+        /** At most this many people, samples each, and events in one replay. */
+        static final int MAX_ACTORS = 8, MAX_SAMPLES = 1500, MAX_EVENTS = 300;
+        final String title;
+        final List<Actor> actors = new ArrayList<>();
+        final List<Object[]> events = new ArrayList<>();
+        String subtitle;
+
+        Replay(String title) {
+            this.title = title;
+        }
+
+        /** A short line under the title, e.g. why this replay was saved. */
+        public Replay subtitle(String text) {
+            this.subtitle = text;
+            return this;
+        }
+
+        /** Someone in the replay. {@code main} draws them highlighted (the player the replay is about). */
+        public Actor actor(String name, boolean main) {
+            Actor a = new Actor(name, main);
+            if (actors.size() < MAX_ACTORS) {
+                actors.add(a);
+            }
+            return a;
+        }
+
+        /**
+         * Something that happened: a line from {@code from} to {@code to} (names of actors; {@code to} may be null)
+         * at {@code timeMillis}. {@code bad} draws it red (a flagged hit), with {@code label} as its tooltip.
+         */
+        public Replay event(long timeMillis, String from, String to, boolean bad, String label) {
+            if (events.size() < MAX_EVENTS) {
+                events.add(new Object[]{timeMillis, from, to, bad, label == null ? "" : label});
+            }
+            return this;
+        }
+
+        public static final class Actor {
+            final String name;
+            final boolean main;
+            final List<double[]> samples = new ArrayList<>();
+
+            Actor(String name, boolean main) {
+                this.name = name;
+                this.main = main;
+            }
+
+            /** Where they were at a moment: block position and look direction (yaw in radians, Hytale's: 0 faces -Z). */
+            public Actor at(long timeMillis, double x, double y, double z, double yaw) {
+                if (samples.size() < MAX_SAMPLES) {
+                    samples.add(new double[]{timeMillis, x, y, z, yaw});
+                }
+                return this;
+            }
         }
     }
 
@@ -541,6 +609,22 @@ public final class PanelData {
                     j.field("type", "pie").field("title", p.title).field("unit", p.unit).name("items").beginArray();
                     for (int i = 0; i < p.labels.size(); i++) {
                         j.beginArray().value(p.labels.get(i)).value(p.values.get(i)).endArray();
+                    }
+                    j.endArray();
+                }
+                case Replay r -> {
+                    j.field("type", "replay").field("title", r.title).field("subtitle", r.subtitle).name("actors").beginArray();
+                    for (Replay.Actor a : r.actors) {
+                        j.beginObject().field("name", a.name).field("main", a.main).name("samples").beginArray();
+                        for (double[] s : a.samples) {
+                            j.beginArray().value((long) s[0]).value(Math.round(s[1] * 100) / 100.0).value(Math.round(s[2] * 100) / 100.0)
+                                    .value(Math.round(s[3] * 100) / 100.0).value(Math.round(s[4] * 1000) / 1000.0).endArray();
+                        }
+                        j.endArray().endObject();
+                    }
+                    j.endArray().name("events").beginArray();
+                    for (Object[] e : r.events) {
+                        j.beginArray().value((Long) e[0]).value((String) e[1]).value((String) e[2]).value((Boolean) e[3]).value((String) e[4]).endArray();
                     }
                     j.endArray();
                 }

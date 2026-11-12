@@ -1033,6 +1033,7 @@ function blocks(list, modes, panel) {
       const last = nodes[nodes.length - 1];
       if (last && last.heatGroup) last.heatGroup.add(b); else nodes.push(heatGroup(b));
     }
+    else if (b.type === 'replay') nodes.push(replayCard(b));
     else if (b.type === 'table') nodes.push(el('div', { class: 'card' }, el('h3', {}, b.title), tableBox(b.columns, b.rows, b.form && panel ? b : null, panel, b.badges || [])));
     else if (b.type === 'form' && panel) nodes.push(formCard(b, panel));
     else if (b.type === 'nav' && panel) nodes.unshift(navBar(b, panel));
