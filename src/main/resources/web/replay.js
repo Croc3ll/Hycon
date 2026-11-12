@@ -21,6 +21,7 @@ function replayCard(r) {
   }
   let t0 = Infinity, t1 = -Infinity;
   for (const a of actors) { t0 = Math.min(t0, a.samples[0][0]); t1 = Math.max(t1, a.samples[a.samples.length - 1][0]); }
+  const main = actors.find((a) => a.main) || actors[0];
   // The same data keeps its card (playback goes on); the ground arriving after the first render counts as new
   // data, as does any change in heights (demo players are lifted onto the ground once it's in).
   const ground = r.terrain ? r.terrain.x0 + ',' + r.terrain.z0 + ',' + r.terrain.w + 'x' + r.terrain.d : 'flat';
@@ -29,7 +30,6 @@ function replayCard(r) {
   if (cached) return cached;
   for (const k of REPLAY_CARDS.keys()) if (k.startsWith(r.title + '|')) REPLAY_CARDS.delete(k);
 
-  const main = actors.find((a) => a.main) || actors[0];
   const colourOf = new Map(actors.map((a, i) => [a.name, REPLAY_COLOURS[i % REPLAY_COLOURS.length]]));
   const events = (r.events || []).slice().sort((a, b) => a[0] - b[0]);
 
