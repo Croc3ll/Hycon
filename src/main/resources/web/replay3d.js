@@ -88,13 +88,17 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       return sprite;
     }
 
+    // Every part's material, per figure, so a hit can make the whole body glow.
+    let parts = null;
     function box3(w, h, d, colour) {
       const m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshLambertMaterial({ color: colour }));
+      if (parts) parts.push(m.material);
       return m;
     }
 
     // One blocky player, facing -Z when not turned (Hytale's yaw 0). Limbs hang from pivots so they can swing.
     function figure(colour, isMain) {
+      parts = [];
       const g = new T.Group(), shirt = new T.Color(colour);
       const limb = (w, h, colourOf, x, y) => {
         const pivot = new T.Group();
@@ -126,7 +130,9 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
         ring.position.y = 0.03;
         g.add(ring);
       }
-      return { g, legL, legR, armL, armR };
+      const materials = parts;
+      parts = null;
+      return { g, legL, legR, armL, armR, materials };
     }
 
     const people = actors.map((a) => {
@@ -174,6 +180,17 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
         }
         p.trail.geometry.setFromPoints(pts.length > 1 ? pts : [new T.Vector3(), new T.Vector3()]);
         p.trail.visible = pts.length > 1;
+      }
+      // Whoever was just hit glows red, fading out: bright for a flagged hit, softer for a normal one.
+      const glow = new Map();
+      for (const [t, , to, bad] of events) {
+        if (!to || t > now || t < now - eventMs) continue;
+        const g = (1 - (now - t) / eventMs) * (bad ? 1 : 0.5);
+        glow.set(to, Math.max(glow.get(to) || 0, g));
+      }
+      for (const p of people) {
+        const g = glow.get(p.a.name) || 0;
+        for (const m of p.f.materials) m.emissive.setRGB(g, 0, 0);
       }
       let used = 0;
       for (const [t, from, to, bad] of events) {

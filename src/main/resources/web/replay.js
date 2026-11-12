@@ -196,9 +196,23 @@ function replayCard(r) {
       ctx.globalAlpha = 1;
     }
 
+    // Whoever was just hit glows red around their dot, fading out (bright for a flagged hit).
+    const glow = new Map();
+    for (const [t, , to, bad] of events) {
+      if (!to || t > now || t < now - REPLAY_EVENT_MS) continue;
+      glow.set(to, Math.max(glow.get(to) || 0, (1 - (now - t) / REPLAY_EVENT_MS) * (bad ? 1 : 0.5)));
+    }
     for (const a of actors) {
       const p = where.get(a.name), colour = colourOf.get(a.name), px = sx(p[1]), pz = sz(p[3]);
       const r0 = (a === main ? 8 : 6) * dpr;
+      const g = glow.get(a.name) || 0;
+      if (g > 0) {
+        const halo = ctx.createRadialGradient(px, pz, r0, px, pz, r0 * 3.2);
+        halo.addColorStop(0, 'rgba(255,60,60,' + (0.85 * g).toFixed(3) + ')');
+        halo.addColorStop(1, 'rgba(255,60,60,0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(px, pz, r0 * 3.2, 0, Math.PI * 2); ctx.fill();
+      }
       // Hytale's look: yaw 0 faces -Z (up on the map); x is -sin(yaw), z is -cos(yaw).
       const lookAngle = Math.atan2(-Math.cos(p[4]), -Math.sin(p[4]));
       arrowHead(ctx, px + Math.cos(lookAngle) * r0 * 1.4, pz + Math.sin(lookAngle) * r0 * 1.4, lookAngle, r0 * 1.3, colour);
