@@ -4,14 +4,18 @@ import com.hycon.auth.AdminStore;
 import com.hycon.auth.Sessions;
 import com.sun.net.httpserver.HttpExchange;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 
 /** One API request as the route handlers see it: who is asking, from where, and with what. */
 public final class Req {
+    /** Bodies smaller than this go out as they are: compressing them saves almost nothing. */
+    private static final int GZIP_FROM = 1024;
 
     final HttpExchange ex;
     public final String ip;
@@ -79,12 +83,31 @@ public final class Req {
         var h = ex.getResponseHeaders();
         h.set("Content-Type", type);
         h.set("Cache-Control", "no-store");
+        h.set("Vary", "Accept-Encoding");
         Headers.security(h);
+        // Replay data and three.js shrink to a fifth or less, so pages load faster on a slow line.
+        if (body.length >= GZIP_FROM && acceptsGzip()) {
+            body = gzip(body);
+            h.set("Content-Encoding", "gzip");
+        }
         ex.sendResponseHeaders(status, body.length == 0 ? -1 : body.length);
         if (body.length > 0) {
             try (OutputStream out = ex.getResponseBody()) {
                 out.write(body);
             }
         }
+    }
+
+    private boolean acceptsGzip() {
+        String accept = ex.getRequestHeaders().getFirst("Accept-Encoding");
+        return accept != null && accept.contains("gzip");
+    }
+
+    private static byte[] gzip(byte[] body) throws IOException {
+        ByteArrayOutputStream packed = new ByteArrayOutputStream(body.length / 4);
+        try (GZIPOutputStream out = new GZIPOutputStream(packed)) {
+            out.write(body);
+        }
+        return packed.toByteArray();
     }
 }

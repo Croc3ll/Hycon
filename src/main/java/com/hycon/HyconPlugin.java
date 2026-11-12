@@ -53,6 +53,8 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -93,6 +95,11 @@ public final class HyconPlugin extends JavaPlugin {
     private Sessions sessions;
     private WebServer web;
     private ScheduledFuture<?> housekeeping;
+    /**
+     * Hycon's own thread for the timed saves and samples. Hytale's scheduler is one thread for the whole server, so
+     * writing files there held up every other plugin's timers.
+     */
+    private ExecutorService io;
     private ScheduledFuture<?> geoRefresh;
     private UpdateCheck updates;
 
@@ -232,12 +239,13 @@ public final class HyconPlugin extends JavaPlugin {
         if (shareServer.error() != null) {
             log.at(Level.WARNING).log("Hycon: %s", shareServer.error());
         }
-        sampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+        io = Executors.newSingleThreadExecutor(Thread.ofPlatform().name("Hycon-IO").daemon().factory());
+        sampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> onIo(() -> {
             Runtime rt = Runtime.getRuntime();
             samples.add(Universe.get().getPlayers().size(), (int) ((rt.totalMemory() - rt.freeMemory()) >> 20));
-        }, 0, Samples.INTERVAL_MS, TimeUnit.MILLISECONDS);
-        pingSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(pingLog::sample, 1, 1, TimeUnit.MINUTES);
-        positionSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(positions::sample,
+        }), 0, Samples.INTERVAL_MS, TimeUnit.MILLISECONDS);
+        pingSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> onIo(pingLog::sample), 1, 1, TimeUnit.MINUTES);
+        positionSampler = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> onIo(positions::sample),
                 PositionLog.SAMPLE_SECONDS, PositionLog.SAMPLE_SECONDS, TimeUnit.SECONDS);
         // Players saved before Hycon was installed, so they can be searched too.
         Path playersDir = Universe.get().getPath().resolve("players");
@@ -252,19 +260,34 @@ public final class HyconPlugin extends JavaPlugin {
                 }
             }), 0, 1, TimeUnit.DAYS);
         }
-        housekeeping = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+        housekeeping = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> onIo(() -> {
             sessions.sweep();
             known.saveIfChanged();
             ties.saveIfChanged();
             geo.saveIfChanged();
             positions.saveIfChanged();
             activity.save(onlineIds());
-        }, 1, 1, TimeUnit.MINUTES);
+        }), 1, 1, TimeUnit.MINUTES);
 
         log.at(Level.INFO).log("Hycon panel: %s", address());
         if (!config.loopbackOnly()) {
             log.at(Level.WARNING).log("Hycon panel listens on %s, not only this machine. Use HTTPS in front of it and a firewall.",
                     config.bindAddress());
+        }
+    }
+
+    /** Runs a timed job on Hycon's IO thread; one that fails is logged and the next round tries again. */
+    private void onIo(Runnable job) {
+        try {
+            io.execute(() -> {
+                try {
+                    job.run();
+                } catch (RuntimeException e) {
+                    getLogger().at(Level.WARNING).log("Hycon: a timed save or sample failed: %s", e);
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // shutting down: the final saves run in shutdown()
         }
     }
 
@@ -290,6 +313,15 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (positionSampler != null) {
             positionSampler.cancel(false);
+        }
+        if (io != null) {
+            // Lets queued saves finish before the files close below.
+            io.shutdown();
+            try {
+                io.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         if (samples != null) {
             samples.close();
