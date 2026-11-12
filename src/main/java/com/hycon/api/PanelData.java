@@ -380,6 +380,14 @@ public final class PanelData {
             this.title = title;
         }
 
+        String world;
+
+        /** The world it happened in: Hycon then draws the real world map underneath. Since API version 8. */
+        public Replay world(String name) {
+            this.world = name;
+            return this;
+        }
+
         /** A short line under the title, e.g. why this replay was saved. */
         public Replay subtitle(String text) {
             this.subtitle = text;
@@ -613,7 +621,8 @@ public final class PanelData {
                     j.endArray();
                 }
                 case Replay r -> {
-                    j.field("type", "replay").field("title", r.title).field("subtitle", r.subtitle).name("actors").beginArray();
+                    j.field("type", "replay").field("title", r.title).field("subtitle", r.subtitle).field("world", r.world)
+                            .name("actors").beginArray();
                     for (Replay.Actor a : r.actors) {
                         j.beginObject().field("name", a.name).field("main", a.main).name("samples").beginArray();
                         for (double[] s : a.samples) {
