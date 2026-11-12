@@ -62,6 +62,29 @@ function replayCard(r) {
   }
 
   const top = el('canvas', { class: 'replay' }), side = el('canvas', { class: 'replay side' });
+  // The 3D view (replay3d.js) shows first; the Map button switches to the flat view from above.
+  const box3d = el('div', { class: 'replay3d-box' });
+  const viewBtn = el('button', { class: 'btn small', title: 'Switch between the 3D view and the map from above' }, 'Map view');
+  let mode = '3d', v3 = null;
+  top.hidden = true;
+  box3d.append(el('p', { class: 'muted' }, 'Loading the 3D view...'));
+  replay3d(box3d, r, actors, main, colourOf, at, events, REPLAY_FLAG, REPLAY_EVENT_MS, REPLAY_TRAIL_MS).then((view) => {
+    v3 = view;
+    box3d.querySelector('p')?.remove();
+    draw();
+  }).catch(() => {
+    box3d.replaceChildren(el('p', { class: 'muted' }, 'The 3D view could not load here, so the map view is shown.'));
+    mode = 'map'; top.hidden = false; viewBtn.hidden = true; draw();
+  });
+  viewBtn.addEventListener('click', () => {
+    mode = mode === '3d' ? 'map' : '3d';
+    top.hidden = mode !== 'map';
+    box3d.hidden = mode !== '3d';
+    viewBtn.textContent = mode === '3d' ? 'Map view' : '3D view';
+    zoomIn.hidden = zoomOut.hidden = mode === '3d';
+    if (mode === '3d' && v3) v3.resize();
+    draw();
+  });
   const slider = el('input', { type: 'range', min: 0, max: 1000, value: 0, class: 'replay-slider' });
   const playBtn = el('button', { class: 'btn small' }, 'Play');
   const speed = el('select', { class: 'small' }, el('option', { value: 1 }, '1x'), el('option', { value: 0.5 }, '0.5x'), el('option', { value: 0.25 }, '0.25x'));
@@ -69,7 +92,7 @@ function replayCard(r) {
   const clock = el('span', { class: 'muted replay-clock' });
   const legend = el('div', { class: 'replay-legend' },
     actors.map((a) => el('span', {}, el('i', { style: 'background:' + colourOf.get(a.name) }), a.name + (a.main ? ' (watched)' : ''))),
-    el('span', { class: 'muted' }, '▲ where they look · white arrow: a hit, with its distance · ',
+    el('span', { class: 'muted' }, 'Faces show where they look · white arrow: a hit, with its distance · ',
       el('b', { style: 'color:' + REPLAY_FLAG }, 'red: flagged')));
   let now = t0, playing = false, last = 0;
 
@@ -112,7 +135,15 @@ function replayCard(r) {
   }
 
   function draw() {
-    size(top, 0.5); size(side, 0.14);
+    size(side, 0.14);
+    if (mode === '3d') {
+      if (v3) v3.draw(now);
+      drawHeight();
+      slider.value = Math.round(((now - t0) / ((t1 - t0) || 1)) * 1000);
+      clock.textContent = ((now - t0) / 1000).toFixed(1) + ' s of ' + ((t1 - t0) / 1000).toFixed(1) + ' s';
+      return;
+    }
+    size(top, 0.5);
     const ctx = top.getContext('2d'), W = top.width, H = top.height, dpr = devicePixelRatio;
     const centre = at(main, now);
     const k = Math.min(W, H) / (reachOut * 2 / REPLAY_ZOOMS[zoom]);
@@ -241,6 +272,7 @@ function replayCard(r) {
     if (playing) requestAnimationFrame(frame);
   });
   slider.addEventListener('input', () => { now = t0 + (Number(slider.value) / 1000) * (t1 - t0); draw(); });
+  zoomIn.hidden = zoomOut.hidden = true; // the 3D view zooms with the mouse wheel
   zoomIn.addEventListener('click', () => { zoom = Math.min(REPLAY_ZOOMS.length - 1, zoom + 1); draw(); });
   zoomOut.addEventListener('click', () => { zoom = Math.max(0, zoom - 1); draw(); });
   // Clicking the height strip jumps there.
@@ -266,10 +298,12 @@ function replayCard(r) {
     tip(null);
   });
   top.addEventListener('mouseleave', () => tip(null));
+  new ResizeObserver(() => { if (v3 && mode === '3d') v3.resize(); draw(); }).observe(box3d);
   new ResizeObserver(() => draw()).observe(top);
 
   const card = el('div', { class: 'card' }, el('h3', {}, r.title), r.subtitle ? el('p', { class: 'muted' }, r.subtitle) : null,
-    top, side, el('div', { class: 'replay-controls' }, playBtn, speed, zoomOut, zoomIn, slider, clock), legend);
+    box3d, top, side, el('div', { class: 'replay-controls' }, playBtn, speed, viewBtn, zoomOut, zoomIn, slider, clock), legend,
+    el('p', { class: 'muted replay-help' }, 'In 3D: drag to turn the camera, scroll to zoom. The camera follows the watched player.'));
   REPLAY_CARDS.set(key, card);
   requestAnimationFrame(draw);
   return card;

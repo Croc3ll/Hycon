@@ -55,7 +55,9 @@ public final class WebServer {
             Map.entry("/logo.svg", "web/logo.svg"), Map.entry("/emblem.svg", "web/emblem.svg"),
             Map.entry("/graph.js", "web/graph.js"), Map.entry("/heatmap.js", "web/heatmap.js"),
             Map.entry("/world.js", "web/world.js"), Map.entry("/globe.js", "web/globe.js"),
-            Map.entry("/replay.js", "web/replay.js"));
+            Map.entry("/replay.js", "web/replay.js"), Map.entry("/replay3d.js", "web/replay3d.js"),
+            Map.entry("/vendor/three.min.js", "web/vendor/three.min.js"),
+            Map.entry("/vendor/OrbitControls.js", "web/vendor/OrbitControls.js"));
 
     private final HyconConfig config;
     private final Sessions sessions;

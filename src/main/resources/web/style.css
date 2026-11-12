@@ -497,3 +497,7 @@ canvas.replay.side { margin-top: 6px; }
 .replay-clock { font-variant-numeric: tabular-nums; }
 .replay-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; }
 .replay-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.replay3d-box canvas.replay3d { width: 100%; display: block; border: 1px solid var(--line); border-radius: 4px; cursor: grab; }
+.replay3d-box canvas.replay3d:active { cursor: grabbing; }
+.replay-help { font-size: 12px; margin: 4px 0 0; }
+canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
