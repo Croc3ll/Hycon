@@ -37,9 +37,11 @@ function replayCard(r) {
   }
   y0 = Math.floor(y0 - 1); y1 = Math.ceil(y1 + 1);
 
-  // How far the others get from the followed player decides the starting zoom.
+  // The starting zoom fits the people the watched player hits (or is hit by): how far they get, at most.
+  // Bystanders who wander off don't shrink the fight; zoom out to see them.
+  const involved = new Set(events.flatMap(([, from, to]) => (from === main.name ? [to] : to === main.name ? [from] : [])));
   let reachOut = REPLAY_MIN_VIEW;
-  for (const a of actors) if (a !== main) for (const s of a.samples) {
+  for (const a of actors) if (a !== main && (involved.size === 0 || involved.has(a.name))) for (const s of a.samples) {
     const p = at(main, s[0]);
     reachOut = Math.max(reachOut, Math.hypot(s[1] - p[1], s[3] - p[3]) + 4);
   }
@@ -171,7 +173,8 @@ function replayCard(r) {
       arrowHead(ctx, px + Math.cos(lookAngle) * r0 * 1.4, pz + Math.sin(lookAngle) * r0 * 1.4, lookAngle, r0 * 1.3, colour);
       ctx.fillStyle = colour; ctx.strokeStyle = '#0b0c0f'; ctx.lineWidth = 2 * dpr;
       ctx.beginPath(); ctx.arc(px, pz, r0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      label(ctx, a.name + '  Y ' + Math.round(p[2]), px + r0 + 6 * dpr, pz - r0, '#ffffff');
+      // The watched player's name above their dot, everyone else's below, so close players don't cover each other.
+      label(ctx, a.name + '  Y ' + Math.round(p[2]), px + r0 + 6 * dpr, a === main ? pz - r0 : pz + r0 + 14 * dpr, '#ffffff');
     }
 
     // Scale bar: a round number of blocks about a sixth of the width.
