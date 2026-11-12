@@ -29,7 +29,7 @@ function replayCard(r) {
   const key = r.title + '|' + t0 + '|' + t1 + '|' + actors.length + '|' + ground + '|' + main.samples[0][2];
   const cached = REPLAY_CARDS.get(key);
   if (cached) return cached;
-  for (const k of REPLAY_CARDS.keys()) if (k.startsWith(r.title + '|')) REPLAY_CARDS.delete(k);
+  for (const [k, old] of REPLAY_CARDS) if (k.startsWith(r.title + '|')) { old.dispose(); REPLAY_CARDS.delete(k); }
 
   const colourOf = new Map(actors.map((a, i) => [a.name, REPLAY_COLOURS[i % REPLAY_COLOURS.length]]));
   const events = (r.events || []).slice().sort((a, b) => a[0] - b[0]);
@@ -70,10 +70,11 @@ function replayCard(r) {
   const box3d = el('div', { class: 'replay3d-box' });
   const viewBtn = el('button', { class: 'btn small', title: 'Switch between the 3D view and the map from above' }, 'Map view');
   const resetBtn = el('button', { class: 'btn small', title: 'Put the camera back behind the watched player' }, 'Reset camera');
-  let mode = '3d', v3 = null;
+  let mode = '3d', v3 = null, gone = false;
   top.hidden = true;
   box3d.append(el('p', { class: 'muted' }, 'Loading the 3D view...'));
   replay3d(box3d, r, actors, main, colourOf, at, events, REPLAY_FLAG, REPLAY_EVENT_MS, REPLAY_TRAIL_MS).then((view) => {
+    if (gone) { view.dispose(); return; }
     v3 = view;
     box3d.querySelector('p')?.remove();
     draw();
@@ -279,6 +280,7 @@ function replayCard(r) {
   }
 
   function frame(ts) {
+    if (!card.isConnected) playing = false; // replaced or closed: stop drawing off screen
     if (!playing) return;
     if (last) now += (ts - last) * Number(speed.value);
     last = ts;
@@ -328,6 +330,7 @@ function replayCard(r) {
   const card = el('div', { class: 'card' }, el('h3', {}, r.title), r.subtitle ? el('p', { class: 'muted' }, r.subtitle) : null,
     box3d, top, side, el('div', { class: 'replay-controls' }, playBtn, speed, viewBtn, resetBtn, zoomOut, zoomIn, slider, clock), legend,
     el('p', { class: 'muted replay-help' }, 'In 3D: drag to turn the camera, scroll to zoom. The camera follows the watched player.'));
+  card.dispose = () => { gone = true; playing = false; if (v3) v3.dispose(); v3 = null; };
   REPLAY_CARDS.set(key, card);
   requestAnimationFrame(draw);
   return card;

@@ -148,7 +148,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
           + '&x=' + tx * TILE + '&z=' + tz * TILE + '&s=' + TILE + '&y0=' + (by - BAND_DOWN) + '&y1=' + (by + BAND_UP))
           .then((b) => {
             loading.delete(key);
-            if (!latestWant.has(key)) return;
+            if (disposed || !latestWant.has(key)) return;
             addTile(key, b);
             stream(...lastAt); // the next tiles, also while paused
             if (followed) clearView(followed);
@@ -451,6 +451,19 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     function reset() {
       followed = null;
     }
-    return { draw, resize, reset, canvas: renderer.domElement };
+    // Frees the GPU side once the card is replaced: browsers only keep a few WebGL views alive at once.
+    let disposed = false;
+    function dispose() {
+      disposed = true;
+      for (const key of [...tiles.keys()]) dropTile(key);
+      scene.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) [].concat(o.material).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
+      });
+      controls.dispose();
+      renderer.dispose();
+      renderer.forceContextLoss();
+    }
+    return { draw, resize, reset, dispose, canvas: renderer.domElement };
   });
 }
