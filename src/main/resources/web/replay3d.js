@@ -70,9 +70,16 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       scene.add(floor);
     }
     // The real ground, as blocks: each column is a stack up to its top block, deep enough to close cliffs.
-    let terrain = null;
+    let terrain = null, blocksMesh = null, ghost = null;
     if (r.blocks && r.blocks.list && r.blocks.list.length) {
-      scene.add(buildBlocks(r.blocks));
+      blocksMesh = buildBlocks(r.blocks);
+      scene.add(blocksMesh);
+      // See-through copies of the blocks between the camera and the watched player, drawn faintly in their place.
+      ghost = new T.InstancedMesh(blocksMesh.geometry, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true,
+        opacity: 0.18, depthWrite: false }), Math.min(2000, blocksMesh.count));
+      ghost.count = 0;
+      ghost.renderOrder = 5;
+      scene.add(ghost);
     } else if (r.terrain && r.terrain.top) {
       terrain = buildTerrain(r.terrain);
       scene.add(terrain.mesh);
@@ -247,6 +254,44 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     const CHEST = P3.legH + P3.bodyH * 0.6;
     let followed = null;
 
+    // Blocks hidden because they stand between the camera and the watched player: id -> their real matrix. They
+    // are drawn faintly by the ghost mesh instead, so you see inside a house without losing its walls.
+    const hidden = new Map(), ray = new T.Raycaster(), ZERO = new T.Matrix4().makeScale(0, 0, 0), tmpC = new T.Color();
+    function clearView(target) {
+      if (!blocksMesh) return;
+      // Put the hidden ones back first, so the lines test every block where it really is.
+      for (const [id, m] of hidden) blocksMesh.setMatrixAt(id, m);
+      const want = new Set();
+      // Lines to the chest, the head and the feet, so a whole body shows through a wall.
+      for (const dy of [0, 0.9, -0.8]) {
+        const to = target.clone().add(new T.Vector3(0, dy, 0)), dir = to.clone().sub(camera.position), len = dir.length();
+        ray.set(camera.position, dir.normalize());
+        ray.far = Math.max(0, len - 0.4);
+        for (const hit of ray.intersectObject(blocksMesh)) want.add(hit.instanceId);
+      }
+      for (const id of [...hidden.keys()]) if (!want.has(id)) hidden.delete(id);
+      for (const id of want) {
+        if (!hidden.has(id)) {
+          const m = new T.Matrix4();
+          blocksMesh.getMatrixAt(id, m);
+          hidden.set(id, m);
+        }
+        blocksMesh.setMatrixAt(id, ZERO);
+      }
+      blocksMesh.instanceMatrix.needsUpdate = true;
+      let n = 0;
+      for (const [id, m] of hidden) {
+        if (n >= ghost.instanceMatrix.count) break;
+        ghost.setMatrixAt(n, m);
+        blocksMesh.getColorAt(id, tmpC);
+        ghost.setColorAt(n, tmpC);
+        n++;
+      }
+      ghost.count = n;
+      ghost.instanceMatrix.needsUpdate = true;
+      if (ghost.instanceColor) ghost.instanceColor.needsUpdate = true;
+    }
+
     function draw(now) {
       const where = new Map();
       for (const p of people) {
@@ -323,6 +368,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       }
       followed = target;
       controls.update();
+      clearView(target);
       renderer.render(scene, camera);
     }
 
@@ -332,7 +378,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     }
-    controls.addEventListener('change', () => renderer.render(scene, camera));
+    controls.addEventListener('change', () => { if (followed) clearView(followed); renderer.render(scene, camera); });
     resize();
     // Back to the starting view: close behind the watched player.
     function reset() {
