@@ -52,6 +52,7 @@ import com.hycon.web.WebServer;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -214,6 +215,12 @@ public final class HyconPlugin extends JavaPlugin {
             web = null;
             return;
         }
+        // Ties keeps plain maps behind its own lock; copy the answer out under it.
+        HyconApi.setLinks(player -> {
+            synchronized (ties) {
+                return Set.copyOf(ties.sameConnection(player));
+            }
+        });
         HyconApi.setRecorder((player, type, by, reason, detail) -> records.record(player,
                 "WARN".equalsIgnoreCase(type) ? PlayerRecords.Type.WARN : PlayerRecords.Type.NOTE, by, reason, detail));
         HyconApi.register(new AnalyticsPanel(samples, known, positions));

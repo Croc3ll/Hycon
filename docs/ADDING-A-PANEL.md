@@ -167,3 +167,8 @@ Implement `HyconProfileSection` instead of `HyconPanel`: `render(UUID player, St
 fills in that one player's numbers and charts. Register it with
 `HyconApi.registerProfileSection(...)` and remove it with `HyconApi.unregisterProfileSection(id)`.
 It appears under the player's profile with the same range picker.
+
+
+## Linked accounts (API 13)
+
+`HyconApi.linkedAccounts(uuid)` gives the other accounts that have played from one of this player's connections (the profile's "Shares a connection"): likely alts. Empty when there are none. Hycon - AntiCheat uses it to alert staff when a banned player's alt joins, and (if the owner turns it on) to ban alts too.

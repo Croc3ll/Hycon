@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -26,7 +27,7 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 12; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks
+    public static final int API_VERSION = 13; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();
@@ -59,6 +60,27 @@ public final class HyconApi {
 
     public static List<HyconRisk> riskSources() {
         return new ArrayList<>(RISK.values());
+    }
+
+    /** Gives the accounts linked to a player. */
+    public interface Links {
+        Set<UUID> linked(UUID player);
+    }
+
+    private static volatile Links links;
+
+    /** Set by Hycon itself. */
+    public static void setLinks(Links l) {
+        links = l;
+    }
+
+    /**
+     * Other accounts that have played from one of this player's connections (Hycon's "Shares a connection" on the
+     * profile): likely alts. Empty when there are none or Hycon isn't running. Any thread. Since API version 13.
+     */
+    public static Set<UUID> linkedAccounts(UUID player) {
+        Links l = links;
+        return l == null || player == null ? Set.of() : l.linked(player);
     }
 
     /** Set by Hycon itself. */
@@ -129,6 +151,7 @@ public final class HyconApi {
         PANELS.clear();
         SECTIONS.clear();
         recorder = null;
+        links = null;
         RISK.clear();
     }
 }
