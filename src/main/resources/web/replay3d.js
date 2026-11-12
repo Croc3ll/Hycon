@@ -58,20 +58,85 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       const clip = (a, b) => { if (b - a < 24) return [a, b]; const m = Math.floor((a + b) / 2); return [m - 11, m + 12]; };
       [cx0, cx1] = clip(cx0, cx1); [cz0, cz1] = clip(cz0, cz1);
       const w = (cx1 - cx0 + 1) * 32, d = (cz1 - cz0 + 1) * 32;
-      const tex = new T.TextureLoader().load('/api/worldmap?world=' + encodeURIComponent(r.world) + '&cx0=' + cx0 + '&cz0=' + cz0 + '&cx1=' + cx1 + '&cz1=' + cz1);
+      const box = [cx0 * 32, cz0 * 32, (cx1 + 1) * 32, (cz1 + 1) * 32];
+      const tex = new T.TextureLoader().load('/api/worldmap?world=' + encodeURIComponent(r.world) + '&cx0=' + cx0 + '&cz0=' + cz0 + '&cx1=' + cx1 + '&cz1=' + cz1,
+        (t) => { colourTerrain(t.image, box); renderer.render(scene, camera); });
       tex.magFilter = T.NearestFilter;
       tex.minFilter = T.LinearMipmapLinearFilter;
       const floor = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshLambertMaterial({ map: tex }));
       floor.rotation.x = -Math.PI / 2;
-      floor.position.set(cx0 * 32 + w / 2, groundY - 0.02, cz0 * 32 + d / 2);
+      // Under real terrain the flat map sits a little lower, filling in past the terrain's edge.
+      floor.position.set(cx0 * 32 + w / 2, groundY - (r.terrain ? 1.5 : 0.02), cz0 * 32 + d / 2);
       scene.add(floor);
     }
+    // The real ground, as blocks: each column is a stack up to its top block, deep enough to close cliffs.
+    let terrain = null;
+    if (r.terrain && r.terrain.top) {
+      terrain = buildTerrain(r.terrain);
+      scene.add(terrain.mesh);
+    }
+
+    function buildTerrain(tr) {
+      const top = (x, z) => (x < 0 || z < 0 || x >= tr.w || z >= tr.d ? null : tr.top[z * tr.w + x]);
+      const cubes = [];
+      let lo = Infinity, hi = -Infinity;
+      for (let z = 0; z < tr.d; z++) for (let x = 0; x < tr.w; x++) {
+        const y = top(x, z);
+        if (y === null || y === undefined) continue;
+        let low = y;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const n = top(x + dx, z + dz);
+          if (n !== null && n !== undefined) low = Math.min(low, n + 1);
+        }
+        low = Math.max(low, y - 8); // cliffs are filled at most 8 blocks down
+        for (let b = y; b >= low; b--) cubes.push([x, b, z, b === y]);
+        lo = Math.min(lo, y); hi = Math.max(hi, y);
+      }
+      const mesh = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0xffffff }), cubes.length);
+      const m = new T.Matrix4(), c = new T.Color();
+      // Until the map's colours are in: grass on top, earth below, a little darker for lower ground.
+      const shade = (y, isTop) => {
+        const f = 0.75 + 0.25 * ((y - lo) / ((hi - lo) || 1));
+        return isTop ? c.setRGB(0.32 * f, 0.55 * f, 0.26 * f) : c.setRGB(0.42 * f, 0.31 * f, 0.2 * f);
+      };
+      cubes.forEach(([x, y, z, isTop], i) => {
+        m.makeTranslation(tr.x0 + x + 0.5, y + 0.5, tr.z0 + z + 0.5);
+        mesh.setMatrixAt(i, m);
+        mesh.setColorAt(i, shade(y, isTop));
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      return { mesh, cubes, tr, shade };
+    }
+
+    // Once the map image is in, the top blocks take its colour at their spot (sides stay a darker shade of it).
+    function colourTerrain(img, box) {
+      if (!terrain) return;
+      const cv = document.createElement('canvas');
+      cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      const g = cv.getContext('2d');
+      g.drawImage(img, 0, 0);
+      let data;
+      try { data = g.getImageData(0, 0, cv.width, cv.height).data; } catch (e) { return; }
+      const pxPerBlock = cv.width / (box[2] - box[0]);
+      const c = new T.Color();
+      terrain.cubes.forEach(([x, y, z, isTop], i) => {
+        const px = Math.floor((terrain.tr.x0 + x - box[0]) * pxPerBlock), pz = Math.floor((terrain.tr.z0 + z - box[1]) * pxPerBlock);
+        if (px < 0 || pz < 0 || px >= cv.width || pz >= cv.height) return;
+        const k = (pz * cv.width + px) * 4;
+        if (data[k + 3] < 10) return;
+        const f = isTop ? 1 : 0.6;
+        terrain.mesh.setColorAt(i, c.setRGB(data[k] / 255 * f, data[k + 1] / 255 * f, data[k + 2] / 255 * f));
+      });
+      terrain.mesh.instanceColor.needsUpdate = true;
+    }
+
     const grid = new T.GridHelper(Math.max(64, Math.ceil(Math.max(x1 - x0, z1 - z0) / 8) * 8 + 64),
       Math.max(16, Math.ceil(Math.max(x1 - x0, z1 - z0) / 8) + 16), 0x3a3d46, 0x24262d);
     grid.position.set((x0 + x1) / 2, groundY, (z0 + z1) / 2);
     grid.material.transparent = true;
     grid.material.opacity = r.world ? 0.25 : 0.8;
-    scene.add(grid);
+    if (!r.terrain) scene.add(grid);
 
     function textSprite(text, colour) {
       const c = document.createElement('canvas'), g = c.getContext('2d'), size = 48;

@@ -381,6 +381,27 @@ public final class PanelData {
         }
 
         String world;
+        /** The ground around the replay: top block Y per column, row by row from (x0, z0); null when none. */
+        int terrainX0, terrainZ0, terrainW, terrainD;
+        int[] terrainTop;
+        /** Most columns a terrain may cover on each side. */
+        static final int MAX_TERRAIN = 96;
+
+        /**
+         * The ground as blocks: {@code top[z * width + x]} is the Y of the highest solid block in the column at
+         * (x0 + x, z0 + z), or {@link Integer#MIN_VALUE} where there is none. Hycon draws it as blocks under the
+         * players in the 3D view, coloured from the world map. Since API version 10.
+         */
+        public Replay terrain(int x0, int z0, int width, int depth, int[] top) {
+            if (width > 0 && depth > 0 && width <= MAX_TERRAIN && depth <= MAX_TERRAIN && top != null && top.length == width * depth) {
+                terrainX0 = x0;
+                terrainZ0 = z0;
+                terrainW = width;
+                terrainD = depth;
+                terrainTop = top.clone();
+            }
+            return this;
+        }
 
         /** The world it happened in: Hycon then draws the real world map underneath. Since API version 8. */
         public Replay world(String name) {
@@ -639,7 +660,20 @@ public final class PanelData {
                         }
                         j.endArray().endObject();
                     }
-                    j.endArray().name("events").beginArray();
+                    j.endArray();
+                    if (r.terrainTop != null) {
+                        j.name("terrain").beginObject().field("x0", r.terrainX0).field("z0", r.terrainZ0).field("w", r.terrainW)
+                                .field("d", r.terrainD).name("top").beginArray();
+                        for (int y : r.terrainTop) {
+                            if (y == Integer.MIN_VALUE) {
+                                j.value((String) null);
+                            } else {
+                                j.value(y);
+                            }
+                        }
+                        j.endArray().endObject();
+                    }
+                    j.name("events").beginArray();
                     for (Object[] e : r.events) {
                         j.beginArray().value((Long) e[0]).value((String) e[1]).value((String) e[2]).value((Boolean) e[3]).value((String) e[4])
                                 .value((String) e[5]).endArray();
