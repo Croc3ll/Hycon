@@ -45,7 +45,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI * 0.49; // never under the floor
     controls.minDistance = 3;
-    controls.maxDistance = 120;
+    controls.maxDistance = 60;
 
     // Floor: the world map image laid flat (north, -Z, at the top of the image), or a plain grid without one.
     let groundY = Infinity;
@@ -314,6 +314,10 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     }
     controls.addEventListener('change', () => renderer.render(scene, camera));
     resize();
-    return { draw, resize, canvas: renderer.domElement };
+    // Back to the starting view: close behind the watched player.
+    function reset() {
+      followed = null;
+    }
+    return { draw, resize, reset, canvas: renderer.domElement };
   });
 }

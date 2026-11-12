@@ -21,7 +21,10 @@ function replayCard(r) {
   }
   let t0 = Infinity, t1 = -Infinity;
   for (const a of actors) { t0 = Math.min(t0, a.samples[0][0]); t1 = Math.max(t1, a.samples[a.samples.length - 1][0]); }
-  const key = r.title + '|' + t0 + '|' + t1 + '|' + actors.length;
+  // The same data keeps its card (playback goes on); the ground arriving after the first render counts as new
+  // data, as does any change in heights (demo players are lifted onto the ground once it's in).
+  const ground = r.terrain ? r.terrain.x0 + ',' + r.terrain.z0 + ',' + r.terrain.w + 'x' + r.terrain.d : 'flat';
+  const key = r.title + '|' + t0 + '|' + t1 + '|' + actors.length + '|' + ground + '|' + main.samples[0][2];
   const cached = REPLAY_CARDS.get(key);
   if (cached) return cached;
   for (const k of REPLAY_CARDS.keys()) if (k.startsWith(r.title + '|')) REPLAY_CARDS.delete(k);
@@ -65,6 +68,7 @@ function replayCard(r) {
   // The 3D view (replay3d.js) shows first; the Map button switches to the flat view from above.
   const box3d = el('div', { class: 'replay3d-box' });
   const viewBtn = el('button', { class: 'btn small', title: 'Switch between the 3D view and the map from above' }, 'Map view');
+  const resetBtn = el('button', { class: 'btn small', title: 'Put the camera back behind the watched player' }, 'Reset camera');
   let mode = '3d', v3 = null;
   top.hidden = true;
   box3d.append(el('p', { class: 'muted' }, 'Loading the 3D view...'));
@@ -72,8 +76,9 @@ function replayCard(r) {
     v3 = view;
     box3d.querySelector('p')?.remove();
     draw();
-  }).catch(() => {
-    box3d.replaceChildren(el('p', { class: 'muted' }, 'The 3D view could not load here, so the map view is shown.'));
+  }).catch((err) => {
+    box3d.replaceChildren(el('p', { class: 'muted' }, 'The 3D view could not load here (' + (err && err.message ? err.message : err)
+      + '), so the map view is shown.'));
     mode = 'map'; top.hidden = false; viewBtn.hidden = true; draw();
   });
   viewBtn.addEventListener('click', () => {
@@ -82,6 +87,7 @@ function replayCard(r) {
     box3d.hidden = mode !== '3d';
     viewBtn.textContent = mode === '3d' ? 'Map view' : '3D view';
     zoomIn.hidden = zoomOut.hidden = mode === '3d';
+    resetBtn.hidden = mode !== '3d';
     if (mode === '3d' && v3) v3.resize();
     draw();
   });
@@ -289,6 +295,7 @@ function replayCard(r) {
   });
   slider.addEventListener('input', () => { now = t0 + (Number(slider.value) / 1000) * (t1 - t0); draw(); });
   zoomIn.hidden = zoomOut.hidden = true; // the 3D view zooms with the mouse wheel
+  resetBtn.addEventListener('click', () => { if (v3) { v3.reset(); draw(); } });
   zoomIn.addEventListener('click', () => { zoom = Math.min(REPLAY_ZOOMS.length - 1, zoom + 1); draw(); });
   zoomOut.addEventListener('click', () => { zoom = Math.max(0, zoom - 1); draw(); });
   // Clicking the height strip jumps there.
@@ -318,7 +325,7 @@ function replayCard(r) {
   new ResizeObserver(() => draw()).observe(top);
 
   const card = el('div', { class: 'card' }, el('h3', {}, r.title), r.subtitle ? el('p', { class: 'muted' }, r.subtitle) : null,
-    box3d, top, side, el('div', { class: 'replay-controls' }, playBtn, speed, viewBtn, zoomOut, zoomIn, slider, clock), legend,
+    box3d, top, side, el('div', { class: 'replay-controls' }, playBtn, speed, viewBtn, resetBtn, zoomOut, zoomIn, slider, clock), legend,
     el('p', { class: 'muted replay-help' }, 'In 3D: drag to turn the camera, scroll to zoom. The camera follows the watched player.'));
   REPLAY_CARDS.set(key, card);
   requestAnimationFrame(draw);
