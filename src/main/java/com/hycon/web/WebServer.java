@@ -54,7 +54,8 @@ public final class WebServer {
             Map.entry("/app.js", "web/app.js"), Map.entry("/style.css", "web/style.css"),
             Map.entry("/logo.svg", "web/logo.svg"), Map.entry("/emblem.svg", "web/emblem.svg"),
             Map.entry("/graph.js", "web/graph.js"), Map.entry("/heatmap.js", "web/heatmap.js"),
-            Map.entry("/world.js", "web/world.js"), Map.entry("/globe.js", "web/globe.js"));
+            Map.entry("/world.js", "web/world.js"), Map.entry("/globe.js", "web/globe.js"),
+            Map.entry("/replay.js", "web/replay.js"));
 
     private final HyconConfig config;
     private final Sessions sessions;
