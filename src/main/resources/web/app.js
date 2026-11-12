@@ -143,7 +143,7 @@ function tabs() {
   for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
   list.push(['bans', 'Bans', 'VIEWER'], ['reports', S.openReports ? 'Reports (' + S.openReports + ')' : 'Reports', 'MODERATOR'],
     ['bugs', S.openBugs ? 'Bugs (' + S.openBugs + ')' : 'Bugs', 'MODERATOR'],
-    ['console', 'Console', 'MODERATOR']);
+    ['chat', 'Chat', 'MODERATOR'], ['console', 'Console', 'MODERATOR']);
   list.push(['audit', 'Audit log', 'ADMIN'], ['sharing', 'Ban sharing', 'OWNER'], ['accounts', 'Accounts', 'OWNER']);
   return list.filter((t) => can(t[2]));
 }
@@ -154,6 +154,7 @@ const TAB_ICONS = {
   bans: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M4.9 4.9l14.2 14.2',
   reports: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
   bugs: 'M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 0 1 6 0v1.1M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6M12 20v-9M6 13H2M22 13h-4M3 21l3-3M21 21l-3-3',
+  chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
   console: 'M4 17l6-6-6-6M12 19h8',
   audit: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8',
   sharing: 'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6M6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6M8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
@@ -253,6 +254,7 @@ function render() {
   if (head) view.append(el('div', { class: 'pagehead' }, el('h1', {}, head[0]), el('p', {}, head[1])));
   if (tab === 'players') players(view);
   else if (tab === 'bans') bans(view);
+  else if (tab === 'chat') chatView(view);
   else if (tab === 'console') consoleView(view);
   else if (tab === 'audit') audit(view);
   else if (tab === 'accounts') accounts(view);
@@ -269,6 +271,7 @@ const PAGES = {
   bans: ['Bans', 'Ban a player, and every ban that is still active.'],
   reports: ['Reports', 'What players reported with /report, newest first.'],
   bugs: ['Bugs', 'Bugs players sent with /bug, with the server log from that moment.'],
+  chat: ['Chat', 'Everything players said in chat, newest first. Kept as long as ping history.'],
   console: ['Console', 'The live server log, server health and console commands.'],
   audit: ['Audit log', 'Everything staff did in this panel, and every login.'],
   sharing: ['Ban sharing', 'Share your ban list with other Hycon servers and import theirs.'],
@@ -505,6 +508,7 @@ function profile(view, uuid) {
             : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null), riskCard),
       profileSections(p.uuid),
       pingCard(p.uuid),
+      can('MODERATOR') ? chatCard(p.uuid) : null,
       can('MODERATOR') ? locationCard(p.uuid) : null,
       can('MODERATOR') ? connectionMap(p.uuid) : null,
       el('div', { class: 'card' }, el('h2', {}, 'History'),
@@ -518,6 +522,51 @@ function profile(view, uuid) {
             el('td', {}, h.by), el('td', {}, h.reason)))
             : el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Clean record.'))))));
   })().catch((e) => out.replaceChildren(el('p', { class: 'bad' }, e.message)));
+}
+
+// ---------- Chat ----------
+
+// A searchable chat list with an "Older" button. One player's lines on a profile (no name column),
+// everyone's on the Chat tab (names open the profile).
+function chatList(player) {
+  const body = el('tbody'), more = el('button', {}, 'Older');
+  const search = el('input', { placeholder: 'Find a word or name', maxlength: 64 });
+  let oldest = null;
+  const cols = player ? 2 : 3;
+  const load = async (fresh) => {
+    if (fresh) { oldest = null; body.replaceChildren(el('tr', {}, el('td', { colspan: cols, class: 'muted' }, 'Loading chat…'))); }
+    const qs = new URLSearchParams();
+    if (player) qs.set('player', player);
+    if (search.value.trim()) qs.set('q', search.value.trim());
+    if (oldest !== null) qs.set('before', oldest);
+    try {
+      const d = await api('GET', '/api/chat?' + qs);
+      if (fresh) body.replaceChildren();
+      for (const l of d.lines) {
+        body.append(el('tr', {}, el('td', { class: 'muted nowrap' }, fmtTime(l.time)),
+          player ? null : el('td', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); go('profile:' + l.uuid); } } }, l.name)),
+          el('td', { class: 'chattext' }, l.text)));
+        oldest = l.time;
+      }
+      if (!body.children.length) body.append(el('tr', {}, el('td', { colspan: cols, class: 'muted' }, search.value.trim() ? 'No chat matches that.' : 'No chat recorded yet.')));
+      more.hidden = !d.more;
+    } catch (e) { toast(e.message, true); }
+  };
+  let wait = null;
+  search.addEventListener('input', () => { clearTimeout(wait); wait = setTimeout(() => load(true), 300); });
+  more.addEventListener('click', () => load(false));
+  load(true);
+  return el('div', {}, el('p', { class: 'row' }, search),
+    el('div', { class: 'chatscroll' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'When'), player ? null : el('th', {}, 'Player'), el('th', {}, 'Said'))), body)),
+    el('p', { class: 'row' }, more));
+}
+
+function chatView(view) {
+  view.append(el('div', { class: 'card' }, chatList(null)));
+}
+
+function chatCard(uuid) {
+  return el('div', { class: 'card' }, el('h2', {}, 'Chat history'), chatList(uuid));
 }
 
 // ---------- Ping (profile) ----------

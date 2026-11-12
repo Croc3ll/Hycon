@@ -3,6 +3,7 @@ package com.hycon;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -19,11 +20,13 @@ import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
+import com.hycon.game.ChatLog;
 import com.hycon.game.KillLog;
 import com.hycon.game.Reports;
 import com.hycon.game.BugReports;
 import com.hycon.commands.BugCommand;
 import com.hycon.web.BugRoutes;
+import com.hycon.web.ChatRoutes;
 import com.hycon.web.GeoRoutes;
 import com.hycon.web.ConsoleRoutes;
 import com.hycon.game.GeoIp;
@@ -76,6 +79,7 @@ public final class HyconPlugin extends JavaPlugin {
     private ScheduledFuture<?> sampler;
     private PingLog pingLog;
     private KillLog killLog;
+    private ChatLog chatLog;
     private PlayerActivity activity;
     private PositionLog positions;
     private Reports reports;
@@ -117,6 +121,11 @@ public final class HyconPlugin extends JavaPlugin {
         pingLog = new PingLog(dir);
         killLog = new KillLog(dir);
         getEntityStoreRegistry().registerSystem(killLog.new Tracker());
+        chatLog = new ChatLog(dir);
+        getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, f -> f.thenApply(e -> {
+            chatLog.onChat(e);
+            return e;
+        }));
         activity = new PlayerActivity(dir);
         activity.systems().forEach(getEntityStoreRegistry()::registerSystem);
         positions = new PositionLog(dir);
@@ -163,6 +172,7 @@ public final class HyconPlugin extends JavaPlugin {
             samples.open();
             sharing.load();
             killLog.open();
+            chatLog.open();
             reports.load();
             bugs.load();
             ties.load();
@@ -190,6 +200,7 @@ public final class HyconPlugin extends JavaPlugin {
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
             new GeoRoutes(web, geo, known, moderation, pingLog, config.serverLocation()).register();
             new BugRoutes(web, bugs, audit).register();
+            new ChatRoutes(web, chatLog, moderation).register();
             new ConsoleRoutes(web, logTap, audit, consoleRunner,
                     new com.hycon.game.AmpClient(config.ampUrl(), config.ampUser(), config.ampPassword())).register();
             banSync = new BanSync(sharing, known, audit);
@@ -313,6 +324,9 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (killLog != null) {
             killLog.close();
+        }
+        if (chatLog != null) {
+            chatLog.close();
         }
     }
 

@@ -136,6 +136,12 @@ name: **Warn** or **Ban** straight from a report, mark it **Handled** (with an o
 also saved in the player's history) or **Dismiss** it. Staff with the permission
 `hycon.reports.notify` get a chat line in game for every new report.
 
+### Chat (MODERATOR and up)
+The **Chat** tab shows everything players said in chat, newest first, kept 14 days. Type a word or
+a name to find it, and press **Older** to go further back. Click a name to open that player's
+profile. Every profile also has a **Chat history** card with just that player's lines. Lines that a
+mute or chat filter cancelled are not kept.
+
 ### Connection map (on profiles, MODERATOR and up)
 A web of everyone tied to the player, and everyone tied to them ("further out"), with a summary
 like "18 direct, 10 further out · among them 3 banned, 5 reported". Ties:
@@ -361,6 +367,7 @@ All in Hycon's data folder:
 | `moderation.log`  | Every player's history: warnings, kicks, bans, unbans and staff notes, one JSON line each.     |
 | `samples.log`     | Players online and memory every 30 s, kept 31 days, for the Analytics charts.                    |
 | `sharing.json`    | Your share codes, followed servers and local exceptions. Holds secrets: keep it private.        |
+| `chat.log`        | Every chat line (time, player, text), kept 14 days. Keep it private.                          |
 | `kills.log`       | Player-versus-player kills with the killer's ping, kept 14 days.                              |
 | `ping/`           | One small file per player with their ping every minute, kept 14 days.                          |
 | `reports.json`    | Player reports and what staff did with them.                                                  |

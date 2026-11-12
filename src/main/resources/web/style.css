@@ -510,3 +510,8 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
 .prompt-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
 .prompt-modal { background: var(--panel); color: var(--text); border: 1px solid var(--gold-dim); border-radius: 10px; padding: 20px 22px; max-width: 560px; max-height: 85vh; overflow: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
 .prompt-modal h2 { margin: 0 0 8px; }
+
+/* Chat history: long lists scroll inside the card, words wrap. */
+.chatscroll { max-height: 520px; overflow-y: auto; }
+.chattext { word-break: break-word; }
+.nowrap { white-space: nowrap; }

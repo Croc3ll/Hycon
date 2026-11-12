@@ -42,6 +42,7 @@ These are made with demo data by `py tools/promo/make_promo.py` (no real players
 - **Reports and alts**: player reports to work through, and accounts linked by connection or by often
   joining together.
 - **Bug reports**: players send them in game with `/bug`; staff read and close them in the panel.
+- **Chat history**: a Chat tab with every line players said (search, 14 days), and each player's chat on their profile.
 - **Console**: the live server log, and console commands for admins (with a blocked-commands list).
 - **Analytics**: player counts, ping, activity and other charts, plus dashboards from other plugins.
 - **Player globe**: a spinning 3D globe on Analytics with a dot for every player (coloured by ping) and
