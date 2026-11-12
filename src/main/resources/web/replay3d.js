@@ -76,7 +76,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       scene.add(blocksMesh);
       // See-through copies of the blocks between the camera and the watched player, drawn faintly in their place.
       ghost = new T.InstancedMesh(blocksMesh.geometry, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true,
-        opacity: 0.18, depthWrite: false }), Math.min(2000, blocksMesh.count));
+        opacity: 0.18, depthWrite: false }), Math.min(4000, blocksMesh.count));
       ghost.count = 0;
       ghost.renderOrder = 5;
       scene.add(ghost);
@@ -256,26 +256,29 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
 
     // Blocks hidden because they stand between the camera and the watched player: id -> their real matrix. They
     // are drawn faintly by the ghost mesh instead, so you see inside a house without losing its walls.
-    const hidden = new Map(), ray = new T.Raycaster(), ZERO = new T.Matrix4().makeScale(0, 0, 0), tmpC = new T.Color();
+    const hidden = new Map(), ZERO = new T.Matrix4().makeScale(0, 0, 0), tmpC = new T.Color();
+    // How wide the see-through hole is: blocks whose middle is this close to the line camera -> player.
+    const HOLE_RADIUS = 2.2;
     function clearView(target) {
       if (!blocksMesh) return;
-      // Put the hidden ones back first, so the lines test every block where it really is.
-      for (const [id, m] of hidden) blocksMesh.setMatrixAt(id, m);
-      const want = new Set();
-      // Lines to the chest, the head and the feet, so a whole body shows through a wall.
-      for (const dy of [0, 0.9, -0.8]) {
-        const to = target.clone().add(new T.Vector3(0, dy, 0)), dir = to.clone().sub(camera.position), len = dir.length();
-        ray.set(camera.position, dir.normalize());
-        ray.far = Math.max(0, len - 0.4);
-        for (const hit of ray.intersectObject(blocksMesh)) want.add(hit.instanceId);
+      const list = r.blocks.list, count = list.length / 4;
+      const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
+      // The line runs to the player's chest; the last bit by the player stays solid so the floor under them shows.
+      const dx = target.x - cx, dy = target.y - cy, dz = target.z - cz, len2 = dx * dx + dy * dy + dz * dz;
+      const want = new Set(), r2 = HOLE_RADIUS * HOLE_RADIUS, stop = Math.max(0, 1 - 1.2 / Math.sqrt(len2 || 1));
+      for (let i = 0; i < count; i++) {
+        const bx = list[i * 4] + 0.5 - cx, by = list[i * 4 + 1] + 0.5 - cy, bz = list[i * 4 + 2] + 0.5 - cz;
+        const t = (bx * dx + by * dy + bz * dz) / (len2 || 1);
+        if (t <= 0 || t >= stop) continue;
+        const ex = bx - dx * t, ey = by - dy * t, ez = bz - dz * t;
+        if (ex * ex + ey * ey + ez * ez < r2) want.add(i);
       }
-      for (const id of [...hidden.keys()]) if (!want.has(id)) hidden.delete(id);
+      for (const [id, m] of hidden) if (!want.has(id)) { blocksMesh.setMatrixAt(id, m); hidden.delete(id); }
       for (const id of want) {
-        if (!hidden.has(id)) {
-          const m = new T.Matrix4();
-          blocksMesh.getMatrixAt(id, m);
-          hidden.set(id, m);
-        }
+        if (hidden.has(id)) continue;
+        const m = new T.Matrix4();
+        blocksMesh.getMatrixAt(id, m);
+        hidden.set(id, m);
         blocksMesh.setMatrixAt(id, ZERO);
       }
       blocksMesh.instanceMatrix.needsUpdate = true;
