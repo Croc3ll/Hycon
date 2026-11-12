@@ -71,15 +71,21 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     }
     // The real ground, as blocks: each column is a stack up to its top block, deep enough to close cliffs.
     let terrain = null, blocksMesh = null, ghost = null;
+    // The see-through hole's rings: up to this far from the camera-player line (blocks), drawn at this opacity.
+    const HOLE_RINGS = [[1.4, 0.06], [2.3, 0.28], [3.1, 0.6]];
     if (r.blocks && r.blocks.list && r.blocks.list.length) {
       blocksMesh = buildBlocks(r.blocks);
       scene.add(blocksMesh);
-      // See-through copies of the blocks between the camera and the watched player, drawn faintly in their place.
-      ghost = new T.InstancedMesh(blocksMesh.geometry, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true,
-        opacity: 0.18, depthWrite: false }), Math.min(4000, blocksMesh.count));
-      ghost.count = 0;
-      ghost.renderOrder = 5;
-      scene.add(ghost);
+      // See-through copies of the blocks between the camera and the watched player, in rings that fade: nearly
+      // gone in the middle, half there around it, a little faded at the edge, so the hole has soft edges.
+      ghost = HOLE_RINGS.map(([, opacity], i) => {
+        const g = new T.InstancedMesh(blocksMesh.geometry, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true,
+          opacity, depthWrite: false }), Math.min(4000, blocksMesh.count));
+        g.count = 0;
+        g.renderOrder = 5 + i;
+        scene.add(g);
+        return g;
+      });
     } else if (r.terrain && r.terrain.top) {
       terrain = buildTerrain(r.terrain);
       scene.add(terrain.mesh);
@@ -257,42 +263,45 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     // Blocks hidden because they stand between the camera and the watched player: id -> their real matrix. They
     // are drawn faintly by the ghost mesh instead, so you see inside a house without losing its walls.
     const hidden = new Map(), ZERO = new T.Matrix4().makeScale(0, 0, 0), tmpC = new T.Color();
-    // How wide the see-through hole is: blocks whose middle is this close to the line camera -> player.
-    const HOLE_RADIUS = 2.2;
     function clearView(target) {
       if (!blocksMesh) return;
-      const list = r.blocks.list, count = list.length / 4;
+      const list = r.blocks.list, count = list.length / 4, outer = HOLE_RINGS[HOLE_RINGS.length - 1][0];
       const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
       // The line runs to the player's chest; the last bit by the player stays solid so the floor under them shows.
       const dx = target.x - cx, dy = target.y - cy, dz = target.z - cz, len2 = dx * dx + dy * dy + dz * dz;
-      const want = new Set(), r2 = HOLE_RADIUS * HOLE_RADIUS, stop = Math.max(0, 1 - 1.2 / Math.sqrt(len2 || 1));
+      const want = new Map(), stop = Math.max(0, 1 - 1.2 / Math.sqrt(len2 || 1));
       for (let i = 0; i < count; i++) {
         const bx = list[i * 4] + 0.5 - cx, by = list[i * 4 + 1] + 0.5 - cy, bz = list[i * 4 + 2] + 0.5 - cz;
         const t = (bx * dx + by * dy + bz * dz) / (len2 || 1);
         if (t <= 0 || t >= stop) continue;
-        const ex = bx - dx * t, ey = by - dy * t, ez = bz - dz * t;
-        if (ex * ex + ey * ey + ez * ez < r2) want.add(i);
+        const ex = bx - dx * t, ey = by - dy * t, ez = bz - dz * t, d = Math.sqrt(ex * ex + ey * ey + ez * ez);
+        if (d >= outer) continue;
+        want.set(i, HOLE_RINGS.findIndex(([edge]) => d < edge));
       }
-      for (const [id, m] of hidden) if (!want.has(id)) { blocksMesh.setMatrixAt(id, m); hidden.delete(id); }
-      for (const id of want) {
-        if (hidden.has(id)) continue;
+      for (const [id, h] of hidden) if (!want.has(id)) { blocksMesh.setMatrixAt(id, h.m); hidden.delete(id); }
+      for (const [id, ring] of want) {
+        const h = hidden.get(id);
+        if (h) { h.ring = ring; continue; }
         const m = new T.Matrix4();
         blocksMesh.getMatrixAt(id, m);
-        hidden.set(id, m);
+        hidden.set(id, { m, ring });
         blocksMesh.setMatrixAt(id, ZERO);
       }
       blocksMesh.instanceMatrix.needsUpdate = true;
-      let n = 0;
-      for (const [id, m] of hidden) {
-        if (n >= ghost.instanceMatrix.count) break;
-        ghost.setMatrixAt(n, m);
+      const n = ghost.map(() => 0);
+      for (const [id, h] of hidden) {
+        const g = ghost[h.ring];
+        if (n[h.ring] >= g.instanceMatrix.count) continue;
+        g.setMatrixAt(n[h.ring], h.m);
         blocksMesh.getColorAt(id, tmpC);
-        ghost.setColorAt(n, tmpC);
-        n++;
+        g.setColorAt(n[h.ring], tmpC);
+        n[h.ring]++;
       }
-      ghost.count = n;
-      ghost.instanceMatrix.needsUpdate = true;
-      if (ghost.instanceColor) ghost.instanceColor.needsUpdate = true;
+      ghost.forEach((g, i) => {
+        g.count = n[i];
+        g.instanceMatrix.needsUpdate = true;
+        if (g.instanceColor) g.instanceColor.needsUpdate = true;
+      });
     }
 
     function draw(now) {
