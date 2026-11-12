@@ -66,14 +66,34 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       const floor = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshLambertMaterial({ map: tex }));
       floor.rotation.x = -Math.PI / 2;
       // Under real terrain the flat map sits a little lower, filling in past the terrain's edge.
-      floor.position.set(cx0 * 32 + w / 2, groundY - (r.terrain ? 1.5 : 0.02), cz0 * 32 + d / 2);
+      floor.position.set(cx0 * 32 + w / 2, groundY - (r.terrain || r.blocks ? 1.5 : 0.02), cz0 * 32 + d / 2);
       scene.add(floor);
     }
     // The real ground, as blocks: each column is a stack up to its top block, deep enough to close cliffs.
     let terrain = null;
-    if (r.terrain && r.terrain.top) {
+    if (r.blocks && r.blocks.list && r.blocks.list.length) {
+      scene.add(buildBlocks(r.blocks));
+    } else if (r.terrain && r.terrain.top) {
       terrain = buildTerrain(r.terrain);
       scene.add(terrain.mesh);
+    }
+
+    // The real blocks, each in its kind's colour, a little lighter or darker block by block so surfaces read.
+    function buildBlocks(b) {
+      const list = b.list, count = list.length / 4;
+      const mesh = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0xffffff }), count);
+      const m = new T.Matrix4(), base = b.colours.map((c) => new T.Color(c)), c = new T.Color();
+      for (let i = 0; i < count; i++) {
+        const x = list[i * 4], y = list[i * 4 + 1], z = list[i * 4 + 2], k = list[i * 4 + 3];
+        m.makeTranslation(x + 0.5, y + 0.5, z + 0.5);
+        mesh.setMatrixAt(i, m);
+        const jitter = 0.92 + (((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) >>> 0) % 17 / 100;
+        c.copy(base[k] || base[0]).multiplyScalar(jitter);
+        mesh.setColorAt(i, c);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      return mesh;
     }
 
     function buildTerrain(tr) {
@@ -136,7 +156,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     grid.position.set((x0 + x1) / 2, groundY, (z0 + z1) / 2);
     grid.material.transparent = true;
     grid.material.opacity = r.world ? 0.25 : 0.8;
-    if (!r.terrain) scene.add(grid);
+    if (!r.terrain && !r.blocks) scene.add(grid);
 
     function textSprite(text, colour) {
       const c = document.createElement('canvas'), g = c.getContext('2d'), size = 48;

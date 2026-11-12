@@ -444,6 +444,25 @@ public final class PanelData {
             return this;
         }
 
+        int[] blocks;
+        String[] blockColours;
+        /** Most blocks one replay may carry. */
+        static final int MAX_BLOCKS = 25_000;
+
+        /**
+         * The actual blocks around the replay, for the 3D view: {@code xyzc} holds x, y, z and a colour index for
+         * each block (only the ones that can be seen), {@code colours} the colours as "#rrggbb". When given, Hycon
+         * draws these instead of the {@link #terrain} columns, so walls, roofs, doorways and trees look as they
+         * are. Since API version 12.
+         */
+        public Replay blocks(int[] xyzc, String[] colours) {
+            if (xyzc != null && colours != null && xyzc.length % 4 == 0 && xyzc.length / 4 <= MAX_BLOCKS) {
+                blocks = xyzc.clone();
+                blockColours = colours.clone();
+            }
+            return this;
+        }
+
         /** The world it happened in: Hycon then draws the real world map underneath. Since API version 8. */
         public Replay world(String name) {
             this.world = name;
@@ -722,6 +741,17 @@ public final class PanelData {
                             } else {
                                 j.value(y);
                             }
+                        }
+                        j.endArray().endObject();
+                    }
+                    if (r.blocks != null) {
+                        j.name("blocks").beginObject().name("colours").beginArray();
+                        for (String c : r.blockColours) {
+                            j.value(c);
+                        }
+                        j.endArray().name("list").beginArray();
+                        for (int v : r.blocks) {
+                            j.value(v);
                         }
                         j.endArray().endObject();
                     }

@@ -24,7 +24,8 @@ function replayCard(r) {
   const main = actors.find((a) => a.main) || actors[0];
   // The same data keeps its card (playback goes on); the ground arriving after the first render counts as new
   // data, as does any change in heights (demo players are lifted onto the ground once it's in).
-  const ground = r.terrain ? r.terrain.x0 + ',' + r.terrain.z0 + ',' + r.terrain.w + 'x' + r.terrain.d : 'flat';
+  const ground = (r.terrain ? r.terrain.x0 + ',' + r.terrain.z0 + ',' + r.terrain.w + 'x' + r.terrain.d : 'flat')
+    + (r.blocks ? '+' + r.blocks.list.length : '');
   const key = r.title + '|' + t0 + '|' + t1 + '|' + actors.length + '|' + ground + '|' + main.samples[0][2];
   const cached = REPLAY_CARDS.get(key);
   if (cached) return cached;
