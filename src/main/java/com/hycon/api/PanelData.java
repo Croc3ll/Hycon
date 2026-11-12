@@ -409,7 +409,15 @@ public final class PanelData {
          */
         public Replay event(long timeMillis, String from, String to, boolean bad, String label) {
             if (events.size() < MAX_EVENTS) {
-                events.add(new Object[]{timeMillis, from, to, bad, label == null ? "" : label});
+                events.add(new Object[]{timeMillis, from, to, bad, label == null ? "" : label, "hit"});
+            }
+            return this;
+        }
+
+        /** A shot (bullet, arrow) that hit: drawn as a dashed line, red when {@code bad}. Since API version 9. */
+        public Replay shot(long timeMillis, String from, String to, boolean bad, String label) {
+            if (events.size() < MAX_EVENTS) {
+                events.add(new Object[]{timeMillis, from, to, bad, label == null ? "" : label, "shot"});
             }
             return this;
         }
@@ -633,7 +641,8 @@ public final class PanelData {
                     }
                     j.endArray().name("events").beginArray();
                     for (Object[] e : r.events) {
-                        j.beginArray().value((Long) e[0]).value((String) e[1]).value((String) e[2]).value((Boolean) e[3]).value((String) e[4]).endArray();
+                        j.beginArray().value((Long) e[0]).value((String) e[1]).value((String) e[2]).value((Boolean) e[3]).value((String) e[4])
+                                .value((String) e[5]).endArray();
                     }
                     j.endArray();
                 }

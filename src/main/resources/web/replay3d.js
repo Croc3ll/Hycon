@@ -151,7 +151,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     function arrow(i) {
       if (!arrows[i]) {
         const line = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3()]),
-          new T.LineBasicMaterial({ color: 0xffffff, transparent: true, linewidth: 2 }));
+          new T.LineDashedMaterial({ color: 0xffffff, transparent: true, dashSize: 1000, gapSize: 0 }));
         const cone = new T.Mesh(new T.ConeGeometry(0.15, 0.4, 12), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
         scene.add(line); scene.add(cone);
         arrows[i] = { line, cone, label: null, text: '' };
@@ -193,7 +193,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
         for (const m of p.f.materials) m.emissive.setRGB(g, 0, 0);
       }
       let used = 0;
-      for (const [t, from, to, bad] of events) {
+      for (const [t, from, to, bad, , kind] of events) {
         if (t > now || t < now - eventMs || !to) continue;
         const a = where.get(from), b = where.get(to);
         if (!a || !b) continue;
@@ -203,6 +203,10 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
         const end = A.clone().add(dir.clone().setLength(Math.max(0, dist - 0.35)));
         const ar = arrow(used++);
         ar.line.geometry.setFromPoints([A, end]);
+        ar.line.computeLineDistances();
+        // Shots are dashed, melee hits solid (a dash longer than any line).
+        ar.line.material.dashSize = kind === 'shot' ? 0.5 : 1000;
+        ar.line.material.gapSize = kind === 'shot' ? 0.35 : 0;
         ar.line.material.color.set(colour); ar.line.material.opacity = 0.4 + 0.6 * fade; ar.line.visible = true;
         ar.cone.position.copy(end);
         ar.cone.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.clone().normalize());

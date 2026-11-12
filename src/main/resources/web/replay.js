@@ -92,7 +92,7 @@ function replayCard(r) {
   const clock = el('span', { class: 'muted replay-clock' });
   const legend = el('div', { class: 'replay-legend' },
     actors.map((a) => el('span', {}, el('i', { style: 'background:' + colourOf.get(a.name) }), a.name + (a.main ? ' (watched)' : ''))),
-    el('span', { class: 'muted' }, 'Faces show where they look · white arrow: a hit, with its distance · ',
+    el('span', { class: 'muted' }, 'Faces show where they look · solid arrow: a melee hit · dashed: a shot · with the distance · ',
       el('b', { style: 'color:' + REPLAY_FLAG }, 'red: flagged')));
   let now = t0, playing = false, last = 0;
 
@@ -176,7 +176,7 @@ function replayCard(r) {
       where.set(a.name, at(a, now));
     }
 
-    for (const [t, from, to, bad] of events) {
+    for (const [t, from, to, bad, , kind] of events) {
       if (t > now || t < now - REPLAY_EVENT_MS) continue;
       const a = where.get(from), b = to ? where.get(to) : null;
       if (!a) continue;
@@ -185,7 +185,9 @@ function replayCard(r) {
       if (b) {
         const ax = sx(a[1]), az = sz(a[3]), bx = sx(b[1]), bz = sz(b[3]), angle = Math.atan2(bz - az, bx - ax);
         ctx.strokeStyle = colour; ctx.lineWidth = (bad ? 3.5 : 2.5) * dpr;
+        ctx.setLineDash(kind === 'shot' ? [10 * dpr, 7 * dpr] : []); // shots dashed, melee solid
         ctx.beginPath(); ctx.moveTo(ax, az); ctx.lineTo(bx - Math.cos(angle) * 9 * dpr, bz - Math.sin(angle) * 9 * dpr); ctx.stroke();
+        ctx.setLineDash([]);
         arrowHead(ctx, bx - Math.cos(angle) * 7 * dpr, bz - Math.sin(angle) * 7 * dpr, angle, 11 * dpr, colour);
         const dist = Math.hypot(b[1] - a[1], b[2] - a[2], b[3] - a[3]);
         label(ctx, dist.toFixed(1) + ' blocks', (ax + bx) / 2 + 6 * dpr, (az + bz) / 2 - 6 * dpr, colour);
