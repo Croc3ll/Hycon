@@ -33,6 +33,7 @@ import com.hycon.game.GeoIp;
 import com.hycon.game.Ties;
 import com.hycon.commands.ReportCommand;
 import com.hycon.web.IntelRoutes;
+import com.hycon.game.DiscoveryProbe;
 import com.hycon.game.EntitlementProbe;
 import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
@@ -151,6 +152,7 @@ public final class HyconPlugin extends JavaPlugin {
         // Test probe: logs what each identity token says about the account (see EntitlementProbe).
         entitlementProbe = new EntitlementProbe(getLogger());
         entitlementProbe.start();
+        new DiscoveryProbe(getLogger()).start();
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
             known.joined(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
