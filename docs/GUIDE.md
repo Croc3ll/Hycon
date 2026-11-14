@@ -356,7 +356,7 @@ passwords and session cookies would travel unencrypted. Hycon warns in the log i
 beyond the local machine.
 
 ### Game edition and staff watch (on profiles)
-Each profile shows the player's **game edition** (Standard, Supporter, ...) and the raw entitlements
+Each profile shows the player's **game edition** (Standard, Supporter or Cursebreaker) and the raw entitlements
 Hytale lists for their account. Hycon reads them from the player's login token when they join, so a
 player shows "Unknown" until their next join.
 
