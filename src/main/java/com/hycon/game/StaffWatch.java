@@ -219,8 +219,8 @@ public final class StaffWatch implements HyconProfileSection {
 
     private static Map<String, String> defaultEditions() {
         Map<String, String> m = new LinkedHashMap<>();
-        m.put("game.base", "Base game");
-        m.put("game.deluxe", "Standard");
+        m.put("game.base", "Standard");
+        m.put("game.deluxe", "Supporter");
         return m;
     }
 }
