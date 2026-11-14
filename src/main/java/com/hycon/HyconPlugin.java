@@ -33,6 +33,7 @@ import com.hycon.game.GeoIp;
 import com.hycon.game.Ties;
 import com.hycon.commands.ReportCommand;
 import com.hycon.web.IntelRoutes;
+import com.hycon.game.EntitlementProbe;
 import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
 import com.hycon.analytics.ActivitySection;
@@ -81,6 +82,7 @@ public final class HyconPlugin extends JavaPlugin {
     private ShareServer shareServer;
     private ScheduledFuture<?> sampler;
     private PingLog pingLog;
+    private EntitlementProbe entitlementProbe;
     private KillLog killLog;
     private ChatLog chatLog;
     private PlayerActivity activity;
@@ -146,6 +148,9 @@ public final class HyconPlugin extends JavaPlugin {
         bugs = new BugReports(dir);
         bugs.startLogCapture();
         getCommandRegistry().registerCommand(new BugCommand(bugs));
+        // Test probe: logs what each identity token says about the account (see EntitlementProbe).
+        entitlementProbe = new EntitlementProbe(getLogger());
+        entitlementProbe.start();
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
             known.joined(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
@@ -293,6 +298,9 @@ public final class HyconPlugin extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (entitlementProbe != null) {
+            entitlementProbe.stop();
+        }
         if (updates != null) {
             updates.stop();
         }
