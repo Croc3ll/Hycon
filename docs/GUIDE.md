@@ -355,6 +355,18 @@ and restart. Open `https://admin.example.com/`.
 passwords and session cookies would travel unencrypted. Hycon warns in the log if it listens
 beyond the local machine.
 
+### Game edition and staff watch (on profiles)
+Each profile shows the player's **game edition** (Standard, Supporter, ...) and the raw entitlements
+Hytale lists for their account. Hycon reads them from the player's login token when they join, so a
+player shows "Unknown" until their next join.
+
+If a joining player has an entitlement not listed in `staff-watch.json` under `Editions`, or is listed
+under `WatchPlayers` (`"uuid": "note"`), staff with `hycon.reports.notify` get a chat line, and it goes
+in the audit log and the server log. The hope is that a Hytale staff account carries an entitlement
+normal players don't. When an alert turns out to be a new edition, add it to `Editions` (lowest edition
+first) and restart. The token is read before Hytale checks it, so this only informs staff: never give
+anything based on it.
+
 ## 7. Files Hycon keeps
 
 All in Hycon's data folder:
@@ -375,6 +387,8 @@ All in Hycon's data folder:
 | `activity/`       | Per player: blocks broken, placed and used, things crafted, zones found.                     |
 | `positions/`      | Per player: where they were each minute, kept 14 days.                                        |
 | `heat.json`       | Server-wide minutes per 16-block square, for the Analytics heatmap.                           |
+| `staff-watch.json` | Known editions and watched players for the staff watch (yours to edit).                        |
+| `editions.json`   | Each player's entitlements from their last join.                                               |
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `geo.json`        | Each player's looked-up place (city, country, coordinates) for the globe.                       |
 | `geoip/`          | The downloaded DB-IP location database.                                                         |
