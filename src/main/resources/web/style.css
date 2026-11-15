@@ -59,6 +59,26 @@ input, select { width: 100%; padding: 9px 12px; border: 1px solid var(--line); b
 input:hover, select:hover { border-color: #323743; }
 input:focus, select:focus { outline: none; border-color: var(--gold-dim); box-shadow: 0 0 0 3px var(--gold-bg); }
 .row input, .row select { width: auto; flex: 1; min-width: 140px; }
+
+/* Dropdowns: our own chevron and a dark option list in the panel's colours, not the system's white and blue.
+   Browsers that support it (Chrome/Edge 135+) get a fully styled list; others keep their native list in dark. */
+select { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 36px;
+  background: #0d0f13 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23e2b54b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center / 12px 8px; }
+option { background: var(--panel); color: var(--text); }
+option:checked { background: var(--gold-bg); color: var(--gold2); }
+@supports (appearance: base-select) {
+  select, ::picker(select) { appearance: base-select; }
+  select::picker-icon { display: none; }
+  ::picker(select) { margin-top: 6px; padding: 5px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel);
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .75); opacity: 0; transform: translateY(-4px);
+    transition: opacity .14s var(--ease), transform .14s var(--ease), overlay .14s allow-discrete, display .14s allow-discrete; }
+  ::picker(select):popover-open { opacity: 1; transform: none; }
+  @starting-style { ::picker(select):popover-open { opacity: 0; transform: translateY(-4px); } }
+  option { padding: 8px 12px; border-radius: 6px; background: transparent; cursor: pointer; transition: background .12s; }
+  option:hover, option:focus-visible { background: rgba(255, 255, 255, .06); outline: none; }
+  option:checked { background: var(--gold-bg); color: var(--gold2); font-weight: 600; }
+  option::checkmark { color: var(--gold); }
+}
 button { cursor: pointer; padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--panel2);
   font-size: 13px; font-weight: 600; letter-spacing: 0; transition: background .15s, border-color .15s, color .15s, transform .1s, box-shadow .15s; }
 button:hover { border-color: #3a404c; background: #20242c; }
