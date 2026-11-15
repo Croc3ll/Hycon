@@ -259,6 +259,11 @@ public final class GameRoutes {
         if (info != null) {
             j.field("first", info.firstSeen()).field("last", info.lastSeen()).field("world", info.world());
         }
+        com.hycon.game.StaffWatch watch = com.hycon.game.StaffWatch.get();
+        String edition = watch == null ? null : watch.edition(t.uuid());
+        if (edition != null) {
+            j.field("edition", edition);
+        }
         j.field("warnings", records.count(t.uuid(), PlayerRecords.Type.WARN))
                 .field("kicks", records.count(t.uuid(), PlayerRecords.Type.KICK))
                 .field("bans", records.count(t.uuid(), PlayerRecords.Type.BAN));

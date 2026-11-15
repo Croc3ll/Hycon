@@ -515,3 +515,16 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
 .chatscroll { max-height: 520px; overflow-y: auto; }
 .chattext { word-break: break-word; }
 .nowrap { white-space: nowrap; }
+
+/* Game edition badge on profiles, in Hytale's own edition colours. */
+.edition { position: relative; overflow: hidden; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); background: rgba(255, 255, 255, .03); }
+.edition.standard { color: #b8f07a; border-color: rgba(152, 214, 90, .55); background: linear-gradient(135deg, rgba(60, 120, 50, .35), rgba(20, 70, 60, .35)); }
+.edition.supporter { color: #ffb36b; border-color: rgba(255, 140, 50, .6); background: linear-gradient(135deg, rgba(140, 60, 20, .45), rgba(70, 30, 15, .45));
+  box-shadow: 0 0 10px rgba(255, 130, 40, .25); }
+.edition.cursebreaker { color: #e2b8ff; border-color: rgba(190, 120, 255, .7); background: linear-gradient(135deg, rgba(110, 50, 200, .5), rgba(40, 90, 200, .4));
+  box-shadow: 0 0 14px rgba(170, 100, 255, .45); }
+.edition.supporter::after, .edition.cursebreaker::after { content: ''; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .35) 50%, transparent 70%); animation: edition-shine 4s ease-in-out infinite; }
+@keyframes edition-shine { 0%, 60% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { .edition::after { animation: none; display: none; } }

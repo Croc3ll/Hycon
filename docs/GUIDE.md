@@ -356,9 +356,9 @@ passwords and session cookies would travel unencrypted. Hycon warns in the log i
 beyond the local machine.
 
 ### Game edition and staff watch (on profiles)
-Each profile shows the player's **game edition** (Standard, Supporter or Cursebreaker) and the raw entitlements
-Hytale lists for their account. Hycon reads them from the player's login token when they join, so a
-player shows "Unknown" until their next join.
+Each profile shows the player's **game edition** as a badge next to their name: green for Standard,
+orange for Supporter, purple for Cursebreaker. Hycon reads it from the player's login token when they
+join, so there's no badge until their first join after this update.
 
 If a joining player has an entitlement not listed in `staff-watch.json` under `Editions`, or is listed
 under `WatchPlayers` (`"uuid": "note"`), staff with `hycon.reports.notify` get a chat line, and it goes

@@ -1,7 +1,5 @@
 package com.hycon.game;
 
-import com.hycon.api.HyconProfileSection;
-import com.hycon.api.PanelData;
 import com.hycon.audit.AuditLog;
 import com.hycon.commands.ReportCommand;
 import com.hycon.web.Json;
@@ -33,7 +31,7 @@ import java.util.logging.Level;
  * anything else Hytale puts there. Hytale reads that list at login and then drops it, so the first
  * {@link Connect} packet is the only place a plugin can see it.
  *
- * <p>Each player's edition shows on their profile. An entitlement that isn't in
+ * <p>Each player's edition shows in their profile's top card. An entitlement that isn't in
  * {@code staff-watch.json}'s {@code Editions}, or a player listed under {@code WatchPlayers}, alerts
  * staff: a chat line, the audit log and a log warning. We hope a Hytale staff account carries an
  * entitlement normal players don't.
@@ -41,10 +39,12 @@ import java.util.logging.Level;
  * <p>The token is only decoded, not verified. Hytale verifies it a moment later and kicks a forged
  * one, but a forged token is still read first. So this only informs staff and never grants anything.
  */
-public final class StaffWatch implements HyconProfileSection {
+public final class StaffWatch {
 
     /** Known entitlements and the edition name each one stands for, lowest edition first. */
     private static final Map<String, String> DEFAULT_EDITIONS = defaultEditions();
+
+    private static volatile StaffWatch instance;
 
     private final HytaleLogger log;
     private final AuditLog audit;
@@ -62,7 +62,13 @@ public final class StaffWatch implements HyconProfileSection {
         this.seenFile = dataDir.resolve("editions.json");
     }
 
+    /** The running watch, or null before Hycon starts it. */
+    public static StaffWatch get() {
+        return instance;
+    }
+
     public void start() {
+        instance = this;
         loadConfig();
         loadSeen();
         filter = PacketAdapters.registerInbound((PacketWatcher) (handler, packet) -> {
@@ -115,24 +121,17 @@ public final class StaffWatch implements HyconProfileSection {
         }
     }
 
-    @Override
-    public String id() {
-        return "edition";
-    }
-
-    @Override
-    public String title() {
-        return "Game edition";
-    }
-
-    @Override
-    public void render(UUID player, String name, PanelData out) {
+    /**
+     * The player's edition for their profile, or null if they haven't joined since Hycon started
+     * reading it. Entitlements Hycon doesn't know are added in brackets.
+     */
+    public String edition(UUID player) {
         List<String> owned = seen.get(player);
         if (owned == null) {
-            out.stat("Edition", "Unknown", "seen at their next join");
-            return;
+            return null;
         }
-        out.stat("Edition", edition(owned)).stat("Entitlements", owned.isEmpty() ? "-" : String.join(", ", owned));
+        List<String> unknown = owned.stream().filter(e -> !editions.containsKey(e)).toList();
+        return unknown.isEmpty() ? edition(owned) : edition(owned) + " (" + String.join(", ", unknown) + ")";
     }
 
     /** The highest edition the player owns, by the order in {@code Editions}. */

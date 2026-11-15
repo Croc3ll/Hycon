@@ -492,6 +492,7 @@ function profile(view, uuid) {
         el('div', { class: 'herotop' }, el('div', { class: 'heroav' + (p.online ? ' on' : '') }, avatar(p.name, p.uuid, 72)),
           el('div', { class: 'heroname' }, el('h2', { class: 'big' }, p.name),
             el('div', { class: 'row' }, el('span', { class: 'pill ' + (p.online ? 'good' : 'dim') }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline'),
+              p.edition ? editionBadge(p.edition) : null,
               p.ban ? el('span', { class: 'badge red' }, 'Banned') : null),
             el('div', { class: 'mono muted small' }, p.uuid))),
         el('div', { class: 'herostats' },
@@ -1454,6 +1455,13 @@ function pieCard(p) {
       const dot = el('i'); dot.style.background = PIE_COLORS[i % PIE_COLORS.length];
       return el('div', {}, dot, el('span', { class: 'pl' }, label), el('span', { class: 'pv' }, short(v) + ' · ' + Math.round(v / total * 100) + '%'));
     }))));
+}
+
+// The player's game edition as a badge in Hytale's edition colours; unknown editions stay plain.
+function editionBadge(edition) {
+  const tier = edition.split(' ')[0].toLowerCase();
+  const known = ['standard', 'supporter', 'cursebreaker'].includes(tier);
+  return el('span', { class: 'edition' + (known ? ' ' + tier : ''), title: 'Hytale edition they own' }, edition);
 }
 
 // Plugin sections on a profile (Hycon's own Activity, then any other plugin's), with a range picker.

@@ -237,7 +237,6 @@ public final class HyconPlugin extends JavaPlugin {
                 "WARN".equalsIgnoreCase(type) ? PlayerRecords.Type.WARN : PlayerRecords.Type.NOTE, by, reason, detail));
         HyconApi.register(new AnalyticsPanel(samples, known, positions));
         HyconApi.registerProfileSection(new WorldSection(positions, activity));
-        HyconApi.registerProfileSection(staffWatch);
         HyconApi.registerProfileSection(new ActivitySection(known, pingLog, killLog, records, reports));
         HyconApi.registerProfileSection(new com.hycon.analytics.RiskSection(known, records, reports, ties, moderation));
         banSync.start();
