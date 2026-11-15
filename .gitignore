@@ -23,3 +23,6 @@ src/main/resources/ties.json
 src/main/resources/activity/
 src/main/resources/positions/
 src/main/resources/heat.json
+
+# Python bytecode caches
+__pycache__/
