@@ -70,6 +70,8 @@ Everyone online, with their world and UUID. Refreshes every 5 seconds.
 ### Player profile
 Click any player's name to open their profile (their record). Each player gets an emblem in
 the colour of their UUID (Hytale offers no picture of a player's character to show instead).
+Everything under the top card is in tabs (Activity, other plugins' sections, Ping, Chat, Location,
+Connections, History), one at a time; the tab you pick stays open when you move to another player.
 
 - UUID, first and last seen, last world, and whether they're online,
 - a count of warnings, kicks and bans, and their current ban if any,
