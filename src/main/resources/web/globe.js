@@ -176,9 +176,9 @@ function globe(opts) {
 
   function frame() {
     // Not on the page yet (built before its card was added, e.g. when coming back to Analytics):
-    // keep waiting a while. Once shown and then removed, the tab changed: stop.
+    // keep waiting a while. Once shown and then removed, the tab changed: stop until resume().
     if (!wrap.isConnected) {
-      if (shown || ++waits > 600) { cancelAnimationFrame(raf); return; }
+      if (shown || ++waits > 600) { cancelAnimationFrame(raf); raf = 0; return; }
       raf = requestAnimationFrame(frame); return;
     }
     if (!shown) { shown = true; size(); }
@@ -232,6 +232,13 @@ function globe(opts) {
   }, { passive: false });
   new ResizeObserver(size).observe(wrap);
   requestAnimationFrame(() => { size(); frame(); });
+  // Tabs call this when the globe's tab is shown again, to restart the stopped animation.
+  wrap.dataset.resume = '';
+  wrap.resume = () => {
+    if (raf) return;
+    shown = false; waits = 0;
+    raf = requestAnimationFrame(frame);
+  };
   return wrap;
 }
 

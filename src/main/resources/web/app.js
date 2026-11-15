@@ -1053,6 +1053,11 @@ function analyticsLayout(list, modes, panel, globeNode) {
   return [kpis, tabbed(tabs, 'analyticsTab')];
 }
 
+// Restarts animations (the globe) that stopped while their tab was hidden.
+function resumeIn(node) {
+  node.querySelectorAll('[data-resume]').forEach((e) => e.resume());
+}
+
 // A row of tabs over [title, nodes] pairs, showing one at a time. The pick is kept in S[key].
 function tabbed(tabs, key) {
   if (!tabs.length) return null;
@@ -1061,6 +1066,7 @@ function tabbed(tabs, key) {
   const show = () => {
     bar.replaceChildren(...tabs.map(([t]) => el('button', { class: t === S[key] ? 'on' : '', on: { click: () => { S[key] = t; show(); } } }, t)));
     body.replaceChildren(...tabs.find(([t]) => t === S[key])[1]);
+    resumeIn(body);
   };
   show();
   return el('div', { class: 'tabbed' }, bar, body);
@@ -1504,6 +1510,7 @@ function profileSections(uuid, extras) {
     const extra = extras.find(([t]) => t === S.profileTab);
     if (!built.has(extra[0])) built.set(extra[0], extra[1]());
     out.replaceChildren(built.get(extra[0]));
+    resumeIn(out);
   }
   async function load() {
     try {
