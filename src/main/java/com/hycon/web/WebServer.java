@@ -137,9 +137,24 @@ public final class WebServer {
         }
     }
 
+    /** Headers a tunnel or reverse proxy adds. A request carrying one came from somewhere else. */
+    private static final List<String> PROXY_HEADERS = List.of("CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP", "Forwarded");
+
+    /**
+     * A loopback connection with no proxy header. The socket address is checked, never the header a
+     * client could fake with TrustProxy on. A tunnel on this machine also connects from loopback, so
+     * its header marks the request as remote.
+     */
+    private static boolean local(HttpExchange ex) {
+        if (!ex.getRemoteAddress().getAddress().isLoopbackAddress()) {
+            return false;
+        }
+        return PROXY_HEADERS.stream().noneMatch(ex.getRequestHeaders()::containsKey);
+    }
+
     private void handle(HttpExchange ex) {
         try (ex) {
-            Req r = new Req(ex, clientIp(ex));
+            Req r = new Req(ex, clientIp(ex), local(ex));
             try {
                 serve(r);
             } catch (RuntimeException e) {

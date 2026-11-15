@@ -73,7 +73,7 @@ public final class AuthRoutes {
             r.error(401, "Wrong name or password");
             return;
         }
-        if (a.defaultPassword() && !loopback(r.ip)) {
+        if (a.defaultPassword() && !r.local) {
             // The default password is published, so it only works from the server machine itself.
             audit.record(a.name(), r.ip, "login", null, "default password used from another machine", false);
             r.error(403, "Log in from the server machine itself until the default password is changed");
@@ -190,10 +190,6 @@ public final class AuthRoutes {
         } catch (IllegalArgumentException e) {
             r.error(400, e.getMessage());
         }
-    }
-
-    private static boolean loopback(String ip) {
-        return ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || ip.equals("::1");
     }
 
     /** Null when acceptable, else what's wrong. Length matters far more than character rules. */

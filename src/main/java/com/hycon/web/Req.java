@@ -19,6 +19,8 @@ public final class Req {
 
     final HttpExchange ex;
     public final String ip;
+    /** True only for a browser on the server machine itself: a loopback connection that no proxy forwarded. */
+    public final boolean local;
     /** Never null by the time a handler runs. */
     public Sessions.Session session;
     /** Logged-in account, or null. */
@@ -29,9 +31,10 @@ public final class Req {
     /** Set by the login route: the new session whose cookie must be sent. */
     Sessions.Session newSession;
 
-    Req(HttpExchange ex, String ip) {
+    Req(HttpExchange ex, String ip, boolean local) {
         this.ex = ex;
         this.ip = ip;
+        this.local = local;
     }
 
     public String str(String key) {
