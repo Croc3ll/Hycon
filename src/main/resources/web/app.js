@@ -507,12 +507,12 @@ function profile(view, uuid) {
           p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
           p.ban ? el('button', { on: { click: unban } }, 'Unban')
             : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null), riskCard),
-      profileSections(p.uuid),
-      pingCard(p.uuid),
-      can('MODERATOR') ? chatCard(p.uuid) : null,
-      can('MODERATOR') ? locationCard(p.uuid) : null,
-      can('MODERATOR') ? connectionMap(p.uuid) : null,
-      el('div', { class: 'card' }, el('h2', {}, 'History'),
+      profileSections(p.uuid, [
+        ['Ping', () => pingCard(p.uuid)],
+        can('MODERATOR') ? ['Chat', () => chatCard(p.uuid)] : null,
+        can('MODERATOR') ? ['Location', () => locationCard(p.uuid)] : null,
+        can('MODERATOR') ? ['Connections', () => connectionMap(p.uuid)] : null,
+        ['History', () => el('div', { class: 'card' }, el('h2', {}, 'History'),
         can('MODERATOR') ? el('form', { class: 'row', on: { submit: async (e) => {
           e.preventDefault();
           try { await api('POST', '/api/note', { player: p.uuid, text: note.value }); toast('Note saved'); render(); } catch (err) { toast(err.message, true); }
@@ -521,7 +521,8 @@ function profile(view, uuid) {
           el('tbody', {}, p.history.length ? p.history.map((h) => el('tr', {}, el('td', {}, fmtTime(h.time)),
             el('td', { class: h.type === 'BAN' || h.type === 'WARN' ? 'bad' : '' }, TYPE[h.type] + (h.detail ? ' (' + h.detail + ')' : '')),
             el('td', {}, h.by), el('td', {}, h.reason)))
-            : el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Clean record.'))))));
+            : el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Clean record.')))))],
+      ].filter(Boolean)));
   })().catch((e) => out.replaceChildren(el('p', { class: 'bad' }, e.message)));
 }
 
@@ -1464,29 +1465,48 @@ function editionBadge(edition) {
   return el('span', { class: 'edition' + (known ? ' ' + tier : ''), title: 'Hytale edition they own' }, edition);
 }
 
-// Plugin sections on a profile (Hycon's own Activity, then any other plugin's), with a range picker.
-function profileSections(uuid) {
-  const out = el('div');
-  let range = S.range || '30d';
+// Everything below the profile's top card, one tab at a time: each plugin section (Hycon's own
+// Activity, then any other plugin's), then Hycon's fixed cards. A tab builds only when first opened,
+// and the chosen tab is kept when switching players.
+function profileSections(uuid, extras) {
+  const tabs = el('div', { class: 'seg tabs' }), bar = el('div', { class: 'row' }), out = el('div');
+  const built = new Map();
+  let sections = [], range = S.range || '30d';
   const seg = el('div', { class: 'seg' });
   const drawSeg = () => seg.replaceChildren(...RANGES.map(([r, t]) => el('button', { class: r === range ? 'on' : '',
     on: { click: () => { range = S.range = r; drawSeg(); load(); } } }, t)));
   drawSeg();
+  const titles = () => [...sections.map((s) => s.title), ...extras.map(([t]) => t)];
+  function show() {
+    const all = titles();
+    if (!all.includes(S.profileTab)) S.profileTab = all[0];
+    tabs.replaceChildren(...all.map((t) => el('button', { class: t === S.profileTab ? 'on' : '',
+      on: { click: () => { S.profileTab = t; show(); } } }, t)));
+    const sec = sections.find((s) => s.title === S.profileTab);
+    bar.replaceChildren(...(sec ? [el('button', { on: { click: load } }, '↻ Refresh'), seg] : []));
+    if (sec) {
+      out.replaceChildren(el('div', { class: 'section' },
+        sec.error ? el('p', { class: 'bad' }, sec.error) : blocks(sec.blocks, {})));
+      return;
+    }
+    const extra = extras.find(([t]) => t === S.profileTab);
+    if (!built.has(extra[0])) built.set(extra[0], extra[1]());
+    out.replaceChildren(built.get(extra[0]));
+  }
   async function load() {
     try {
-      const d = await api('GET', '/api/profile-sections?player=' + encodeURIComponent(uuid) + '&range=' + range);
-      out.replaceChildren(...d.sections.map((sec) => el('div', { class: 'section' },
-        el('h2', {}, sec.title), sec.error ? el('p', { class: 'bad' }, sec.error) : blocks(sec.blocks, {}))));
-    } catch (e) { out.replaceChildren(el('p', { class: 'bad' }, e.message)); }
+      sections = (await api('GET', '/api/profile-sections?player=' + encodeURIComponent(uuid) + '&range=' + range)).sections;
+    } catch (e) { sections = [{ title: 'Player stats', error: e.message }]; }
+    show();
   }
+  show();
   load();
-  // Refreshes by itself every 30 s while the profile is open (stops once it's gone from the page).
+  // Plugin sections refresh by themselves every 30 s while the profile is open (stops once it's gone).
   const auto = setInterval(() => {
     if (!out.isConnected) { clearInterval(auto); return; }
-    if (!document.hidden) load();
+    if (!document.hidden && sections.some((s) => s.title === S.profileTab)) load();
   }, 30000);
-  return el('div', {}, el('div', { class: 'spread' }, el('span', { class: 'muted' }, 'Player stats'),
-    el('div', { class: 'row' }, el('button', { on: { click: load } }, '↻ Refresh'), seg)), out);
+  return el('div', { class: 'profiletabs' }, el('div', { class: 'spread' }, tabs, bar), out);
 }
 
 function columnsCard(c) {
