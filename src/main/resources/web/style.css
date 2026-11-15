@@ -532,3 +532,5 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
 /* Profile tabs: one section at a time under the top card. */
 .profiletabs { margin-top: 18px; }
 .seg.tabs { flex-wrap: wrap; }
+.tabbed { margin-top: 18px; }
+.tabbed > .seg.tabs { margin-bottom: 12px; }

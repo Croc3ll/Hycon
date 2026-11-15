@@ -1030,12 +1030,10 @@ function analyticsLayout(list, modes, panel, globeNode) {
       return el('div', { class: 'kpi' + (l === 'Online now' ? ' live' : '') }, el('div', { class: 'h' }, b.label), el('div', { class: 'v' }, b.value),
         b.hint ? el('div', { class: 's' }, b.hint) : null);
     })))));
-  let n = 0;
+  // Each section is a tab under the headline numbers; the chosen one survives the 15 s refresh.
   const section = (title, ...kids) => {
     kids = kids.flat().filter(Boolean);
-    if (!kids.length) return null;
-    n++;
-    return el('section', { class: 'asec' }, el('div', { class: 'eyebrow' }, el('b', {}, String(n).padStart(2, '0')), ' — ' + title), ...kids);
+    return kids.length ? [title, kids] : null;
   };
   const pair = (cls, ...nodes) => { nodes = nodes.flat().filter(Boolean); return nodes.length ? el('div', { class: cls }, ...nodes) : null; };
   const playersSeries = take((b) => b.type === 'series' && /players/i.test(b.title));
@@ -1046,12 +1044,26 @@ function analyticsLayout(list, modes, panel, globeNode) {
   const regulars = take((b) => b.type === 'table' && /stick around/i.test(b.title));
   const heat = list.filter((b) => b.type === 'heatmap' && !used.has(b));
   heat.forEach((b) => used.add(b));
-  return [kpis,
+  const tabs = [
     section('Activity', one(playersSeries), pair('acols', one(hours), one(memorySeries))),
     globeNode ? section('Where players are', globeNode) : null,
     section('Players', pair('acols wide-right', one(topBars), one(active)), one(regulars)),
     section('World', blocks(heat, modes, panel)),
     section('More', blocks(list.filter((b) => !used.has(b) && b.type !== 'stat'), modes, panel))].filter(Boolean);
+  return [kpis, tabbed(tabs, 'analyticsTab')];
+}
+
+// A row of tabs over [title, nodes] pairs, showing one at a time. The pick is kept in S[key].
+function tabbed(tabs, key) {
+  if (!tabs.length) return null;
+  if (!tabs.some(([t]) => t === S[key])) S[key] = tabs[0][0];
+  const bar = el('div', { class: 'seg tabs' }), body = el('section', { class: 'asec' });
+  const show = () => {
+    bar.replaceChildren(...tabs.map(([t]) => el('button', { class: t === S[key] ? 'on' : '', on: { click: () => { S[key] = t; show(); } } }, t)));
+    body.replaceChildren(...tabs.find(([t]) => t === S[key])[1]);
+  };
+  show();
+  return el('div', { class: 'tabbed' }, bar, body);
 }
 
 function blocks(list, modes, panel) {

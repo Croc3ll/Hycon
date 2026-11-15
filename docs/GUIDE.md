@@ -175,7 +175,8 @@ the log. If a command takes longer than 5 seconds, the panel stops waiting but t
 
 ### Analytics, and dashboards from other plugins
 **Analytics** shows players online now, unique players, peak and average players, uptime and
-memory, for the last 24 hours, 7 days or 30 days (buttons at the top right). Below that:
+memory, for the last 24 hours, 7 days or 30 days (buttons at the top right). Below that, in tabs
+(Activity, Where players are, Players, World, More):
 
 - **Players online** over time (the most online in each step); red bands are times the server was off. Hover for exact values,
   or switch to **Table** for the raw numbers.
