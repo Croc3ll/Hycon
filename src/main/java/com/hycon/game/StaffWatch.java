@@ -220,6 +220,7 @@ public final class StaffWatch {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("game.base", "Standard");
         m.put("game.deluxe", "Supporter");
+        m.put("game.founder", "Cursebreaker");
         return m;
     }
 }
