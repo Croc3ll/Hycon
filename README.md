@@ -38,7 +38,9 @@ These are made with demo data by `py tools/promo/make_promo.py` (no real players
 - **Risk score**: every profile gets a 0-100 score (Low / Medium / High / Very high) built from warnings,
   kicks, bans, open and closed reports, other accounts sharing their connection (and whether those are
   banned), and new accounts, plus reasons plugins add. Each point is listed with its reason, so it's a
-  pointer for staff, not a black box.
+  pointer for staff, not a black box. Warnings, kicks, bans and closed reports fade (full points for 30 days,
+  half until 90, then none), and moderators can **Clear risk** on a profile for false flags: everything
+  before that stops counting, but stays in the history.
 - **Reports and alts**: player reports to work through, and accounts linked by connection or by often
   joining together.
 - **Bug reports**: players send them in game with `/bug`; staff read and close them in the panel.
@@ -139,7 +141,8 @@ Beyond tabs, the API (`HyconApi.API_VERSION`, currently 6) lets a plugin:
 - put **forms and row buttons** on its tab and handle them in `action(...)`, with the viewer's
   account level (version 4);
 - write **warnings and notes to a player's record** (`HyconApi.record`, version 5);
-- add **reasons to the risk score** (`registerRiskSource`, version 6).
+- add **reasons to the risk score** (`registerRiskSource`, version 6), leaving out anything from before
+  `HyconApi.riskClearedAt(player)` (version 15).
 
 Read `API_VERSION` at run time (reflectively, since the constant is compiled in) before using newer calls.
 

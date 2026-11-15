@@ -27,7 +27,7 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 14; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts; 14: block sources
+    public static final int API_VERSION = 15; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts; 14: block sources; 15: risk cleared time
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();
@@ -87,6 +87,27 @@ public final class HyconApi {
 
     public static HyconBlocks blockSource(String id) {
         return id == null ? null : BLOCKS.get(id);
+    }
+
+    /** When staff last cleared a player's risk score, in epoch milliseconds (0 = never). */
+    public interface ClearedAt {
+        long clearedAt(UUID player);
+    }
+
+    private static volatile ClearedAt clearedAt;
+
+    /** Set by Hycon itself. */
+    public static void setClearedAt(ClearedAt c) {
+        clearedAt = c;
+    }
+
+    /**
+     * When staff last cleared this player's risk score with "Clear risk" (epoch milliseconds, 0 if never or Hycon
+     * isn't running). A risk source should leave out anything from before this moment. Since API version 15.
+     */
+    public static long riskClearedAt(UUID player) {
+        ClearedAt c = clearedAt;
+        return c == null || player == null ? 0 : c.clearedAt(player);
     }
 
     /** Set by Hycon itself. */
@@ -172,6 +193,7 @@ public final class HyconApi {
         SECTIONS.clear();
         recorder = null;
         links = null;
+        clearedAt = null;
         BLOCKS.clear();
         RISK.clear();
     }

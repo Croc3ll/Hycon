@@ -228,6 +228,7 @@ public final class HyconPlugin extends JavaPlugin {
             return;
         }
         // Ties keeps plain maps behind its own lock; copy the answer out under it.
+        HyconApi.setClearedAt(records::clearedAt);
         HyconApi.setLinks(player -> {
             synchronized (ties) {
                 return Set.copyOf(ties.sameConnection(player));

@@ -67,6 +67,7 @@ public final class GameRoutes {
         web.post("/api/unban", Level.MODERATOR, this::unban);
         web.post("/api/warn", Level.MODERATOR, this::warn);
         web.post("/api/note", Level.MODERATOR, this::note);
+        web.post("/api/clear-risk", Level.MODERATOR, this::clearRisk);
         web.get("/api/profile", Level.VIEWER, this::profile);
         web.get("/api/ping", Level.VIEWER, this::ping);
         web.get("/api/log", Level.MODERATOR, this::log);
@@ -245,6 +246,27 @@ public final class GameRoutes {
         records.record(t.uuid(), PlayerRecords.Type.NOTE, r.who(), text, null);
         audit.record(r.who(), r.ip, "note", label(t), text, true);
         r.ok(new Json().beginObject().field("ok", true).field("message", "Note saved").endObject());
+    }
+
+    /**
+     * "Clear risk": records older than now stop counting toward the player's risk score (for false
+     * flags, or a player who has turned things around). The records stay in the history.
+     */
+    private void clearRisk(Req r) throws IOException {
+        String reason = r.str("reason");
+        reason = reason == null ? "" : reason.strip().replaceAll("[\r\n\t]+", " ");
+        if (reason.isEmpty() || reason.length() > 200) {
+            r.error(400, "Give a reason (1-200 characters)");
+            return;
+        }
+        Moderation.Target t = moderation.resolve(r.str("player"));
+        if (t == null) {
+            r.error(404, "Unknown player");
+            return;
+        }
+        records.record(t.uuid(), PlayerRecords.Type.CLEAR, r.who(), reason, null);
+        audit.record(r.who(), r.ip, "clear-risk", label(t), reason, true);
+        r.ok(new Json().beginObject().field("ok", true).field("message", "Risk cleared for " + t.name()).endObject());
     }
 
     /** Everything known about one player: identity, status, current ban and full history. */

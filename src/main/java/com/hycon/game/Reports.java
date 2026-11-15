@@ -140,6 +140,11 @@ public final class Reports {
         return n;
     }
 
+    /** Every report against this player, open or closed, oldest first. */
+    public synchronized List<Report> listAgainst(UUID target) {
+        return reports.stream().filter(r -> r.target().equals(target)).toList();
+    }
+
     /** All reports against this player, open or closed. */
     public synchronized int against(UUID target) {
         int n = 0;

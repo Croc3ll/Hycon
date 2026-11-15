@@ -23,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class PlayerRecords {
 
-    public enum Type { WARN, KICK, BAN, UNBAN, NOTE }
+    /** {@code CLEAR}: staff cleared the risk score; older records stop counting toward it. */
+    public enum Type { WARN, KICK, BAN, UNBAN, NOTE, CLEAR }
 
     /** {@code detail}: ban length ("7d", "permanent") or empty. */
     public record Entry(long time, UUID player, Type type, String by, String reason, String detail) {
@@ -94,6 +95,22 @@ public final class PlayerRecords {
         }
         java.util.Collections.reverse(copy);
         return copy;
+    }
+
+    /** When the player's risk was last cleared (epoch milliseconds), or 0 if never. */
+    public long clearedAt(UUID player) {
+        List<Entry> list = byPlayer.get(player);
+        if (list == null) {
+            return 0;
+        }
+        synchronized (list) {
+            for (int i = list.size() - 1; i >= 0; i--) {
+                if (list.get(i).type() == Type.CLEAR) {
+                    return list.get(i).time();
+                }
+            }
+        }
+        return 0;
     }
 
     public int count(UUID player, Type type) {

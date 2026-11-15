@@ -534,3 +534,4 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
 .seg.tabs { flex-wrap: wrap; }
 .tabbed { margin-top: 18px; }
 .tabbed > .seg.tabs { margin-bottom: 12px; }
+.riskfoot { margin: 8px 0 0; }

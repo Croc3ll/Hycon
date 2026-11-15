@@ -110,6 +110,7 @@ public final class ActivitySection implements HyconProfileSection {
                 case BAN -> "Bans";
                 case UNBAN -> "Unbans";
                 case NOTE -> "Staff notes";
+                case CLEAR -> "Risk cleared";
             }, records.count(player, t));
         }
         out.pie("PvP (last 14 days)").unit("").slice("Kills", k).slice("Deaths", d);

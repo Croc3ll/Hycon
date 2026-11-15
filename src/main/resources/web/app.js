@@ -461,7 +461,7 @@ function profile(view, uuid) {
   const out = el('div');
   const back = tabs().find((t) => t[0] === S.back) || tabs()[0];
   view.append(el('p', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); go(back[0]); } } }, '\u2190 ' + back[1])), out);
-  const TYPE = { WARN: 'Warning', KICK: 'Kick', BAN: 'Ban', UNBAN: 'Unban', NOTE: 'Note' };
+  const TYPE = { WARN: 'Warning', KICK: 'Kick', BAN: 'Ban', UNBAN: 'Unban', NOTE: 'Note', CLEAR: 'Risk cleared' };
   (async () => {
     const p = await api('GET', '/api/profile?player=' + encodeURIComponent(uuid));
     const note = el('input', { maxlength: 500, placeholder: 'Staff note (never shown to the player)' });
@@ -477,6 +477,12 @@ function profile(view, uuid) {
     document.body.style.setProperty('--risk-a', (8 + sc * 0.37).toFixed(0) + '%');
     document.body.classList.add('riskpage');
     const fill = el('div'); fill.style.width = Math.max(2, sc) + '%';
+    // For false flags or a player in good standing: older records stop counting, the history keeps them.
+    async function clearRisk() {
+      const reason = prompt('Why clear ' + p.name + "'s risk? (shown in their history)", '');
+      if (!reason || !reason.trim()) return;
+      try { await api('POST', '/api/clear-risk', { player: p.uuid, reason: reason.trim() }); toast('Risk cleared'); render(); } catch (err) { toast(err.message, true); }
+    }
     const riskCard = el('div', { class: 'card riskcard' },
       el('div', { class: 'risklabel' }, 'Risk'),
       el('div', { class: 'riskscore' }, String(risk.score), el('span', {}, ' / 100')),
@@ -486,7 +492,8 @@ function profile(view, uuid) {
         ? risk.reasons.slice(0, 6).map((x) => el('li', {}, el('b', {}, '+' + x.points), ' ' + x.what,
           x.detail ? el('span', { class: 'muted' }, ' \u2013 ' + x.detail) : null))
         : el('li', { class: 'muted' }, 'Nothing stands out.')),
-      el('div', { class: 'muted small' }, 'A pointer for staff, not proof.'));
+      el('div', { class: 'spread riskfoot' }, el('span', { class: 'muted small' }, 'A pointer for staff, not proof.'),
+        can('MODERATOR') && risk.score > 0 ? el('button', { class: 'small', on: { click: clearRisk } }, 'Clear risk') : null));
     out.replaceChildren(
       el('div', { class: 'profiletop' }, el('div', { class: 'card profilehero' },
         el('div', { class: 'herotop' }, el('div', { class: 'heroav' + (p.online ? ' on' : '') }, avatar(p.name, p.uuid, 72)),
