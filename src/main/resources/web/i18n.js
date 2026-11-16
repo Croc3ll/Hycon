@@ -13,7 +13,8 @@ const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
 // Inside these the text is data or code, never panel wording.
 const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE']);
 
-const I18N = { lang: 'en', dict: {}, english: new WeakMap() };
+// english: a text node's English. shown: what we last wrote there, so our own text is never taken for new English.
+const I18N = { lang: 'en', dict: {}, english: new WeakMap(), shown: new WeakMap(), loading: 0 };
 
 function pickLang() {
   let saved = null;
@@ -38,10 +39,11 @@ function translateText(node) {
   if (node.parentNode && SKIP.has(node.parentNode.nodeName)) return;
   let english = I18N.english.get(node);
   // The app changed the text since we last translated it: what it holds now is the new English.
-  if (english === undefined || (node.data !== english && node.data !== tr(english))) english = node.data;
+  if (english === undefined || node.data !== I18N.shown.get(node)) english = node.data;
   if (!english.trim()) return;
-  I18N.english.set(node, english);
   const out = tr(english);
+  I18N.english.set(node, english);
+  I18N.shown.set(node, out);
   if (node.data !== out) node.data = out;
 }
 
@@ -51,9 +53,10 @@ function translateAttrs(elm) {
     const key = 'data-en-' + a;
     const now = elm.getAttribute(a);
     let english = elm.getAttribute(key);
-    if (english === null || (now !== english && now !== tr(english))) english = now;
-    elm.setAttribute(key, english);
+    if (english === null || now !== elm.getAttribute('data-shown-' + a)) english = now;
     const out = tr(english);
+    elm.setAttribute(key, english);
+    elm.setAttribute('data-shown-' + a, out);
     if (now !== out) elm.setAttribute(a, out);
   }
 }
@@ -80,10 +83,12 @@ const watcher = new MutationObserver((records) => {
 async function setLang(code) {
   if (!(code in LANGS)) code = 'en';
   try { localStorage.setItem(LANG_KEY, code); } catch (e) { /* storage blocked: the pick lasts this visit */ }
+  const ticket = ++I18N.loading;
   let dict = {};
   if (code !== 'en') {
     try { dict = await (await fetch('lang/' + code + '.json', { credentials: 'same-origin' })).json(); } catch (e) { dict = {}; }
   }
+  if (ticket !== I18N.loading) return; // a later pick arrived first; it wins
   I18N.lang = code;
   I18N.dict = dict;
   document.documentElement.lang = code;
