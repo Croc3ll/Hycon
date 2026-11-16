@@ -56,6 +56,16 @@ public final class WebServer {
             Map.entry("/graph.js", "web/graph.js"), Map.entry("/heatmap.js", "web/heatmap.js"),
             Map.entry("/world.js", "web/world.js"), Map.entry("/globe.js", "web/globe.js"),
             Map.entry("/replay.js", "web/replay.js"), Map.entry("/replay3d.js", "web/replay3d.js"),
+            Map.entry("/i18n.js", "web/i18n.js"),
+            Map.entry("/lang/es.json", "web/lang/es.json"),
+            Map.entry("/lang/de.json", "web/lang/de.json"),
+            Map.entry("/lang/fr.json", "web/lang/fr.json"),
+            Map.entry("/lang/pt.json", "web/lang/pt.json"),
+            Map.entry("/lang/pl.json", "web/lang/pl.json"),
+            Map.entry("/lang/ru.json", "web/lang/ru.json"),
+            Map.entry("/lang/it.json", "web/lang/it.json"),
+            Map.entry("/lang/nl.json", "web/lang/nl.json"),
+            Map.entry("/lang/tr.json", "web/lang/tr.json"),
             Map.entry("/vendor/three.min.js", "web/vendor/three.min.js"),
             Map.entry("/vendor/OrbitControls.js", "web/vendor/OrbitControls.js"));
 
@@ -177,7 +187,8 @@ public final class WebServer {
         if (res != null && method.equals("GET")) {
             String type = res.endsWith(".svg") ? "image/svg+xml"
                     : res.endsWith(".js") ? "text/javascript; charset=utf-8"
-                    : res.endsWith(".css") ? "text/css; charset=utf-8" : "text/html; charset=utf-8";
+                    : res.endsWith(".css") ? "text/css; charset=utf-8"
+                    : res.endsWith(".json") ? "application/json; charset=utf-8" : "text/html; charset=utf-8";
             r.send(200, type, files.get(res));
             return;
         }

@@ -50,6 +50,11 @@ and then open `http://127.0.0.1:8096/` on your own PC, or set up HTTPS access as
 
 The tabs you see depend on your account level (see [section 4](#4-staff-accounts)).
 
+**Language**: the dropdown at the top right switches the panel between English, Spanish, German, French,
+Portuguese, Polish, Russian, Italian, Dutch and Turkish (the same languages as hytaleserver.xyz). It starts in your
+browser's language and remembers your pick. Player names, chat and logs stay as they are. Translators: the files are
+`src/main/resources/web/lang/<code>.json`, keyed by the English text; `py tools/make_lang.py` fills new lines through DeepL.
+
 ### Players
 Everyone online, with their world and UUID. Refreshes every 5 seconds.
 

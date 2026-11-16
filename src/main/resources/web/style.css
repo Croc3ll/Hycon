@@ -34,6 +34,8 @@ nav button { background: none; border: 1px solid transparent; border-radius: 999
 nav button:hover { color: var(--text); background: rgba(255, 255, 255, .05); border-color: transparent; }
 nav button.active { color: var(--gold2); background: var(--gold-bg); border-color: rgba(226, 181, 75, .28); }
 #me { color: var(--muted); display: flex; gap: 8px; align-items: center; font-size: 12px; }
+#lang { background: transparent; color: var(--muted); border: 1px solid var(--line, #333); border-radius: 6px; padding: 4px 6px; font-size: 12px; }
+#lang option { background: #111; color: var(--text); }
 #me .who { color: var(--text); }
 #me .lvl { color: var(--gold); border: 1px solid var(--gold-dim); padding: 2px 8px; font-size: 10px; letter-spacing: 1px; border-radius: 999px; background: var(--gold-bg); }
 

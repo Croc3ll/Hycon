@@ -1,0 +1,107 @@
+// Panel translations, the way the hytaleserver.xyz site does them: each fixed piece of English text is looked up
+// in lang/<code>.json, keyed by its English wording. A missing entry stays English, so new text never breaks a page.
+// The panel builds its pages in many files, so instead of wrapping every string this watches the page and swaps
+// text as it appears. The English is kept per node, so switching language re-translates everything in place.
+'use strict';
+
+const LANGS = {
+  en: 'English', es: 'Español', de: 'Deutsch', fr: 'Français', pt: 'Português', pl: 'Polski',
+  ru: 'Русский', it: 'Italiano', nl: 'Nederlands', tr: 'Türkçe',
+};
+const LANG_KEY = 'hycon_lang';
+const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
+// Inside these the text is data or code, never panel wording.
+const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE']);
+
+const I18N = { lang: 'en', dict: {}, english: new WeakMap() };
+
+function pickLang() {
+  let saved = null;
+  try { saved = localStorage.getItem(LANG_KEY); } catch (e) { /* storage blocked: use the browser's language */ }
+  if (saved in LANGS) return saved;
+  for (const l of navigator.languages || [navigator.language || 'en']) {
+    const code = String(l).slice(0, 2).toLowerCase();
+    if (code in LANGS) return code;
+  }
+  return 'en';
+}
+
+// Keeps the spaces around a fragment ("Log in as ", name, " with...") and translates the words between.
+function tr(text) {
+  if (I18N.lang === 'en' || !text) return text;
+  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
+  const hit = I18N.dict[m[2]];
+  return hit ? m[1] + hit + m[3] : text;
+}
+
+function translateText(node) {
+  if (node.parentNode && SKIP.has(node.parentNode.nodeName)) return;
+  let english = I18N.english.get(node);
+  // The app changed the text since we last translated it: what it holds now is the new English.
+  if (english === undefined || (node.data !== english && node.data !== tr(english))) english = node.data;
+  if (!english.trim()) return;
+  I18N.english.set(node, english);
+  const out = tr(english);
+  if (node.data !== out) node.data = out;
+}
+
+function translateAttrs(elm) {
+  for (const a of ATTRS) {
+    if (!elm.hasAttribute(a)) continue;
+    const key = 'data-en-' + a;
+    const now = elm.getAttribute(a);
+    let english = elm.getAttribute(key);
+    if (english === null || (now !== english && now !== tr(english))) english = now;
+    elm.setAttribute(key, english);
+    const out = tr(english);
+    if (now !== out) elm.setAttribute(a, out);
+  }
+}
+
+function translateTree(root) {
+  if (root.nodeType === Node.TEXT_NODE) return translateText(root);
+  if (root.nodeType !== Node.ELEMENT_NODE || SKIP.has(root.nodeName)) return;
+  translateAttrs(root);
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    if (n.nodeType === Node.TEXT_NODE) translateText(n);
+    else if (!SKIP.has(n.nodeName)) translateAttrs(n);
+  }
+}
+
+const watcher = new MutationObserver((records) => {
+  for (const r of records) {
+    if (r.type === 'childList') r.addedNodes.forEach(translateTree);
+    else if (r.type === 'characterData') translateText(r.target);
+    else if (r.type === 'attributes') translateAttrs(r.target);
+  }
+});
+
+async function setLang(code) {
+  if (!(code in LANGS)) code = 'en';
+  try { localStorage.setItem(LANG_KEY, code); } catch (e) { /* storage blocked: the pick lasts this visit */ }
+  let dict = {};
+  if (code !== 'en') {
+    try { dict = await (await fetch('lang/' + code + '.json', { credentials: 'same-origin' })).json(); } catch (e) { dict = {}; }
+  }
+  I18N.lang = code;
+  I18N.dict = dict;
+  document.documentElement.lang = code;
+  translateTree(document.body);
+}
+
+function langPicker() {
+  const sel = document.createElement('select');
+  sel.id = 'lang';
+  sel.setAttribute('aria-label', 'Language');
+  for (const [code, name] of Object.entries(LANGS)) sel.append(new Option(name, code, false, code === I18N.lang));
+  sel.addEventListener('change', () => setLang(sel.value));
+  return sel;
+}
+
+addEventListener('DOMContentLoaded', () => {
+  I18N.lang = pickLang();
+  document.querySelector('header').append(langPicker());
+  watcher.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+  setLang(I18N.lang);
+});
