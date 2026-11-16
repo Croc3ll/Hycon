@@ -58,13 +58,15 @@ val deployToTestServer by tasks.registering {
     onlyIf { target.isPresent && file(target.get()).isDirectory }
     doLast {
         val src = jarFile.get().asFile
-        val dest = file(target.get()).resolve(src.name)
+        // Staged as <jar>.new: the test server's runServer swaps it in on start and removes the other
+        // Hycon versions. A plain copy next to the old jar made the server stop on a duplicate plugin.
+        val dest = file(target.get()).resolve(src.name + ".new")
         try {
             src.copyTo(dest, overwrite = true)
-            logger.lifecycle("Hycon copied to $dest")
+            logger.lifecycle("Hycon staged at $dest (swapped in on the next start)")
         } catch (e: Exception) {
-            // Windows locks the jar while that server runs; a failed copy must not fail the build.
-            logger.warn("Could not copy Hycon to $dest (is that server running? stop it and build again): ${e.message}")
+            // A failed copy must not fail the build.
+            logger.warn("Could not copy Hycon to $dest: ${e.message}")
         }
     }
 }
