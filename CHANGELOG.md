@@ -3,6 +3,13 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.27 (2026-11-15)
+- Profiles and Analytics: sections below the top card are tabs, one at a time.
+- Each profile shows the player's game edition as a badge, and staff get an alert for unusual editions.
+- Risk scores fade over time and staff can clear them.
+- Safer first login: the default password only works from a browser on the server machine.
+- Darker, cleaner dropdowns in the panel.
+
 ## 0.1.26 (2026-11-12)
 - Faster panel on slow connections: pages are compressed, so replays and the 3D view load much quicker.
 - Saves and samples run on Hycon's own thread, so they never hold up the server.
