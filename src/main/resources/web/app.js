@@ -189,20 +189,35 @@ function playIntro(view) {
   introTimer = setTimeout(() => view.classList.remove('intro'), INTRO_MS);
 }
 
-// The gold pill glides from the last tab to the new one.
+// The gold pill glides from the last tab to the new one. The tab is measured on the next frame, after
+// i18n.js has swapped in its translated (often wider) name.
 let tabMarkAt = null;
+const measure = (b) => ({ offsetLeft: b.offsetLeft, offsetTop: b.offsetTop, offsetWidth: b.offsetWidth, offsetHeight: b.offsetHeight });
+const placeMark = (mark, b) => { mark.style.left = b.offsetLeft + 'px'; mark.style.top = b.offsetTop + 'px';
+  mark.style.width = b.offsetWidth + 'px'; mark.style.height = b.offsetHeight + 'px'; };
 function slideTabMark() {
   const nav = $('tabs'), on = nav.querySelector('button.active');
   if (!on) { tabMarkAt = null; return; }
   const mark = el('span', { class: 'tabmark' });
   nav.prepend(mark);
-  const place = (b) => { mark.style.left = b.offsetLeft + 'px'; mark.style.top = b.offsetTop + 'px';
-    mark.style.width = b.offsetWidth + 'px'; mark.style.height = b.offsetHeight + 'px'; };
-  const to = { offsetLeft: on.offsetLeft, offsetTop: on.offsetTop, offsetWidth: on.offsetWidth, offsetHeight: on.offsetHeight };
-  place(tabMarkAt && !calm() ? tabMarkAt : to);
-  requestAnimationFrame(() => { mark.classList.add('glide'); place(to); });
-  tabMarkAt = to;
+  const from = tabMarkAt && !calm() ? tabMarkAt : null;
+  if (from) placeMark(mark, from);
+  requestAnimationFrame(() => {
+    const to = measure(on);
+    if (!from) placeMark(mark, to);
+    else requestAnimationFrame(() => { mark.classList.add('glide'); placeMark(mark, to); });
+    tabMarkAt = to;
+  });
 }
+
+// A new language changes every tab's width: put the pill back on the active tab.
+addEventListener('hycon-lang', () => requestAnimationFrame(() => {
+  const on = $('tabs').querySelector('button.active'), mark = $('tabs').querySelector('.tabmark');
+  if (!on || !mark) return;
+  mark.classList.remove('glide');
+  tabMarkAt = measure(on);
+  placeMark(mark, tabMarkAt);
+}));
 
 // Big numbers count up when they first show, and tick to the new value (with a gold flash) when it changes.
 const shownValues = new Map();

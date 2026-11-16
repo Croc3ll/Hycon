@@ -3,6 +3,9 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.32 (2026-11-16)
+- Fixed: in a translated panel the gold pill behind the open tab sat off to one side.
+
 ## 0.1.31 (2026-11-16)
 - Fixed: switching from one translation to another sometimes kept the old language until a refresh.
 

@@ -93,6 +93,7 @@ async function setLang(code) {
   I18N.dict = dict;
   document.documentElement.lang = code;
   translateTree(document.body);
+  dispatchEvent(new Event('hycon-lang')); // widths changed; the tab pill re-measures
 }
 
 function langPicker() {
