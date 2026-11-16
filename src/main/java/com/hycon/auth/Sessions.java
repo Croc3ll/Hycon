@@ -57,6 +57,11 @@ public final class Sessions {
     }
 
     /** The live session for this cookie value, or null (expired sessions are dropped here). */
+    /** Open panel sessions, for {@code /hycon debug}. */
+    public int count() {
+        return sessions.size();
+    }
+
     public Session get(String id) {
         if (id == null) {
             return null;

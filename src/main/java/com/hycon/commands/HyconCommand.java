@@ -17,6 +17,7 @@ import java.nio.file.Path;
  * {@code /hycon} - console-only recovery for the panel.
  * <pre>
  * /hycon info                  panel address and status
+ * /hycon debug                 writes debug/dump-&lt;UTC time&gt;.txt (see docs/diagnostics.md)
  * /hycon resetpassword &lt;name&gt;  new password for a panel account, written to FIRST-LOGIN.txt
  *                              (creates it as OWNER if it doesn't exist - the way back in
  *                              if every owner is locked out)
@@ -29,6 +30,7 @@ public final class HyconCommand extends AbstractCommandCollection {
         super("hycon", "Hycon web panel (console only)");
         addSubCommand(new Info());
         addSubCommand(new ResetPassword());
+        addSubCommand(new Debug());
     }
 
     private static boolean console(CommandContext ctx) {
@@ -48,6 +50,20 @@ public final class HyconCommand extends AbstractCommandCollection {
         protected void executeSync(@Nonnull CommandContext ctx) {
             if (console(ctx)) {
                 ctx.sendMessage(Message.raw(HyconPlugin.get().status()));
+            }
+        }
+    }
+
+    private static final class Debug extends CommandBase {
+        Debug() {
+            super("debug", "Write a debug dump for diagnosing problems");
+        }
+
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            if (console(ctx)) {
+                ctx.sendMessage(Message.raw("Writing debug dump..."));
+                HyconPlugin.get().debugDump(line -> ctx.sendMessage(Message.raw(line)));
             }
         }
     }

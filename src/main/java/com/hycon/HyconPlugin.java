@@ -402,6 +402,45 @@ public final class HyconPlugin extends JavaPlugin {
         return web == null ? "Hycon panel is not running (see hycon.json and the server log)." : "Hycon panel: " + address();
     }
 
+    /** Writes a debug dump off-thread ({@code /hycon debug}); {@code done} gets the file path or the reason. */
+    public void debugDump(java.util.function.Consumer<String> done) {
+        DebugDump.run(getDataDirectory(), String.valueOf(getManifest().getVersion()), this::debugState, getLogger(), done);
+    }
+
+    /** Hycon's own state for the dump. Reads only references and counters; runs on the dump thread. */
+    private String debugState() {
+        StringBuilder out = new StringBuilder();
+        out.append(status()).append('\n');
+        out.append("Panel sessions: ").append(sessions == null ? "-" : sessions.count()).append('\n');
+        out.append("Log tap latest seq: ").append(logTap == null ? "-" : logTap.latest()).append('\n');
+        out.append("Ban sharing server: ").append(shareServer == null ? "off" : "on")
+                .append(", ban sync: ").append(banSync == null ? "off" : "on").append('\n');
+        out.append("IO executor: ").append(io == null ? "-" : io.isShutdown() ? "shut down" : "running").append('\n');
+        task(out, "sampler", sampler);
+        task(out, "pingSampler", pingSampler);
+        task(out, "positionSampler", positionSampler);
+        task(out, "housekeeping", housekeeping);
+        task(out, "geoRefresh", geoRefresh);
+        String[] services = {"admins", "audit", "known", "records", "samples", "sharing", "pingLog", "staffWatch",
+                "killLog", "chatLog", "activity", "positions", "reports", "bugs", "ties", "geo", "updates"};
+        Object[] values = {admins, audit, known, records, samples, sharing, pingLog, staffWatch,
+                killLog, chatLog, activity, positions, reports, bugs, ties, geo, updates};
+        StringBuilder missing = new StringBuilder();
+        for (int k = 0; k < services.length; k++) {
+            if (values[k] == null) {
+                missing.append(' ').append(services[k]);
+            }
+        }
+        out.append("Services not started:").append(missing.length() == 0 ? " none" : missing).append('\n');
+        return out.toString();
+    }
+
+    private static void task(StringBuilder out, String name, ScheduledFuture<?> f) {
+        out.append("Task ").append(name).append(": ")
+                .append(f == null ? "not scheduled" : f.isCancelled() ? "cancelled" : f.isDone() ? "STOPPED (threw?)" : "scheduled")
+                .append('\n');
+    }
+
     public Path resetPasswordToFile(String name) throws IOException {
         if (web == null) {
             // Accounts may not have been read; saving now could overwrite admins.json with an empty list.
