@@ -3,6 +3,10 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.33 (2026-11-16)
+- Much more of the panel is translated: the AntiCheat, Prison, Arena, Economy Guard, Permissions and Referral tabs,
+  sentences with numbers or names in them, server messages, and confirm boxes.
+
 ## 0.1.32 (2026-11-16)
 - Fixed: in a translated panel the gold pill behind the open tab sat off to one side.
 

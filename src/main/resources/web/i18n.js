@@ -14,7 +14,7 @@ const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
 const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE']);
 
 // english: a text node's English. shown: what we last wrote there, so our own text is never taken for new English.
-const I18N = { lang: 'en', dict: {}, english: new WeakMap(), shown: new WeakMap(), loading: 0 };
+const I18N = { lang: 'en', dict: {}, english: new WeakMap(), shown: new WeakMap(), loading: 0, templates: [] };
 
 function pickLang() {
   let saved = null;
@@ -31,8 +31,42 @@ function pickLang() {
 function tr(text) {
   if (I18N.lang === 'en' || !text) return text;
   const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
-  const hit = I18N.dict[m[2]];
+  const hit = I18N.dict[m[2]] || fromTemplate(m[2]);
   return hit ? m[1] + hit + m[3] : text;
+}
+
+// "Last 7 days" matches the entry "Last {0} days": the values are put back into the translation.
+function fromTemplate(text) {
+  for (const t of I18N.templates) {
+    const got = t.match.exec(text);
+    if (got) return t.out.replace(/\{(\d)\}/g, (s, i) => (got[+i + 1] !== undefined ? got[+i + 1] : s));
+  }
+  return null;
+}
+
+// Longest first, so "Last {0} days of {1}" wins over "Last {0}".
+function compileTemplates(dict) {
+  return Object.keys(dict).filter((k) => /\{\d\}/.test(k) && /[A-Za-z]{2}/.test(k.replace(/\{\d\}/g, '')))
+    .sort((a, b) => b.length - a.length)
+    .map((k) => {
+      const order = [];
+      const body = k.split(/(\{\d\})/).map((p) => {
+        const slot = /^\{(\d)\}$/.exec(p);
+        if (!slot) return p.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&');
+        order.push(+slot[1]);
+        return '([\\s\\S]+?)';
+      }).join('');
+      // Captures come in the order they appear; map them back to their {n}.
+      const re = new RegExp('^' + body + '$');
+      return { match: { exec: (s) => { const g = re.exec(s); if (!g) return null;
+        const byIndex = []; order.forEach((n, i) => { byIndex[n + 1] = g[i + 1]; }); return byIndex; } }, out: dict[k] };
+    });
+}
+
+// Alerts, confirms and prompts aren't page text, so the watcher never sees them.
+for (const name of ['alert', 'confirm', 'prompt']) {
+  const native = window[name].bind(window);
+  window[name] = (msg, ...rest) => native(tr(String(msg ?? '')), ...rest);
 }
 
 function translateText(node) {
@@ -91,6 +125,7 @@ async function setLang(code) {
   if (ticket !== I18N.loading) return; // a later pick arrived first; it wins
   I18N.lang = code;
   I18N.dict = dict;
+  I18N.templates = compileTemplates(dict);
   document.documentElement.lang = code;
   translateTree(document.body);
   dispatchEvent(new Event('hycon-lang')); // widths changed; the tab pill re-measures
