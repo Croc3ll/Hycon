@@ -3,6 +3,9 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.30 (2026-11-16)
+- Nicer language picker: a rounded pill with a gold globe, left of your account name.
+
 ## 0.1.29 (2026-11-16)
 - A globe icon on the language picker, so it is easy to find in any language.
 

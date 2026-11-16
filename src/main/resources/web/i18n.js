@@ -111,7 +111,7 @@ const GLOBE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" strok
 
 addEventListener('DOMContentLoaded', () => {
   I18N.lang = pickLang();
-  document.querySelector('header').append(langPicker());
+  document.querySelector('header').insertBefore(langPicker(), document.getElementById('me'));
   watcher.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
   setLang(I18N.lang);
 });

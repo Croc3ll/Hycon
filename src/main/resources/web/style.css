@@ -33,11 +33,16 @@ nav button { background: none; border: 1px solid transparent; border-radius: 999
   color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; }
 nav button:hover { color: var(--text); background: rgba(255, 255, 255, .05); border-color: transparent; }
 nav button.active { color: var(--gold2); background: var(--gold-bg); border-color: rgba(226, 181, 75, .28); }
+/* Language picker: a pill like the header buttons, a gold globe disc, then the dropdown with its chevron. */
+.langbox { display: flex; align-items: center; gap: 2px; margin-left: auto; padding: 3px 3px 3px 4px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--panel2); cursor: pointer; transition: border-color .15s, background .15s; }
+.langbox:hover { border-color: var(--gold-dim); background: #20242c; }
+.langbox svg { flex: none; width: 26px; height: 26px; padding: 5px; border-radius: 50%; color: var(--gold2); background: var(--gold-bg); }
+#lang { width: auto; border: 0; box-shadow: none; background-color: transparent; padding: 5px 28px 5px 8px; background-position: right 10px center;
+  font-size: 13px; font-weight: 600; color: var(--text); }
+#lang:focus { box-shadow: none; }
+.langbox:focus-within { border-color: var(--gold-dim); box-shadow: 0 0 0 3px var(--gold-bg); }
 #me { color: var(--muted); display: flex; gap: 8px; align-items: center; font-size: 12px; }
-.langbox { display: flex; align-items: center; gap: 6px; color: var(--gold); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
-.langbox:hover { border-color: var(--gold-dim); }
-#lang { background: transparent; color: var(--muted); border: 0; padding: 0; font-size: 12px; cursor: pointer; }
-#lang option { background: #111; color: var(--text); }
 #me .who { color: var(--text); }
 #me .lvl { color: var(--gold); border: 1px solid var(--gold-dim); padding: 2px 8px; font-size: 10px; letter-spacing: 1px; border-radius: 999px; background: var(--gold-bg); }
 
