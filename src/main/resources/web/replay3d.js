@@ -52,6 +52,10 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
     for (const a of actors) for (const s of a.samples) groundY = Math.min(groundY, s[2]);
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const a of actors) for (const [, x, , z] of a.samples) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    // The map floor sits at the watched player's lowest point in the seconds around now, not the whole clip's: a
+    // replay that climbs 26 blocks left the map far below him (2026-11-16).
+    const FLOOR_WINDOW_MS = 3000, floorDrop = r.terrain || r.blocks || r.blockSource ? 1.5 : 0.02;
+    let floor = null;
     if (r.world) {
       const ch = (b) => Math.floor(b / 32);
       let cx0 = ch(x0 - 48), cx1 = ch(x1 + 48), cz0 = ch(z0 - 48), cz1 = ch(z1 + 48);
@@ -63,10 +67,10 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
         (t) => { colourTerrain(t.image, box); renderer.render(scene, camera); });
       tex.magFilter = T.NearestFilter;
       tex.minFilter = T.LinearMipmapLinearFilter;
-      const floor = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshLambertMaterial({ map: tex }));
+      floor = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshLambertMaterial({ map: tex }));
       floor.rotation.x = -Math.PI / 2;
       // Under real terrain the flat map sits a little lower, filling in past the terrain's edge.
-      floor.position.set(cx0 * 32 + w / 2, groundY - (r.terrain || r.blocks || r.blockSource ? 1.5 : 0.02), cz0 * 32 + d / 2);
+      floor.position.set(cx0 * 32 + w / 2, groundY - floorDrop, cz0 * 32 + d / 2);
       scene.add(floor);
     }
     // The real ground, as blocks: each column is a stack up to its top block, deep enough to close cliffs.
@@ -358,6 +362,15 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
       });
     }
 
+    function lowestNear(a, now) {
+      let y = Infinity;
+      for (const q of a.samples) {
+        if (q[0] > now + FLOOR_WINDOW_MS) break;
+        if (q[0] >= now - FLOOR_WINDOW_MS) y = Math.min(y, q[2]);
+      }
+      return y === Infinity ? at(a, now)[2] : y;
+    }
+
     function draw(now) {
       const where = new Map();
       for (const p of people) {
@@ -433,6 +446,7 @@ function replay3d(box, r, actors, main, colourOf, at, events, flagColour, eventM
         controls.target.add(moved);
       }
       followed = target;
+      if (floor) floor.position.y = lowestNear(main, now) - floorDrop;
       stream(m[1], m[2], m[3]);
       controls.update();
       clearView(target);
