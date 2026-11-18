@@ -296,7 +296,9 @@ server whose staff do the banning.
 ## 5. Settings (hycon.json)
 
 `hycon.json` is in Hycon's data folder and explains every option in its own comments.
-Changes need a **server restart**.
+Most changes apply within 5 seconds of saving the file, no restart needed (the server log says when it read them).
+`BindAddress`, `Port`, the session and login limits, `LogLines`, `SharePort`, `ShareBindAddress` and `GeoIp` need a
+**server restart**.
 
 | Option               | Default       | What it does                                                                                      |
 |----------------------|---------------|---------------------------------------------------------------------------------------------------|

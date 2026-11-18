@@ -106,7 +106,7 @@ for both configs.
 
 | What you see | Fix |
 |---|---|
-| "Unknown host name; add it to AllowedHosts" | The address isn't in `AllowedHosts`. Add it exactly, without `https://`, and restart. |
+| "Unknown host name; add it to AllowedHosts" | The address isn't in `AllowedHosts`. Add it exactly, without `https://`. It applies within a few seconds. |
 | You log in, then get sent back to the login page | `SecureCookie` is `true` but the address isn't HTTPS. Open it with `https://`. |
 | "Too many failed logins" for everyone at once | `TrustProxy` is off behind a proxy, so all visitors share the proxy's address. Turn it on. |
 | The page doesn't load (Option B) | Port `8096` isn't open on your host, or the IP in the Caddyfile is wrong. |

@@ -8,7 +8,9 @@
 //  password before anything else works. Until then the default only
 //  works from the server machine itself.
 //
-//  Changes in this file need a server RESTART.
+//  Most changes apply within a few seconds, no restart needed.
+//  BindAddress, Port, the Session and Login limits, LogLines,
+//  SharePort, ShareBindAddress and GeoIp need a server RESTART.
 // =====================================================================
 {
   // false = no web server at all.

@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * The player globe: where players roughly connect from (see {@link GeoIp}) with their usual ping.
@@ -34,16 +35,16 @@ public final class GeoRoutes {
     private final KnownPlayers known;
     private final Moderation moderation;
     private final PingLog pings;
-    private final double[] server;
+    private final Supplier<String> serverLocation;
     private final Map<UUID, Cached> pingCache = new ConcurrentHashMap<>();
 
-    public GeoRoutes(WebServer web, GeoIp geo, KnownPlayers known, Moderation moderation, PingLog pings, String serverLocation) {
+    public GeoRoutes(WebServer web, GeoIp geo, KnownPlayers known, Moderation moderation, PingLog pings, Supplier<String> serverLocation) {
         this.web = web;
         this.geo = geo;
         this.known = known;
         this.moderation = moderation;
         this.pings = pings;
-        this.server = parse(serverLocation);
+        this.serverLocation = serverLocation;
     }
 
     public void register() {
@@ -82,6 +83,7 @@ public final class GeoRoutes {
 
     private Json head() {
         Json j = new Json().beginObject().field("ready", geo.ready());
+        double[] server = parse(serverLocation.get());
         if (server != null) {
             j.name("server").beginObject().field("lat", server[0]).field("lon", server[1]).endObject();
         }

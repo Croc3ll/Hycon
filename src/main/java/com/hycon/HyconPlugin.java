@@ -16,6 +16,7 @@ import com.hycon.auth.LoginLimiter;
 import com.hycon.auth.Sessions;
 import com.hycon.commands.HyconCommand;
 import com.hycon.config.HyconConfig;
+import com.hycon.config.LiveConfig;
 import com.hycon.game.ConsoleRunner;
 import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
@@ -69,9 +70,13 @@ public final class HyconPlugin extends JavaPlugin {
 
     /** Who hears about new Hycon releases on join. Operators have every permission. */
     private static final String UPDATE_NOTICE_PERMISSION = "hycon.updates.notify";
+    /** How often hycon.json is checked for edits. */
+    private static final int CONFIG_CHECK_SECONDS = 5;
     private static HyconPlugin instance;
 
     private HyconConfig config;
+    private LiveConfig liveConfig;
+    private ScheduledFuture<?> configWatch;
     private AdminStore admins;
     private AuditLog audit;
     private KnownPlayers known;
@@ -118,7 +123,8 @@ public final class HyconPlugin extends JavaPlugin {
     protected void setup() {
         Path dir = getDataDirectory();
         try {
-            config = HyconConfig.load(dir);
+            liveConfig = new LiveConfig(dir);
+            config = liveConfig.get();
         } catch (IOException e) {
             throw new IllegalStateException("Hycon could not read hycon.json: " + e.getMessage(), e);
         }
@@ -206,16 +212,16 @@ public final class HyconPlugin extends JavaPlugin {
         sessions.rememberIn(getDataDirectory());
         Moderation moderation = new Moderation(known);
         try {
-            web = new WebServer(config, sessions, admins);
+            web = new WebServer(liveConfig, sessions, admins);
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
-            ConsoleRunner consoleRunner = new ConsoleRunner(config.blockedCommands());
+            ConsoleRunner consoleRunner = new ConsoleRunner(() -> liveConfig.get().blockedCommands());
             new GameRoutes(web, moderation, consoleRunner, logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
-            new GeoRoutes(web, geo, known, moderation, pingLog, config.serverLocation()).register();
+            new GeoRoutes(web, geo, known, moderation, pingLog, () -> liveConfig.get().serverLocation()).register();
             new BugRoutes(web, bugs, audit).register();
             new ChatRoutes(web, chatLog, moderation).register();
             new ConsoleRoutes(web, logTap, audit, consoleRunner,
-                    new com.hycon.game.AmpClient(config.ampUrl(), config.ampUser(), config.ampPassword())).register();
+                    new com.hycon.game.AmpClient(liveConfig)).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
@@ -275,10 +281,28 @@ public final class HyconPlugin extends JavaPlugin {
             activity.save(onlineIds());
         }), 1, 1, TimeUnit.MINUTES);
 
+        configWatch = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> onIo(this::reloadConfig),
+                CONFIG_CHECK_SECONDS, CONFIG_CHECK_SECONDS, TimeUnit.SECONDS);
+
         log.at(Level.INFO).log("Hycon panel: %s", address());
         if (!config.loopbackOnly()) {
             log.at(Level.WARNING).log("Hycon panel listens on %s, not only this machine. Use HTTPS in front of it and a firewall.",
                     config.bindAddress());
+        }
+    }
+
+    /** Applies edits to hycon.json without a restart. Options only read at start-up say so in the log. */
+    private void reloadConfig() {
+        try {
+            switch (liveConfig.reloadIfChanged()) {
+                case RELOADED -> getLogger().at(Level.INFO).log("Hycon: hycon.json changed and is now in use");
+                case NEEDS_RESTART -> getLogger().at(Level.INFO).log(
+                        "Hycon: hycon.json changed. The address, ports, sessions, login limits, LogLines and GeoIp apply after a restart");
+                case NONE -> {
+                }
+            }
+        } catch (IOException e) {
+            getLogger().at(Level.WARNING).log("Hycon: could not read the edited hycon.json (%s); the last good settings stay", e.getMessage());
         }
     }
 
@@ -337,6 +361,9 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (housekeeping != null) {
             housekeeping.cancel(false);
+        }
+        if (configWatch != null) {
+            configWatch.cancel(false);
         }
         if (web != null) {
             web.stop();
@@ -420,6 +447,7 @@ public final class HyconPlugin extends JavaPlugin {
         task(out, "pingSampler", pingSampler);
         task(out, "positionSampler", positionSampler);
         task(out, "housekeeping", housekeeping);
+        task(out, "configWatch", configWatch);
         task(out, "geoRefresh", geoRefresh);
         String[] services = {"admins", "audit", "known", "records", "samples", "sharing", "pingLog", "staffWatch",
                 "killLog", "chatLog", "activity", "positions", "reports", "bugs", "ties", "geo", "updates"};

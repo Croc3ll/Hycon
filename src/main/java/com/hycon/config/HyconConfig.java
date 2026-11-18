@@ -77,6 +77,14 @@ public record HyconConfig(
                 str(m, "ServerLocation", ""));
     }
 
+    /** True when {@code next} changes an option that is only read when the panel starts. */
+    public boolean needsRestart(HyconConfig next) {
+        return enabled != next.enabled || !bindAddress.equals(next.bindAddress) || port != next.port
+                || sessionIdleMs != next.sessionIdleMs || sessionMaxMs != next.sessionMaxMs
+                || loginAttempts != next.loginAttempts || loginWindowMs != next.loginWindowMs || logLines != next.logLines
+                || sharePort != next.sharePort || !shareBindAddress.equals(next.shareBindAddress) || geoIp != next.geoIp;
+    }
+
     /** True when only this machine can reach the panel. */
     public boolean loopbackOnly() {
         return bindAddress.equals("127.0.0.1") || bindAddress.equals("::1") || bindAddress.equalsIgnoreCase("localhost");

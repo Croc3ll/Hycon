@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 /** Runs console commands for the panel through Hytale's normal command system. */
 public final class ConsoleRunner {
@@ -14,9 +15,10 @@ public final class ConsoleRunner {
     public record Result(boolean finished, List<String> output, String error) {
     }
 
-    private final Set<String> blocked;
+    private final Supplier<Set<String>> blocked;
 
-    public ConsoleRunner(Set<String> blocked) {
+    /** {@code blocked} is read on each check, so edits to BlockedCommands apply at once. */
+    public ConsoleRunner(Supplier<Set<String>> blocked) {
         this.blocked = blocked;
     }
 
@@ -31,7 +33,7 @@ public final class ConsoleRunner {
     }
 
     public boolean isBlocked(String command) {
-        return blocked.contains(root(command));
+        return blocked.get().contains(root(command));
     }
 
     /**

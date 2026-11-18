@@ -13,7 +13,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * The panel's web server (the JDK's built-in one) and every security check that applies to all
@@ -48,6 +48,8 @@ public final class WebServer {
 
     private static final String COOKIE = "hycon_sid";
     private static final int MAX_BODY = 16 * 1024;
+    /** Names that always reach the panel; AllowedHosts in hycon.json adds more. */
+    private static final Set<String> LOCAL_HOSTS = Set.of("127.0.0.1", "localhost", "[::1]");
     // Map.of stops at ten pairs, so the files are listed as entries.
     private static final Map<String, String> STATIC = Map.ofEntries(
             Map.entry("/", "web/index.html"), Map.entry("/index.html", "web/index.html"),
@@ -69,21 +71,18 @@ public final class WebServer {
             Map.entry("/vendor/three.min.js", "web/vendor/three.min.js"),
             Map.entry("/vendor/OrbitControls.js", "web/vendor/OrbitControls.js"));
 
-    private final HyconConfig config;
+    private final Supplier<HyconConfig> config;
     private final Sessions sessions;
     private final AdminStore admins;
-    private final Set<String> hosts = new HashSet<>();
     private final Map<String, Route> routes = new HashMap<>();
     private final Map<String, byte[]> files = new HashMap<>();
     private HttpServer server;
     private ExecutorService executor;
 
-    public WebServer(HyconConfig config, Sessions sessions, AdminStore admins) throws IOException {
+    public WebServer(Supplier<HyconConfig> config, Sessions sessions, AdminStore admins) throws IOException {
         this.config = config;
         this.sessions = sessions;
         this.admins = admins;
-        hosts.addAll(List.of("127.0.0.1", "localhost", "[::1]"));
-        hosts.addAll(config.allowedHosts());
         for (String res : Set.copyOf(STATIC.values())) {
             try (InputStream in = WebServer.class.getClassLoader().getResourceAsStream(res)) {
                 if (in == null) {
@@ -125,7 +124,7 @@ public final class WebServer {
     }
 
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(config.bindAddress(), config.port()), 0);
+        server = HttpServer.create(new InetSocketAddress(config.get().bindAddress(), config.get().port()), 0);
         AtomicInteger n = new AtomicInteger();
         // A few threads, because a login check deliberately takes a quarter second (see Passwords).
         executor = Executors.newFixedThreadPool(4, r -> {
@@ -293,7 +292,11 @@ public final class WebServer {
 
     private boolean hostAllowed(HttpExchange ex) {
         String host = ex.getRequestHeaders().getFirst("Host");
-        return host != null && hosts.contains(stripPort(host).toLowerCase(Locale.ROOT));
+        return host != null && knownHost(stripPort(host).toLowerCase(Locale.ROOT));
+    }
+
+    private boolean knownHost(String host) {
+        return LOCAL_HOSTS.contains(host) || config.get().allowedHosts().contains(host);
     }
 
     private static boolean sameOrigin(String origin, String host) {
@@ -316,7 +319,7 @@ public final class WebServer {
     }
 
     private String clientIp(HttpExchange ex) {
-        if (config.trustProxy()) {
+        if (config.get().trustProxy()) {
             // Cloudflare (tunnel or proxy) sends the visitor's address here; clients can't set it.
             String cf = ex.getRequestHeaders().getFirst("CF-Connecting-IP");
             if (cf != null && !cf.isBlank()) {
@@ -345,7 +348,7 @@ public final class WebServer {
     /** Sets (or with null, clears) the remember-me cookie; call before responding. */
     public void setRememberCookie(Req r, String token) {
         r.ex.getResponseHeaders().add("Set-Cookie", REMEMBER_COOKIE + "=" + (token == null ? "" : token) + "; Path=/; HttpOnly; SameSite=Strict"
-                + "; Max-Age=" + (token == null ? 0 : Sessions.REMEMBER_MS / 1000) + (config.secureCookie() ? "; Secure" : ""));
+                + "; Max-Age=" + (token == null ? 0 : Sessions.REMEMBER_MS / 1000) + (config.get().secureCookie() ? "; Secure" : ""));
     }
 
     private static String cookie(HttpExchange ex, String COOKIE) {
@@ -366,6 +369,6 @@ public final class WebServer {
 
     private void setCookie(HttpExchange ex, Sessions.Session s) {
         ex.getResponseHeaders().add("Set-Cookie", COOKIE + "=" + s.id + "; Path=/; HttpOnly; SameSite=Strict"
-                + (config.secureCookie() ? "; Secure" : ""));
+                + (config.get().secureCookie() ? "; Secure" : ""));
     }
 }
