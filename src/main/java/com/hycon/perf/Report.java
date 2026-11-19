@@ -137,8 +137,10 @@ final class Report {
             s.append(", ").append(spikes).append(spikes == 1 ? " lag spike" : " lag spikes");
         }
         s.append('.');
-        if (top != null) {
+        if (top != null && worldShare.get(top) >= 0.01) {
             s.append(String.format(" %s uses the most world-thread time (%.0f%%).", top, worldShare.get(top) * 100));
+        } else if (top != null) {
+            s.append(" No plugin uses a noticeable share of the world threads.");
         }
         if (!ioMsPerMin.isEmpty()) {
             String io = ioMsPerMin.keySet().iterator().next();

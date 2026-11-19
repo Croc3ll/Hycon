@@ -321,6 +321,14 @@ public final class Profiler {
         if (io < 0) {
             return null;
         }
+        // Netty (Hytale's networking) never blocks a game thread: a packet send only queues it and nudges the network
+        // thread (NioIoHandler.wakeup writes to a pipe), which looks like socket IO on the stack. Not a wait.
+        for (int i = io; i < Math.min(stack.length, io + 12); i++) {
+            String c = stack[i].getClassName();
+            if (c.startsWith("io.netty.") || c.startsWith("sun.nio.ch.SelectorImpl") || stack[i].getMethodName().equals("wakeup")) {
+                return null;
+            }
+        }
         for (int i = io; i < stack.length; i++) {
             String c = stack[i].getClassName();
             if (!isIo(c) && !c.startsWith("java.") && !c.startsWith("javax.") && !c.startsWith("sun.") && !c.startsWith("jdk.")

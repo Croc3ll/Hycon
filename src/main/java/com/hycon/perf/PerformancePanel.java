@@ -71,8 +71,7 @@ public final class PerformancePanel implements HyconPanel {
                         + ": steps slower than the spike limit. A few a day is normal (saves, players joining); several a minute is a problem.")
                 .stat("World threads busy", String.format("%.0f%%", r.busy * 100), grade(r.busy * 100, 50, 80)
                         + ": how much of the time the worlds are working instead of waiting. Under 50% leaves room for more players; over 80% means little headroom.")
-                .stat("Scheduler", String.format("%.0f%% busy", r.schedBusy * 100), grade(Math.max(r.schedBusy * 100, r.schedLateMaxMs / 5), 10, 50)
-                        + String.format(": the one helper thread all plugins share. Tasks ran up to %.0f ms late. Under 10%% busy and under 50 ms late is good; slow tasks here delay every plugin.", r.schedLateMaxMs))
+                .stat("Scheduler", String.format("%.0f%% busy", r.schedBusy * 100), schedulerHint(r))
                 .stat("Memory", r.heapMb + " MB", grade(memPct, 70, 90)
                         + String.format(": %.0f%% of the %d MB the server may use. Under 70%% is good; staying over 90%% risks freezes and crashes. "
                         + "Cleaning up (GC) took %.0f ms a minute, longest single pause %d ms (under 100 ms is fine).", memPct, r.heapMaxMb,
@@ -99,6 +98,17 @@ public final class PerformancePanel implements HyconPanel {
         versions(out, now);
         out.note(String.format("Sampling every %d ms. Shares are of all world-thread time, idle included. A plugin is blamed for the Hytale code it calls.",
                 perf.profiler().sampleEveryMs()));
+    }
+
+    /** The scheduler's grade, naming which part (how busy, or how late tasks start) is the problem. */
+    private static String schedulerHint(Report r) {
+        String busy = grade(r.schedBusy * 100, 10, 50), late = grade(r.schedLateMaxMs, 50, 250);
+        String worst = busy.equals("Bad") || late.equals("Bad") ? "Bad" : busy.equals("Watch") || late.equals("Watch") ? "Watch" : "Good";
+        String s = worst + ": the one helper thread all plugins share; a slow task here delays every plugin. ";
+        s += String.format("%.0f%% busy is %s (under 10%% is good). ", r.schedBusy * 100, busy.equals("Good") ? "fine" : "high");
+        s += String.format("Tasks started up to %.0f ms late: %s (under 50 ms is good)", r.schedLateMaxMs,
+                late.equals("Good") ? "fine" : "a slow task held it up, see Late scheduler tasks below");
+        return s + ".";
     }
 
     /** "Good", "Watch" or "Bad" for a value where lower is better. */

@@ -3,6 +3,11 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.38 (2026-11-19)
+- Performance: Hytale's networking (a packet nudging the network thread) no longer counts as waiting on files, so it
+  stops costing health points. The Scheduler card says whether "busy" or "late" is the problem. The summary no longer
+  names a plugin at 0%.
+
 ## 0.1.37 (2026-11-19)
 - **Performance** tab: a Server health score (0 to 100) at the top, with what cost it points.
 
