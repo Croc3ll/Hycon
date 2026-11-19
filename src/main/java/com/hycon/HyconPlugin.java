@@ -50,6 +50,9 @@ import com.hycon.sync.BanSync;
 import com.hycon.sync.ShareServer;
 import com.hycon.sync.SharingStore;
 import com.hycon.web.WebServer;
+import com.hycon.perf.LagCommand;
+import com.hycon.perf.Perf;
+import com.hycon.perf.PerformancePanel;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -109,6 +112,8 @@ public final class HyconPlugin extends JavaPlugin {
     private ExecutorService io;
     private ScheduledFuture<?> geoRefresh;
     private UpdateCheck updates;
+    /** The always-on profiler; null when hycon.json turns it off. */
+    private Perf perf;
 
     public HyconPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -172,6 +177,11 @@ public final class HyconPlugin extends JavaPlugin {
                 e.getPlayerRef().sendMessage(Message.raw(update).color("#FFAA00"));
             }
         });
+        if (config.profiler()) {
+            perf = new Perf(dir, getLogger(), liveConfig::get);
+            getEntityStoreRegistry().registerSystem(perf.heartbeat());
+            getCommandRegistry().registerCommand(new LagCommand(perf));
+        }
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, e -> known.left(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername()));
     }
 
@@ -180,6 +190,10 @@ public final class HyconPlugin extends JavaPlugin {
         HytaleLogger log = getLogger();
         updates = new UpdateCheck(String.valueOf(getManifest().getVersion()), log);
         updates.start();
+        // The profiler runs even with the panel off: /lag and the alerts still work.
+        if (perf != null) {
+            perf.start();
+        }
         if (!config.enabled()) {
             log.at(Level.INFO).log("Hycon panel is turned off in hycon.json");
             return;
@@ -243,6 +257,9 @@ public final class HyconPlugin extends JavaPlugin {
         HyconApi.setRecorder((player, type, by, reason, detail) -> records.record(player,
                 "WARN".equalsIgnoreCase(type) ? PlayerRecords.Type.WARN : PlayerRecords.Type.NOTE, by, reason, detail));
         HyconApi.register(new AnalyticsPanel(samples, known, positions));
+        if (perf != null) {
+            HyconApi.register(new PerformancePanel(perf));
+        }
         HyconApi.registerProfileSection(new WorldSection(positions, activity));
         HyconApi.registerProfileSection(new ActivitySection(known, pingLog, killLog, records, reports));
         HyconApi.registerProfileSection(new com.hycon.analytics.RiskSection(known, records, reports, ties, moderation));
@@ -323,6 +340,9 @@ public final class HyconPlugin extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (perf != null) {
+            perf.stop();
+        }
         if (staffWatch != null) {
             staffWatch.stop();
         }
@@ -449,6 +469,7 @@ public final class HyconPlugin extends JavaPlugin {
         task(out, "housekeeping", housekeeping);
         task(out, "configWatch", configWatch);
         task(out, "geoRefresh", geoRefresh);
+        out.append(perf == null ? "Profiler: off in hycon.json\n" : perf.debugSummary());
         String[] services = {"admins", "audit", "known", "records", "samples", "sharing", "pingLog", "staffWatch",
                 "killLog", "chatLog", "activity", "positions", "reports", "bugs", "ties", "geo", "updates"};
         Object[] values = {admins, audit, known, records, samples, sharing, pingLog, staffWatch,

@@ -84,5 +84,20 @@
   // Where this server is, as "latitude, longitude" (e.g. "41.88, -87.63"
   // for Chicago), so the globe can draw each player's line to it with
   // their ping. "" = no server marker.
-  "ServerLocation": ""
+  "ServerLocation": "",
+
+  // Performance profiler (Performance tab and /lag). Always on and light:
+  // it reads Hytale's own tick timings and looks at what each world thread
+  // is doing about 20 times a second, so you can see which plugin uses the
+  // most time and what caused each lag spike. false = off.
+  "Profiler": true,
+  // A tick that takes longer than this (milliseconds) is saved as a lag
+  // spike, with what was running during it. 30 ticks a second is 33 ms.
+  "LagSpikeMs": 100,
+  // Staff with hycon.lag.alerts are told when one plugin uses more than
+  // this share (percent) of a world thread for 3 minutes, or a spike lasts
+  // over a second. 0 = no alerts.
+  "LagAlertPercent": 30,
+  // Optional Discord webhook URL for the same alerts. "" = none.
+  "LagWebhook": ""
 }

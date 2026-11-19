@@ -3,6 +3,12 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.35 (2026-11-18)
+- New **Performance** tab and `/lag`: an always-on profiler that shows which plugins use the most server
+  time, each lag spike and its cause, the slowest ECS systems, blocking file or database work on game
+  threads, and each plugin's change between versions. Staff and Discord alerts for a plugin that hogs a
+  world or a long freeze. New settings `Profiler`, `LagSpikeMs`, `LagAlertPercent`, `LagWebhook`.
+
 ## 0.1.33 (2026-11-16)
 - Much more of the panel is translated: the AntiCheat, Prison, Arena, Economy Guard, Permissions and Referral tabs,
   sentences with numbers or names in them, server messages, and confirm boxes.

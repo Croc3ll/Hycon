@@ -47,6 +47,10 @@ These are made with demo data by `py tools/promo/make_promo.py` (no real players
 - **Chat history**: a Chat tab with every line players said (search, 14 days), and each player's chat on their profile.
 - **Console**: the live server log, and console commands for admins (with a blocked-commands list).
 - **Analytics**: player counts, ping, activity and other charts, plus dashboards from other plugins.
+- **Performance profiler**: always on and light (well under 1%). Shows which plugins use the most
+  server time, every lag spike with its cause, the slowest ECS systems, plugins that block the world
+  on files or a database, and whether a plugin got slower after an update. `/lag` in game, alerts to staff
+  and Discord.
 - **Player globe**: a spinning 3D globe on Analytics with a dot for every player (coloured by ping) and
   a per-country table; each profile shows that player's rough location, distance to the server, and a
   warning when their ping is too low for the distance (likely a VPN). Click a dot to open the profile.

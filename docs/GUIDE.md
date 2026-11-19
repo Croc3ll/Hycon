@@ -208,6 +208,34 @@ and can be wrong. Addresses themselves aren't shown. Set `GeoIp` to `false` to t
 Hycon samples every 30 seconds and keeps 31 days (`samples.log`). Playtime counts from when Hycon
 was installed. Other plugins can add their own tabs next to Analytics.
 
+### Performance (MODERATOR and up) and /lag
+Hycon's profiler is always on and costs well under 1% of the server. It shows which plugins use the
+server's time and what caused each lag spike, so you can tell a slow plugin from a busy server.
+
+- **Verdict** at the top in plain words: healthy, busy or lagging, the plugin using the most time, and
+  any plugin that waits on files or a database on a game thread.
+- **Who uses the world threads** and **the shared scheduler thread**: each plugin's share of the time.
+  A plugin is also blamed for the Hytale code it calls (setting blocks, sending packets).
+- **Tick time** over time (average and worst; 33 ms is the budget for 30 ticks a second), and each top
+  plugin's share over time.
+- **Lag spikes**: every tick over `LagSpikeMs`, how long it took, what ran during it and whether garbage
+  collection caused it. During a long tick the profiler looks every 5 ms, so the cause is exact.
+- **Where the time goes**: the busiest methods in each plugin. **Slowest ECS systems**: Hytale's own
+  per-system timings, with the plugin each belongs to.
+- **Waiting on files, network or a database**: work that freezes the world until it finishes.
+- **Worlds**: tick times, entities and loaded chunks per world.
+- **Plugins by version**: each plugin's share on its current version against its version before, so you can
+  see whether an update made it slower.
+
+In game (or the console), **`/lag`** shows the last 5 minutes right away; **`/lag 60`** the last hour and
+**`/lag spikes`** the latest spikes. It needs the `hycon.lag` permission. Staff with `hycon.lag.alerts` are told when
+a plugin uses over `LagAlertPercent` of the world threads for 3 minutes, or a spike lasts over a second
+(also sent to `LagWebhook` if set). `/lag` and the alerts work even with the panel turned off.
+
+How it stays light: tick and system times are timers Hytale already keeps. On top of that one Hycon
+thread looks at what each world thread and the scheduler are doing about 20 times a second, and slows
+itself down if that ever costs over 0.5%. Memory use per plugin is not measured (that can't be done cheaply).
+
 ### Audit log (ADMIN and up)
 The newest 200 actions: logins (and failed ones), kicks, bans, unbans, commands and account changes,
 with the account and the address they came from. Failed or refused actions are marked ✗.
@@ -316,6 +344,10 @@ Most changes apply within 5 seconds of saving the file, no restart needed (the s
 | `LogLines`           | `2000`        | How many recent log lines the Console tab keeps.                                                  |
 | `GeoIp`              | `true`        | Look up players' rough location for the globe (downloads the DB-IP database once a month).       |
 | `ServerLocation`     | `""`          | The server's `"lat,lon"`, e.g. `"50.11,8.68"`, so the globe draws lines to it and shows distances. |
+| `Profiler`           | `true`        | The always-on profiler (Performance tab, `/lag`, lag alerts). Needs a restart.                    |
+| `LagSpikeMs`         | `100`         | A tick longer than this (ms) is saved as a lag spike.                                             |
+| `LagAlertPercent`    | `30`          | Alert staff when one plugin uses this share of the world threads for 3 minutes. `0` = no alerts.  |
+| `LagWebhook`         | `""`          | A Discord webhook URL for the same alerts.                                                        |
 
 ## 6. Opening the panel from another computer
 
@@ -402,6 +434,7 @@ All in Hycon's data folder:
 | `players.json`    | Player directory: UUID, name, first/last seen and last world of everyone who has joined.         |
 | `geo.json`        | Each player's looked-up place (city, country, coordinates) for the globe.                       |
 | `geoip/`          | The downloaded DB-IP location database.                                                         |
+| `profiler-history.jsonl` | Each plugin's share of the world threads per hour with its version, kept 30 days.        |
 | `FIRST-LOGIN.txt` | Only after `/hycon resetpassword`; holds the new password until the account changes it.          |
 
 Back up `admins.json` and `audit.log` with the rest of your server.

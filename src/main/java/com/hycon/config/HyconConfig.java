@@ -36,7 +36,11 @@ public record HyconConfig(
         String ampUser,
         String ampPassword,
         boolean geoIp,
-        String serverLocation) {
+        String serverLocation,
+        boolean profiler,
+        int lagSpikeMs,
+        int lagAlertPercent,
+        String lagWebhook) {
 
     public static HyconConfig load(Path dataDir) throws IOException {
         Path file = dataDir.resolve("hycon.json");
@@ -74,7 +78,11 @@ public record HyconConfig(
                 str(m, "AmpUser", ""),
                 str(m, "AmpPassword", ""),
                 bool(m, "GeoIp", true),
-                str(m, "ServerLocation", ""));
+                str(m, "ServerLocation", ""),
+                bool(m, "Profiler", true),
+                (int) Math.max(50, Math.min(5000, num(m, "LagSpikeMs", 100))),
+                (int) Math.max(0, Math.min(100, num(m, "LagAlertPercent", 30))),
+                str(m, "LagWebhook", ""));
     }
 
     /** True when {@code next} changes an option that is only read when the panel starts. */
@@ -82,7 +90,8 @@ public record HyconConfig(
         return enabled != next.enabled || !bindAddress.equals(next.bindAddress) || port != next.port
                 || sessionIdleMs != next.sessionIdleMs || sessionMaxMs != next.sessionMaxMs
                 || loginAttempts != next.loginAttempts || loginWindowMs != next.loginWindowMs || logLines != next.logLines
-                || sharePort != next.sharePort || !shareBindAddress.equals(next.shareBindAddress) || geoIp != next.geoIp;
+                || sharePort != next.sharePort || !shareBindAddress.equals(next.shareBindAddress) || geoIp != next.geoIp
+                || profiler != next.profiler;
     }
 
     /** True when only this machine can reach the panel. */
