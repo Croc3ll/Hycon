@@ -56,6 +56,11 @@ final class Owners {
         return label(loader);
     }
 
+    /** The owner named by a class loader name from a stack frame. */
+    static String ofLoader(String loader) {
+        return loader != null && (loader.startsWith(THIRD_PARTY) || loader.startsWith(BUILT_IN)) ? label(loader) : HYTALE;
+    }
+
     /** The top frame inside {@code owner}'s code, as {@code Class.method}: where in the plugin the time goes. */
     static String where(StackTraceElement[] stack, String owner) {
         for (StackTraceElement f : stack) {

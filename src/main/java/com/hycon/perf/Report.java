@@ -1,9 +1,14 @@
 package com.hycon.perf;
 
+import com.hycon.perf.PerfData.Late;
 import com.hycon.perf.PerfData.Minute;
 import com.hycon.perf.PerfData.SystemTime;
+import com.hycon.perf.PerfData.TaskRun;
+import com.hycon.perf.PerfData.Traffic;
 import com.hycon.perf.PerfData.WorldMinute;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +36,17 @@ final class Report {
     final int spikes;
     final long heapMb, heapMaxMb;
     final Map<String, WorldMinute> worlds;
+    /** Blocking IO by {@code owner 	 calling method}, in ms per minute, biggest first. */
+    final Map<String, Double> ioWhereMsPerMin;
+    /** World-thread time by {@code world 	 owner}, in ms per minute, biggest first. */
+    final Map<String, Double> worldOwnersMsPerMin;
+    /** Scheduler tasks over the range, longest single run first. */
+    final List<TaskRun> tasks;
+    /** The latest scheduler tasks, latest first. */
+    final List<Late> lates;
+    /** The last minute's traffic per player. */
+    final List<Traffic> traffic;
+    final long gcMaxPauseMs;
 
     private Report(List<Minute> list) {
         minutes = list.size();
@@ -40,6 +56,10 @@ final class Report {
         Map<String, Double> owners = new HashMap<>(), sched = new HashMap<>(), whereMs = new HashMap<>(), io = new HashMap<>(),
                 sys = new HashMap<>();
         Map<String, WorldMinute> lastWorld = new LinkedHashMap<>();
+        Map<String, Double> ioWhereMs = new HashMap<>(), worldOwnerMs = new HashMap<>();
+        Map<String, TaskRun> taskMap = new HashMap<>();
+        List<Late> lateAll = new ArrayList<>();
+        long gcPause = 0;
         for (Minute m : list) {
             worldMs += m.worldMs();
             busyMs += m.worldBusyMs();
@@ -60,6 +80,16 @@ final class Report {
             lateMax = Math.max(lateMax, m.schedLateMaxMs());
             gc += m.gcMs();
             spikeCount += m.spikes();
+            if (m.ioWhere() != null) {
+                m.ioWhere().forEach((k, v) -> ioWhereMs.merge(k, v, Double::sum));
+                m.worldOwners().forEach((k, v) -> worldOwnerMs.merge(k, v, Double::sum));
+                for (TaskRun t : m.tasks()) {
+                    taskMap.merge(t.owner() + "	" + t.task(), t, (a, b) -> new TaskRun(a.owner(), a.task(),
+                            Math.max(a.longestMs(), b.longestMs()), a.busyMs() + b.busyMs(), a.runs() + b.runs()));
+                }
+                lateAll.addAll(m.lates());
+                gcPause = Math.max(gcPause, m.gcMaxPauseMs());
+            }
         }
         int n = Math.max(1, minutes);
         worldShare = sorted(owners, worldMs);
@@ -80,6 +110,15 @@ final class Report {
         heapMaxMb = last == null ? 0 : last.heapMaxMb();
         slowSystems = last == null ? List.of() : last.systems();
         worlds = lastWorld;
+        ioWhereMsPerMin = sorted(ioWhereMs, n);
+        worldOwnersMsPerMin = sorted(worldOwnerMs, n);
+        List<TaskRun> t = new ArrayList<>(taskMap.values());
+        t.sort(Comparator.comparingDouble(TaskRun::longestMs).reversed());
+        tasks = t;
+        lateAll.sort(Comparator.comparingDouble(Late::lateMs).reversed());
+        lates = lateAll.subList(0, Math.min(25, lateAll.size()));
+        traffic = last == null || last.traffic() == null ? List.of() : last.traffic();
+        gcMaxPauseMs = gcPause;
     }
 
     static Report of(List<Minute> list) {
@@ -103,7 +142,9 @@ final class Report {
         }
         if (!ioMsPerMin.isEmpty()) {
             String io = ioMsPerMin.keySet().iterator().next();
-            s.append(String.format(" %s waits on files or a database on a game thread (%.0f ms a minute).", io, ioMsPerMin.get(io)));
+            String from = ioWhereMsPerMin.keySet().stream().filter(k -> k.startsWith(io + "	")).findFirst()
+                    .map(k -> ", mostly " + k.substring(io.length() + 1)).orElse("");
+            s.append(String.format(" %s waits on files or a database on a game thread (%.0f ms a minute%s).", io, ioMsPerMin.get(io), from));
         }
         return s.toString();
     }

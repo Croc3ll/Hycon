@@ -218,19 +218,34 @@ server's time and what caused each lag spike, so you can tell a slow plugin from
   A plugin is also blamed for the Hytale code it calls (setting blocks, sending packets).
 - **Tick time** over time (average and worst; 33 ms is the budget for 30 ticks a second), and each top
   plugin's share over time.
-- **Lag spikes**: every tick over `LagSpikeMs`, how long it took, what ran during it and whether garbage
+- **History graphs** over the chosen range (up to a day): lag spikes, memory in use, players online, and
+  each world's loaded chunks, entities and NPCs.
+- **Lag spikes**: every tick over `LagSpikeMs`, how long it took, what ran during it, the ECS system (or
+  scheduler task) seen most, whether a chunk load, world generation or a save was running, and whether garbage
   collection caused it. During a long tick the profiler looks every 5 ms, so the cause is exact.
-- **Where the time goes**: the busiest methods in each plugin. **Slowest ECS systems**: Hytale's own
+- **Late scheduler tasks**: each time a task on Hytale's shared scheduler started 20 ms or more late, and the
+  task the scheduler was last seen running before it (the one that held it up). **Slowest scheduler tasks**:
+  each task by its run method and plugin, its longest run, busy time a minute and runs seen. These come from
+  samples, so very short tasks are missed and lengths are accurate to about one sample.
+- **Where the time goes**: the busiest methods in each plugin. **Plugin drill-down**: per plugin, its share,
+  top methods, top ECS systems and top scheduler tasks in one row. **Slowest ECS systems**: Hytale's own
   per-system timings, with the plugin each belongs to.
-- **Waiting on files, network or a database**: work that freezes the world until it finishes.
-- **Worlds**: tick times, entities and loaded chunks per world.
+- **Waiting on files, network or a database**: work that freezes the world until it finishes, by plugin and
+  the method that started the wait. The file or table name isn't on a thread's stack, so the method is the
+  most a sampler can name.
+- **Worlds**: tick times, entities, NPCs and loaded chunks per world, and **world-thread time by world** with
+  the plugins using each.
+- **Network traffic per player**: bytes sent to and received from each player in the last minute, from
+  Hytale's own packet counters (as sent on the wire, compressed).
+- **Memory** also shows the longest single garbage collection pause in the range.
 - **Plugins by version**: each plugin's share on its current version against its version before, so you can
   see whether an update made it slower.
 
 In game (or the console), **`/lag`** shows the last 5 minutes right away; **`/lag 60`** the last hour and
 **`/lag spikes`** the latest spikes. It needs the `hycon.lag` permission. Staff with `hycon.lag.alerts` are told when
-a plugin uses over `LagAlertPercent` of the world threads for 3 minutes, or a spike lasts over a second
-(also sent to `LagWebhook` if set). `/lag` and the alerts work even with the panel turned off.
+a plugin uses over `LagAlertPercent` of the world threads for 3 minutes, a spike lasts over `AlertSpikeMs`, a
+minute has `AlertSpikesPerMinute` spikes, or memory stays over `AlertMemoryPercent` for 3 minutes
+(also sent to `LagWebhook` if set; each alert repeats at most every 15 minutes). `/lag` and the alerts work even with the panel turned off.
 
 How it stays light: tick and system times are timers Hytale already keeps. On top of that one Hycon
 thread looks at what each world thread and the scheduler are doing about 20 times a second, and slows
@@ -348,6 +363,9 @@ Most changes apply within 5 seconds of saving the file, no restart needed (the s
 | `LagSpikeMs`         | `100`         | A tick longer than this (ms) is saved as a lag spike.                                             |
 | `LagAlertPercent`    | `30`          | Alert staff when one plugin uses this share of the world threads for 3 minutes. `0` = no alerts.  |
 | `LagWebhook`         | `""`          | A Discord webhook URL for the same alerts.                                                        |
+| `AlertSpikeMs`       | `1000`        | Alert when one tick or scheduler task freezes longer than this (ms). `0` = off.                   |
+| `AlertSpikesPerMinute` | `10`        | Alert when a minute has this many lag spikes. `0` = off.                                          |
+| `AlertMemoryPercent` | `90`          | Alert when memory in use stays over this share of the maximum for 3 minutes. `0` = off.           |
 
 ## 6. Opening the panel from another computer
 

@@ -22,7 +22,8 @@ import java.util.logging.Level;
 
 /**
  * Tells staff (permission {@value #PERMISSION}) and an optional Discord webhook when one plugin
- * keeps using a big share of a world thread, or a spike lasts over a second. Each alert repeats at
+ * keeps using a big share of a world thread, a spike lasts over {@code AlertSpikeMs}, a minute has
+ * {@code AlertSpikesPerMinute} spikes, or memory stays over {@code AlertMemoryPercent}. Each alert repeats at
  * most every 15 minutes. Called on the profiler thread; sending never blocks it.
  */
 final class LagAlerts {
@@ -30,12 +31,12 @@ final class LagAlerts {
     static final String PERMISSION = "hycon.lag.alerts";
     /** Minutes in a row over the limit before a plugin is reported, so one busy minute isn't noise. */
     private static final int STREAK = 3;
-    private static final long BIG_SPIKE_MS = 1000;
     private static final long COOLDOWN_MS = TimeUnit.MINUTES.toMillis(15);
 
     private final HytaleLogger log;
     private final Supplier<HyconConfig> config;
     private final Map<String, Integer> streaks = new HashMap<>();
+    private int memoryStreak;
     private final Map<String, Long> lastSent = new HashMap<>();
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
@@ -45,7 +46,19 @@ final class LagAlerts {
     }
 
     void minute(Minute m) {
-        int percent = config.get().lagAlertPercent();
+        HyconConfig c = config.get();
+        if (c.lagAlertPercent() > 0) {
+            if (c.alertSpikesPerMinute() > 0 && m.spikes() >= c.alertSpikesPerMinute()) {
+                send("spikes", String.format("%d lag spikes in the last minute. Check the Performance tab.", m.spikes()));
+            }
+            double memory = m.heapMaxMb() <= 0 ? 0 : m.heapMb() * 100.0 / m.heapMaxMb();
+            memoryStreak = c.alertMemoryPercent() > 0 && memory >= c.alertMemoryPercent() ? memoryStreak + 1 : 0;
+            if (memoryStreak >= STREAK) {
+                send("memory", String.format("Memory has been over %d%% for %d minutes (%d of %d MB).", c.alertMemoryPercent(),
+                        memoryStreak, m.heapMb(), m.heapMaxMb()));
+            }
+        }
+        int percent = c.lagAlertPercent();
         if (percent <= 0 || m.worldMs() <= 0) {
             streaks.clear();
             return;
@@ -67,8 +80,10 @@ final class LagAlerts {
     }
 
     void spike(Spike s) {
-        if (config.get().lagAlertPercent() > 0 && s.ms() >= BIG_SPIKE_MS) {
-            send("spike:" + s.lane(), String.format("Lag spike: %s froze for %.1f s, mostly %s.", s.lane(), s.ms() / 1000.0, s.cause()));
+        int limit = config.get().alertSpikeMs();
+        if (config.get().lagAlertPercent() > 0 && limit > 0 && s.ms() >= limit) {
+            String in = s.system() == null || s.system().isEmpty() ? "" : " in " + s.system();
+            send("spike:" + s.lane(), String.format("Lag spike: %s froze for %.1f s, mostly %s%s.", s.lane(), s.ms() / 1000.0, s.cause(), in));
         }
     }
 

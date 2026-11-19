@@ -95,9 +95,17 @@
   // spike, with what was running during it. 30 ticks a second is 33 ms.
   "LagSpikeMs": 100,
   // Staff with hycon.lag.alerts are told when one plugin uses more than
-  // this share (percent) of a world thread for 3 minutes, or a spike lasts
-  // over a second. 0 = no alerts.
+  // this share (percent) of a world thread for 3 minutes. 0 = no alerts
+  // at all (the three Alert options below need this above 0).
   "LagAlertPercent": 30,
   // Optional Discord webhook URL for the same alerts. "" = none.
-  "LagWebhook": ""
+  "LagWebhook": "",
+  // Alert when a single tick or scheduler task freezes longer than this
+  // (milliseconds). 0 = off.
+  "AlertSpikeMs": 1000,
+  // Alert when there are this many lag spikes in one minute. 0 = off.
+  "AlertSpikesPerMinute": 10,
+  // Alert when memory in use stays over this share (percent) of the
+  // maximum for 3 minutes. 0 = off.
+  "AlertMemoryPercent": 90
 }

@@ -3,6 +3,14 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.36 (2026-11-19)
+- **Performance** tab: lag spikes now name the ECS system or scheduler task behind them and whether a chunk
+  load, world generation or save was running. New tables for late scheduler tasks (and the task that held
+  them up), the slowest scheduler tasks, a per-plugin drill-down, world-thread time per world, network traffic
+  per player, and which method waits on files or a database on a game thread. History graphs of spikes,
+  memory, players, and each world's chunks, entities and NPCs. Memory shows the longest GC pause.
+- Configurable alerts: new settings `AlertSpikeMs`, `AlertSpikesPerMinute`, `AlertMemoryPercent`.
+
 ## 0.1.35 (2026-11-18)
 - New **Performance** tab and `/lag`: an always-on profiler that shows which plugins use the most server
   time, each lag spike and its cause, the slowest ECS systems, blocking file or database work on game
