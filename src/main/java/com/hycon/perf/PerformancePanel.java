@@ -58,14 +58,27 @@ public final class PerformancePanel implements HyconPanel {
         Report r = Report.of(list);
 
         out.note(r.verdict() + (out.rangeMillis() > DAY_MS ? " Detail covers the last 24 hours; the version table goes back 30 days." : ""));
-        out.stat("Tick time", String.format("%.1f ms", r.tickAvgMs), "average, budget 33 ms")
-                .stat("Worst tick", String.format("%.0f ms", r.tickMaxMs))
-                .stat("Lag spikes", String.valueOf(r.spikes), "ticks over the spike limit")
-                .stat("World threads busy", String.format("%.0f%%", r.busy * 100))
-                .stat("Scheduler", String.format("%.0f%% busy", r.schedBusy * 100), String.format("tasks up to %.0f ms late", r.schedLateMaxMs))
-                .stat("Memory", r.heapMb + " MB", String.format("of %d MB, GC %.0f ms/min, longest pause %d ms", r.heapMaxMb,
+        double memPct = r.heapMaxMb <= 0 ? 0 : r.heapMb * 100.0 / r.heapMaxMb;
+        out.stat("Tick time", String.format("%.1f ms", r.tickAvgMs), grade(r.tickAvgMs, 20, 33)
+                        + ": how long the server needs for one game step, on average. Under 20 ms is good; over 33 ms the game slows down for everyone.")
+                .stat("Worst tick", String.format("%.0f ms", r.tickMaxMs), grade(r.tickMaxMs, 100, 500)
+                        + ": the single slowest step. Under 100 ms nobody notices; over 500 ms players see a freeze or rubber-banding.")
+                .stat("Lag spikes", String.valueOf(r.spikes), grade(r.minutes == 0 ? 0 : r.spikes / (double) r.minutes, 0.2, 2)
+                        + ": steps slower than the spike limit. A few a day is normal (saves, players joining); several a minute is a problem.")
+                .stat("World threads busy", String.format("%.0f%%", r.busy * 100), grade(r.busy * 100, 50, 80)
+                        + ": how much of the time the worlds are working instead of waiting. Under 50% leaves room for more players; over 80% means little headroom.")
+                .stat("Scheduler", String.format("%.0f%% busy", r.schedBusy * 100), grade(Math.max(r.schedBusy * 100, r.schedLateMaxMs / 5), 10, 50)
+                        + String.format(": the one helper thread all plugins share. Tasks ran up to %.0f ms late. Under 10%% busy and under 50 ms late is good; slow tasks here delay every plugin.", r.schedLateMaxMs))
+                .stat("Memory", r.heapMb + " MB", grade(memPct, 70, 90)
+                        + String.format(": %.0f%% of the %d MB the server may use. Under 70%% is good; staying over 90%% risks freezes and crashes. "
+                        + "Cleaning up (GC) took %.0f ms a minute, longest single pause %d ms (under 100 ms is fine).", memPct, r.heapMaxMb,
                         r.gcMsPerMin, r.gcMaxPauseMs));
+        out.note("How to read this page: each number above says Good, Watch or Bad with what it means. Below, the bars and tables show "
+                + "which plugin or task caused it, so you know who to ask or what to remove. \"ms\" is a thousandth of a second; "
+                + "the server does 30 game steps (ticks) a second, so each has 33 ms.");
 
+        out.note("Who uses the time: each plugin's share of the world threads (where the game runs) and of the shared scheduler. "
+                + "\"Hytale\" is the game itself. A plugin that alone takes more than about 10% is worth a closer look.");
         shareBars(out, "Who uses the world threads", r.worldShare, r.busy);
         shareBars(out, "Who uses the shared scheduler thread", r.schedShare, r.schedBusy);
         charts(out, list, r);
@@ -82,6 +95,11 @@ public final class PerformancePanel implements HyconPanel {
         versions(out, now);
         out.note(String.format("Sampling every %d ms. Shares are of all world-thread time, idle included. A plugin is blamed for the Hytale code it calls.",
                 perf.profiler().sampleEveryMs()));
+    }
+
+    /** "Good", "Watch" or "Bad" for a value where lower is better. */
+    private static String grade(double value, double good, double bad) {
+        return value <= good ? "Good" : value <= bad ? "Watch" : "Bad";
     }
 
     private static void shareBars(PanelData out, String title, Map<String, Double> shares, double busy) {
@@ -148,6 +166,8 @@ public final class PerformancePanel implements HyconPanel {
                 perWorld.computeIfAbsent(w.name(), k -> new LinkedHashMap<>()).put(b, new int[]{w.chunks(), w.entities(), w.npcs()});
             }
         }
+        out.note("History: how the server changed over the chosen time. Look for the moment things went up: a jump in spikes "
+                + "with a jump in players or chunks means load; memory that only climbs and never drops can mean a leak.");
         PanelData.Series spikes = out.series("Lag spikes", "spikes").subtitle(per);
         spikes.line("Spikes");
         agg.forEach((b, a) -> spikes.point(b, a[0]));
@@ -180,6 +200,8 @@ public final class PerformancePanel implements HyconPanel {
     }
 
     private void spikes(PanelData out) {
+        out.note("Lag spikes: each slow game step. \"Cause\" is the plugin that ran most during it; \"System or task\" the part of it; "
+                + "\"Also\" shows chunk loading, world generation or saving, which are normal in small amounts. GC is memory clean-up.");
         PanelData.Table t = out.table("Lag spikes (newest first)", "When", "Where", "Length", "Cause", "System or task", "Also",
                 "Running", "GC");
         for (Spike s : perf.profiler().spikes()) {
@@ -190,6 +212,8 @@ public final class PerformancePanel implements HyconPanel {
 
     /** The tasks behind "tasks up to N ms late", and the slowest scheduler tasks. */
     private static void scheduler(PanelData out, Report r) {
+        out.note("Scheduler: every plugin shares one helper thread for timers. One slow task makes all the others wait. "
+                + "A task late by under 50 ms is fine; one that runs 100 ms or more should move its work to its own thread (tell its author).");
         if (!r.lates.isEmpty()) {
             PanelData.Table t = out.table("Late scheduler tasks (worst first)", "When", "Late by", "Held up by");
             for (Late l : r.lates) {
@@ -227,6 +251,7 @@ public final class PerformancePanel implements HyconPanel {
                 l.add(k.task() + String.format(" %.0f ms", k.longestMs()));
             }
         }
+        out.note("Plugin drill-down: for each plugin, where its time goes. Useful to send to a plugin's author when it is slow.");
         PanelData.Table t = out.table("Plugin drill-down", "Plugin", "World share", "Top methods", "Top ECS systems", "Top scheduler tasks");
         r.worldShare.keySet().stream().limit(12).forEach(owner -> t.row(owner, String.format("%.1f%%", r.worldShare.get(owner) * 100),
                 String.join(", ", methods.getOrDefault(owner, List.of())), String.join(", ", systems.getOrDefault(owner, List.of())),
@@ -256,6 +281,8 @@ public final class PerformancePanel implements HyconPanel {
         if (r.ioMsPerMin.isEmpty()) {
             return;
         }
+        out.note("Waiting on files or a database: while this happens the world stands still. Any amount here is worth fixing; "
+                + "over 50 ms a minute players can feel it.");
         PanelData.Table t = out.table("Waiting on files, network or a database on a game thread", "Plugin", "Called from", "ms per minute");
         r.ioWhereMsPerMin.entrySet().stream().limit(20).forEach(e -> {
             String[] parts = e.getKey().split("\t", 2);
@@ -300,6 +327,8 @@ public final class PerformancePanel implements HyconPanel {
         if (r.traffic.isEmpty()) {
             return;
         }
+        out.note("Network: data sent to and from each player. Up to about 50 KB/s each is normal; far more for one player can mean "
+                + "a busy area (many entities) or a plugin sending too much.");
         PanelData.Table t = out.table("Network traffic per player (last minute)", "Player", "Sent to them", "Received", "Sent per second");
         for (Traffic tr : r.traffic) {
             t.row(tr.player(), kb(tr.sent()), kb(tr.received()), kb(tr.sent() / 60) + "/s");
