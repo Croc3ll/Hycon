@@ -46,7 +46,9 @@ def cmd_lint():
         rel = f.relative_to(ROOT)
         for n, line in enumerate(read(f).splitlines(), 1):
             # Hytale's scheduler is one thread for the whole server: timers must hand work off (onIo or a thread).
-            if "SCHEDULED_EXECUTOR.scheduleAtFixedRate" in line and "onIo(" not in line and "Thread." not in line:
+            # "scheduler-ok" on the line marks a timer that must run there and does no IO (the profiler's lateness probe).
+            if ("SCHEDULED_EXECUTOR.scheduleAtFixedRate" in line and "onIo(" not in line and "Thread." not in line
+                    and "scheduler-ok" not in line):
                 problems.append(f"{rel}:{n}: timer runs its work on Hytale's shared scheduler (wrap it in onIo)")
     for f in WEB.rglob("*.js"):
         rel = f.relative_to(ROOT)

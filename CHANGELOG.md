@@ -3,6 +3,9 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.39 (2026-11-19)
+- Profiler: a paused server (machine asleep, VM frozen) is no longer reported as hours-long lag spikes with alerts.
+
 ## 0.1.38 (2026-11-19)
 - Performance: Hytale's networking (a packet nudging the network thread) no longer counts as waiting on files, so it
   stops costing health points. The Scheduler card says whether "busy" or "late" is the problem. The summary no longer

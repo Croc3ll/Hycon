@@ -131,11 +131,14 @@ public final class Profiler {
         long start = System.nanoTime();
         long period = scheduler.intervalNs;
         long[] n = {0};
-        probe = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+        probe = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> { // scheduler-ok: measures that thread, no IO
             long now = System.nanoTime();
             n[0]++;
             scheduler.thread = Thread.currentThread();
             long late = Math.max(0, now - (start + n[0] * period));
+            if (late > PAUSE_NS) {
+                return; // catching up after the process was paused (machine asleep): not a late task
+            }
             scheduler.late(late);
             if (late / 1e6 >= LATE_LOG_MS && lates.size() < 200) {
                 String blame = lastTask;
@@ -183,11 +186,41 @@ public final class Profiler {
         return sampleMs;
     }
 
+    /** A sampler loop this late means the whole process stood still (the machine slept), not that a world lagged. */
+    private static final long PAUSE_NS = TimeUnit.SECONDS.toNanos(5);
+    private long lastLoopNs;
+
+    /**
+     * After a pause every world looks frozen for as long as the pause lasted (a 10-hour "spike" on a test PC that
+     * slept, 2026-11-19). Drop spikes in progress, treat every thread as having just checked in, and restart the
+     * cost window so the self-limiter doesn't read the pause as sampling cost. Sampler thread.
+     */
+    private void resumedFromPause(long now) {
+        log.at(Level.INFO).log("Hycon profiler: the server was paused for %d s (machine asleep?); not counted as lag",
+                TimeUnit.NANOSECONDS.toSeconds(now - lastLoopNs));
+        for (Lane lane : lanes.values()) {
+            lane.spike = null;
+            lane.lastBeat = now;
+            lane.lastSample = 0;
+            lane.runTask = null;
+        }
+        scheduler.spike = null;
+        scheduler.lastBeat = now;
+        scheduler.lastSample = 0;
+        scheduler.runTask = null;
+        costNs = 0;
+        costWindowStart = now;
+    }
+
     private void loop() {
         while (running) {
             boolean fast = false;
             try {
                 long t0 = System.nanoTime();
+                if (lastLoopNs != 0 && t0 - lastLoopNs > PAUSE_NS) {
+                    resumedFromPause(t0); // the whole process was paused (host asleep, VM frozen): not lag
+                }
+                lastLoopNs = t0;
                 fast = sampleAll(t0);
                 costNs += System.nanoTime() - t0;
                 if (System.currentTimeMillis() - minuteStart >= 60_000) {
