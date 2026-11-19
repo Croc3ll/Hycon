@@ -212,6 +212,9 @@ was installed. Other plugins can add their own tabs next to Analytics.
 Hycon's profiler is always on and costs well under 1% of the server. It shows which plugins use the
 server's time and what caused each lag spike, so you can tell a slow plugin from a busy server.
 
+- **Server health**, 0 to 100, for a quick look: 90+ excellent, 75+ good (in good standing), 50+ fair, below that poor.
+  It starts at 100 and loses points for slow or frozen ticks, lag spikes, full memory, a slow shared scheduler and file
+  or database waits on game threads, and lists what cost the points.
 - **Verdict** at the top in plain words: healthy, busy or lagging, the plugin using the most time, and
   any plugin that waits on files or a database on a game thread.
 - **Who uses the world threads** and **the shared scheduler thread**: each plugin's share of the time.

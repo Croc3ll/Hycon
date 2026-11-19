@@ -3,6 +3,9 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.37 (2026-11-19)
+- **Performance** tab: a Server health score (0 to 100) at the top, with what cost it points.
+
 ## 0.1.36 (2026-11-19)
 - **Performance** tab: lag spikes now name the ECS system or scheduler task behind them and whether a chunk
   load, world generation or save was running. New tables for late scheduler tasks (and the task that held

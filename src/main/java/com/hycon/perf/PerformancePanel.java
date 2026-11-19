@@ -59,6 +59,10 @@ public final class PerformancePanel implements HyconPanel {
 
         out.note(r.verdict() + (out.rangeMillis() > DAY_MS ? " Detail covers the last 24 hours; the version table goes back 30 days." : ""));
         double memPct = r.heapMaxMb <= 0 ? 0 : r.heapMb * 100.0 / r.heapMaxMb;
+        int health = r.health(memPct);
+        out.stat("Server health", health < 0 ? "..." : health + " / 100", Report.healthWord(health) + (health < 0 ? ": check back in a minute."
+                : r.healthReasons.isEmpty() ? ": nothing is holding the server back. Players get smooth play."
+                : ": in good standing at 75 and up. Points lost for: " + String.join(", ", r.healthReasons) + "."));
         out.stat("Tick time", String.format("%.1f ms", r.tickAvgMs), grade(r.tickAvgMs, 20, 33)
                         + ": how long the server needs for one game step, on average. Under 20 ms is good; over 33 ms the game slows down for everyone.")
                 .stat("Worst tick", String.format("%.0f ms", r.tickMaxMs), grade(r.tickMaxMs, 100, 500)

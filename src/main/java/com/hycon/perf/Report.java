@@ -149,6 +149,42 @@ final class Report {
         return s.toString();
     }
 
+    /** What took points off the health score, biggest first (empty when nothing did). */
+    final java.util.List<String> healthReasons = new java.util.ArrayList<>();
+
+    /**
+     * One number for a quick look, 0 to 100: starts at 100 and loses points for slow ticks, freezes, lag spikes,
+     * memory pressure, a slow shared scheduler and file or database waits on game threads. The reasons say why.
+     */
+    int health(double memPct) {
+        if (minutes == 0) {
+            return -1;
+        }
+        healthReasons.clear();
+        java.util.Map<String, Double> off = new java.util.LinkedHashMap<>();
+        off.put(String.format("ticks take %.1f ms on average", tickAvgMs), Math.min(30, Math.max(0, (tickAvgMs - 20) * 1.5)));
+        off.put(String.format("worst tick %.0f ms", tickMaxMs), Math.min(20, Math.max(0, (tickMaxMs - 100) / 20)));
+        double spm = spikes / (double) minutes;
+        off.put(String.format("%.1f lag spikes a minute", spm), Math.min(20, spm * 10));
+        off.put(String.format("memory %.0f%% full", memPct), Math.min(15, Math.max(0, memPct - 70)));
+        off.put(String.format("scheduler tasks up to %.0f ms late", schedLateMaxMs), Math.min(10, Math.max(0, (schedLateMaxMs - 50) / 20)));
+        off.put(String.format("scheduler %.0f%% busy", schedBusy * 100), Math.min(10, Math.max(0, (schedBusy * 100 - 10) / 2)));
+        double io = ioMsPerMin.values().stream().mapToDouble(Double::doubleValue).sum();
+        off.put(String.format("%.0f ms a minute waiting on files or a database", io), Math.min(10, io / 10));
+        double score = 100;
+        for (var e : off.entrySet().stream().sorted(java.util.Map.Entry.<String, Double>comparingByValue().reversed()).toList()) {
+            if (e.getValue() >= 1) {
+                healthReasons.add(e.getKey() + String.format(" (-%.0f)", e.getValue()));
+            }
+            score -= e.getValue();
+        }
+        return (int) Math.max(0, Math.round(score));
+    }
+
+    static String healthWord(int score) {
+        return score < 0 ? "Collecting" : score >= 90 ? "Excellent" : score >= 75 ? "Good" : score >= 50 ? "Fair" : "Poor";
+    }
+
     /** The third-party plugin using the most world-thread time, or null. */
     String topPlugin() {
         return worldShare.keySet().stream().filter(Owners::isPlugin).findFirst().orElse(null);
