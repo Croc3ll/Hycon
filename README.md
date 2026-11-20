@@ -110,6 +110,8 @@ The panel can ban players and run commands, so:
 
 - It listens on **127.0.0.1 only** by default. To reach it from elsewhere, put an HTTPS reverse
   proxy in front, set `SecureCookie`, `AllowedHosts` and (only behind your own proxy) `TrustProxy`.
+  If that proxy reaches Hycon from a public IP (a VPS in front of your game server), also add its IP to
+  `TrustedProxies`. A proxy on the same machine, a private network or Cloudflare Tunnel needs nothing more.
 - Passwords are stored as PBKDF2-SHA256 hashes (600,000 rounds) in `admins.json`.
 - Sessions use an HttpOnly, SameSite=Strict cookie; they expire when idle and after a maximum time.
   Logging in, and changing a password, issue a new session id.

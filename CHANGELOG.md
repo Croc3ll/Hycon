@@ -4,6 +4,8 @@ Every Hycon release, newest first. Downloads are on the [releases page](https://
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
 ## 0.1.51 (2026-11-20)
+Updating from 0.1.48 or older? Read **Action needed** under 0.1.49.
+
 - Only OWNER accounts can download log files (last hour, today's log). Whole log files hold every player's IP
   address. Moderators still watch the live console.
 
@@ -14,6 +16,12 @@ Every Hycon release, newest first. Downloads are on the [releases page](https://
 
 ## 0.1.49 (2026-11-20)
 Security fixes. Updating is recommended.
+
+**Action needed** if a proxy reaches your panel from a public IP (for example a VPS in front of your game server):
+add that IP to `TrustedProxies` in `hycon.json`, e.g. `"TrustedProxies": ["203.0.113.7"]`. Otherwise every visitor
+shares the proxy's address for the login limit. If it's missing, the server log names the address to add.
+Cloudflare Tunnel and proxies on the same machine or a private network need no change.
+
 - Slow clients can no longer freeze the panel or the ban-share port. A client that sent its request one byte at a
   time held a worker forever, so four of them froze the panel and one froze ban sharing. Requests now have 20
   seconds to arrive and 120 seconds to be answered.
