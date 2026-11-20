@@ -163,3 +163,8 @@ Hycon is installed. See [docs/ADDING-A-PANEL.md](docs/ADDING-A-PANEL.md) for a f
 To test inside another server too, add `hyconTestMods=<that server>/mods` to your own
 `~/.gradle/gradle.properties`; every `gradlew build` then copies the jar there (stop that server first,
 Windows locks the jar while it runs).
+
+## License
+
+Free to run on any server you own or operate, including paid ones. Selling it, re-uploading it or passing it off as
+your own is not allowed. See [LICENSE](LICENSE).
