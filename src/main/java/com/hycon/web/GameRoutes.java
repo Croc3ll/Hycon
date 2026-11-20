@@ -12,6 +12,8 @@ import com.hycon.game.KnownPlayers;
 import com.hycon.game.LogTap;
 import com.hycon.game.Moderation;
 import com.hycon.game.KillLog;
+import com.hycon.game.Mutes;
+import com.hycon.game.Presets;
 import com.hycon.game.PingLog;
 import com.hycon.game.PlayerRecords;
 import com.hycon.sync.SharingStore;
@@ -41,10 +43,14 @@ public final class GameRoutes {
     private final SharingStore sharing;
     private final PingLog pings;
     private final KillLog kills;
+    private final Mutes mutes;
+    private final Presets presets;
 
     public GameRoutes(WebServer web, Moderation moderation, ConsoleRunner console, LogTap log, AuditLog audit,
                       AdminStore admins, KnownPlayers known, PlayerRecords records, SharingStore sharing, PingLog pings,
-                      KillLog kills) {
+                      KillLog kills, Mutes mutes, Presets presets) {
+        this.mutes = mutes;
+        this.presets = presets;
         this.pings = pings;
         this.kills = kills;
         this.records = records;
@@ -66,6 +72,12 @@ public final class GameRoutes {
         web.post("/api/ban", Level.MODERATOR, this::ban);
         web.post("/api/unban", Level.MODERATOR, this::unban);
         web.post("/api/warn", Level.MODERATOR, this::warn);
+        web.post("/api/mute", Level.MODERATOR, this::mute);
+        web.post("/api/unmute", Level.MODERATOR, this::unmute);
+        web.get("/api/mutes", Level.VIEWER, this::mutesList);
+        web.get("/api/presets", Level.MODERATOR, this::presetsList);
+        web.post("/api/punish", Level.MODERATOR, this::punishWithPreset);
+        web.post("/api/presets/save", Level.OWNER, this::presetsSave);
         web.post("/api/note", Level.MODERATOR, this::note);
         web.post("/api/clear-risk", Level.MODERATOR, this::clearRisk);
         web.get("/api/profile", Level.VIEWER, this::profile);
@@ -82,11 +94,59 @@ public final class GameRoutes {
         web.get("/api/worldmap", Level.VIEWER, this::worldMap);
     }
 
+    /**
+     * How long a player's risk on the Players table is reused. Plugins add to the score from their own
+     * databases, and the table asks every 5 seconds for everyone online, so a fresh score each time
+     * would keep the database busy for a number nobody needs to the second.
+     */
+    private static final long RISK_CACHE_MS = 60_000;
+
+    private record CachedRisk(int score, String level, long at) {
+    }
+
+    private final Map<UUID, CachedRisk> riskCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private CachedRisk risk(com.hycon.analytics.RiskSection section, UUID player) {
+        long now = System.currentTimeMillis();
+        CachedRisk c = riskCache.get(player);
+        if (c == null || now - c.at() > RISK_CACHE_MS) {
+            var s = section.score(player);
+            c = new CachedRisk(s.score(), s.level(), now);
+            riskCache.put(player, c);
+        }
+        return c;
+    }
+
+    /** Who is online, with what staff look at first: session length, total playtime, ping and risk. */
     private void players(Req r) throws IOException {
+        com.hycon.analytics.RiskSection risk = com.hycon.analytics.RiskSection.get();
+        java.util.Set<UUID> online = new java.util.HashSet<>();
         Json j = new Json().beginObject().name("players").beginArray();
         for (Moderation.OnlinePlayer p : moderation.online()) {
-            j.beginObject().field("uuid", p.uuid().toString()).field("name", p.name()).field("world", p.world()).endObject();
+            online.add(p.uuid());
+            j.beginObject().field("uuid", p.uuid().toString()).field("name", p.name()).field("world", p.world());
+            if (mutes.get(p.uuid()) != null) {
+                j.field("muted", true);
+            }
+            Long since = known.sessionStart(p.uuid());
+            if (since != null) {
+                j.field("since", since);
+            }
+            KnownPlayers.Info info = known.get(p.uuid());
+            if (info != null) {
+                j.field("playtimeMs", known.playtimeNow(info));
+            }
+            Integer ping = pings.latest(p.uuid());
+            if (ping != null) {
+                j.field("ping", ping);
+            }
+            if (risk != null) {
+                CachedRisk c = risk(risk, p.uuid());
+                j.field("risk", c.score()).field("riskLevel", c.level());
+            }
+            j.endObject();
         }
+        riskCache.keySet().retainAll(online); // players who left are scored fresh when they're back
         r.ok(j.endArray().endObject());
     }
 
@@ -104,12 +164,20 @@ public final class GameRoutes {
         Json j = new Json().beginObject().field("total", known.size()).name("players").beginArray();
         for (KnownPlayers.Info i : known.search(q, online::contains, 100)) {
             j.beginObject().field("uuid", i.uuid().toString()).field("name", i.name()).field("online", online.contains(i.uuid()))
-                    .field("first", i.firstSeen()).field("last", i.lastSeen()).field("world", i.world());
+                    .field("first", i.firstSeen()).field("last", i.lastSeen()).field("world", i.world())
+                    .field("playtimeMs", known.playtimeNow(i));
             Moderation.BanInfo b = banned.get(i.uuid());
             if (b != null) {
                 j.field("banned", true);
                 if (b.expires() != null) {
                     j.field("banEnds", b.expires().toEpochMilli());
+                }
+            }
+            Mutes.Mute m = mutes.get(i.uuid());
+            if (m != null) {
+                j.field("muted", true);
+                if (m.until() != 0) {
+                    j.field("muteEnds", m.until());
                 }
             }
             j.endObject();
@@ -149,42 +217,184 @@ public final class GameRoutes {
     }
 
     private void kick(Req r) throws IOException {
-        String reason = reason(r);
-        Moderation.Target t = moderation.resolve(r.str("player"));
-        if (t == null || t.online() == null) {
-            audit.record(r.who(), r.ip, "kick", r.str("player"), "not online", false);
-            r.error(404, "That player isn't online");
-            return;
-        }
-        boolean ok = moderation.kick(t, reason);
-        audit.record(r.who(), r.ip, "kick", label(t), reason, ok);
-        if (ok) {
-            records.record(t.uuid(), PlayerRecords.Type.KICK, r.who(), reason, null);
-        }
-        done(r, ok, ok ? "Kicked " + t.name() : t.name() + " wasn't online");
+        single(r, "kick");
     }
 
     private void ban(Req r) throws IOException {
-        String reason = reason(r);
-        Duration duration;
-        try {
-            duration = Moderation.parseDuration(r.str("duration"));
-        } catch (IllegalArgumentException e) {
-            r.error(400, e.getMessage());
-            return;
-        }
+        single(r, "ban");
+    }
+
+    private void mute(Req r) throws IOException {
+        single(r, "mute");
+    }
+
+    /** Warns a player: always saved to their history; shown on screen if they are online. */
+    private void warn(Req r) throws IOException {
+        single(r, "warn");
+    }
+
+    /** One of the moderation buttons: warn, kick, mute or ban with the reason and time typed in the panel. */
+    private void single(Req r, String action) throws IOException {
         Moderation.Target t = moderation.resolve(r.str("player"));
         if (t == null) {
             r.error(404, "Unknown player. Use the exact name of someone who has been online, or their UUID.");
             return;
         }
-        boolean ok = moderation.ban(t, r.admin.uuid(), reason, duration);
-        String len = duration == null ? "permanent" : r.str("duration");
-        audit.record(r.who(), r.ip, "ban", label(t), len + ": " + reason, ok);
-        if (ok) {
-            records.record(t.uuid(), PlayerRecords.Type.BAN, r.who(), reason, len);
+        try {
+            Outcome o = punish(r, t, action, r.str("duration"), reason(r));
+            done(r, o.ok(), o.message());
+        } catch (IllegalArgumentException e) {
+            r.error(400, e.getMessage());
         }
-        done(r, ok, ok ? "Banned " + t.name() + " (" + len + ")" : t.name() + " is already banned");
+    }
+
+    private record Outcome(boolean ok, String message) {
+    }
+
+    /**
+     * Carries out one punishment and writes it to the audit log and the player's record. The single
+     * buttons and the presets both come through here, so each is logged the same way.
+     *
+     * @throws IllegalArgumentException with a message for the panel (a bad time, a warning without a reason)
+     */
+    private Outcome punish(Req r, Moderation.Target t, String action, String durationText, String reason) throws IOException {
+        switch (action) {
+            case "kick" -> {
+                if (t.online() == null) {
+                    audit.record(r.who(), r.ip, "kick", label(t), "not online", false);
+                    return new Outcome(false, t.name() + " isn't online");
+                }
+                boolean ok = moderation.kick(t, reason);
+                audit.record(r.who(), r.ip, "kick", label(t), reason, ok);
+                if (ok) {
+                    records.record(t.uuid(), PlayerRecords.Type.KICK, r.who(), reason, null);
+                }
+                return new Outcome(ok, ok ? "Kicked " + t.name() : t.name() + " wasn't online");
+            }
+            case "ban" -> {
+                Duration duration = Moderation.parseDuration(durationText);
+                String len = duration == null ? "permanent" : durationText;
+                boolean ok = moderation.ban(t, r.admin.uuid(), reason, duration);
+                audit.record(r.who(), r.ip, "ban", label(t), len + ": " + reason, ok);
+                if (ok) {
+                    records.record(t.uuid(), PlayerRecords.Type.BAN, r.who(), reason, len);
+                }
+                return new Outcome(ok, ok ? "Banned " + t.name() + " (" + len + ")" : t.name() + " is already banned");
+            }
+            case "mute" -> {
+                Duration duration = Moderation.parseDuration(durationText);
+                String len = duration == null ? "permanent" : durationText;
+                Mutes.Mute m = mutes.mute(t.uuid(), t.name(), r.who(), reason, duration);
+                moderation.tell(t, Mutes.notice(m));
+                audit.record(r.who(), r.ip, "mute", label(t), len + ": " + reason, true);
+                records.record(t.uuid(), PlayerRecords.Type.MUTE, r.who(), reason, len);
+                return new Outcome(true, "Muted " + t.name() + " (" + len + ")");
+            }
+            case "warn" -> {
+                if (reason.isEmpty()) {
+                    throw new IllegalArgumentException("A warning needs a reason");
+                }
+                int number = records.count(t.uuid(), PlayerRecords.Type.WARN) + 1;
+                records.record(t.uuid(), PlayerRecords.Type.WARN, r.who(), reason, null);
+                boolean shown = moderation.warn(t, reason, number);
+                audit.record(r.who(), r.ip, "warn", label(t), reason, true);
+                return new Outcome(true, "Warning #" + number + " for " + t.name() + (shown ? " shown in game" : " saved (player is offline)"));
+            }
+            default -> throw new IllegalArgumentException("Unknown action " + action);
+        }
+    }
+
+    private void unmute(Req r) throws IOException {
+        Moderation.Target t = moderation.resolve(r.str("player"));
+        if (t == null) {
+            r.error(404, "Unknown player");
+            return;
+        }
+        boolean ok = mutes.unmute(t.uuid());
+        audit.record(r.who(), r.ip, "unmute", label(t), null, ok);
+        if (ok) {
+            records.record(t.uuid(), PlayerRecords.Type.UNMUTE, r.who(), reason(r), null);
+            moderation.tell(t, "You can chat again.");
+        }
+        done(r, ok, ok ? "Unmuted " + t.name() : t.name() + " wasn't muted");
+    }
+
+    private void mutesList(Req r) throws IOException {
+        Json j = new Json().beginObject().name("mutes").beginArray();
+        for (Mutes.Mute m : mutes.all()) {
+            Mutes.write(j.beginObject(), m).endObject();
+        }
+        r.ok(j.endArray().endObject());
+    }
+
+    /** How many times the player was already punished for this preset's offence. */
+    private int offences(UUID player, Presets.Preset p) {
+        int n = 0;
+        for (PlayerRecords.Entry e : records.history(player)) {
+            boolean punishment = e.type() == PlayerRecords.Type.WARN || e.type() == PlayerRecords.Type.KICK
+                    || e.type() == PlayerRecords.Type.MUTE || e.type() == PlayerRecords.Type.BAN;
+            if (punishment && e.reason() != null && e.reason().startsWith(p.tag())) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Every preset with its steps; with {@code player}, also which step that player is on next. */
+    private void presetsList(Req r) throws IOException {
+        Moderation.Target t = r.query("player") == null ? null : moderation.resolve(r.query("player"));
+        Json j = new Json().beginObject().field("text", presets.text()).name("presets").beginArray();
+        for (Presets.Preset p : presets.all()) {
+            j.beginObject().field("name", p.name()).name("steps").beginArray();
+            for (Presets.Step s : p.steps()) {
+                j.beginObject().field("action", s.action());
+                if (s.duration() != null) {
+                    j.field("duration", s.duration());
+                }
+                j.endObject();
+            }
+            j.endArray();
+            if (t != null) {
+                int done = offences(t.uuid(), p);
+                j.field("done", done).field("next", Math.min(done, p.steps().size() - 1));
+            }
+            j.endObject();
+        }
+        r.ok(j.endArray().endObject());
+    }
+
+    /** Applies the player's next step of a preset; the reason is "[Preset]" plus anything staff typed. */
+    private void punishWithPreset(Req r) throws IOException {
+        Presets.Preset p = presets.get(r.str("preset"));
+        Moderation.Target t = moderation.resolve(r.str("player"));
+        if (p == null || t == null) {
+            r.error(404, p == null ? "No such preset" : "Unknown player");
+            return;
+        }
+        Presets.Step step = p.next(offences(t.uuid(), p));
+        String note = reason(r);
+        String reason = p.tag() + (note.isEmpty() ? "" : " " + note);
+        try {
+            Outcome o = punish(r, t, step.action(), step.duration(), reason.length() > MAX_REASON ? reason.substring(0, MAX_REASON) : reason);
+            done(r, o.ok(), o.message());
+        } catch (IllegalArgumentException e) {
+            r.error(400, e.getMessage());
+        }
+    }
+
+    private void presetsSave(Req r) throws IOException {
+        String text = r.str("text");
+        if (text == null || text.length() > 4000) {
+            r.error(400, "Write one preset per line");
+            return;
+        }
+        try {
+            presets.replace(text);
+            audit.record(r.who(), r.ip, "presets", "", presets.all().size() + " presets", true);
+            r.ok(new Json().beginObject().field("ok", true).field("message", "Presets saved").endObject());
+        } catch (IllegalArgumentException e) {
+            r.error(400, e.getMessage());
+        }
     }
 
     private void unban(Req r) throws IOException {
@@ -205,29 +415,6 @@ public final class GameRoutes {
             records.record(t.uuid(), PlayerRecords.Type.UNBAN, r.who(), reason(r), null);
         }
         done(r, ok, ok ? "Unbanned " + t.name() : t.name() + " wasn't banned");
-    }
-
-    /**
-     * Warns a player: always saved to their history; shown on screen if they are online, otherwise
-     * only recorded (they'll find it in their record, staff see it in the profile).
-     */
-    private void warn(Req r) throws IOException {
-        String reason = reason(r);
-        if (reason.isEmpty()) {
-            r.error(400, "A warning needs a reason");
-            return;
-        }
-        Moderation.Target t = moderation.resolve(r.str("player"));
-        if (t == null) {
-            r.error(404, "Unknown player");
-            return;
-        }
-        int number = records.count(t.uuid(), PlayerRecords.Type.WARN) + 1;
-        records.record(t.uuid(), PlayerRecords.Type.WARN, r.who(), reason, null);
-        boolean shown = moderation.warn(t, reason, number);
-        audit.record(r.who(), r.ip, "warn", label(t), reason, true);
-        r.ok(new Json().beginObject().field("ok", true).field("message", "Warning #" + number + " for " + t.name()
-                + (shown ? " shown in game" : " saved (player is offline)")).endObject());
     }
 
     /** A staff-only note on the player's profile; never shown to the player. */
@@ -288,7 +475,16 @@ public final class GameRoutes {
         }
         j.field("warnings", records.count(t.uuid(), PlayerRecords.Type.WARN))
                 .field("kicks", records.count(t.uuid(), PlayerRecords.Type.KICK))
-                .field("bans", records.count(t.uuid(), PlayerRecords.Type.BAN));
+                .field("bans", records.count(t.uuid(), PlayerRecords.Type.BAN))
+                .field("mutes", records.count(t.uuid(), PlayerRecords.Type.MUTE));
+        Mutes.Mute mute = mutes.get(t.uuid());
+        if (mute != null) {
+            j.name("mute").beginObject().field("by", mute.by()).field("since", mute.since()).field("reason", mute.reason());
+            if (mute.until() != 0) {
+                j.field("expires", mute.until());
+            }
+            j.endObject();
+        }
         Moderation.BanInfo ban = moderation.ban(t.uuid());
         if (ban != null) {
             j.name("ban").beginObject().field("by", byName(ban.by())).field("since", ban.since().toEpochMilli()).field("reason", ban.reason());
@@ -470,7 +666,12 @@ public final class GameRoutes {
         Json j = new Json().beginObject().name("panels").beginArray();
         for (HyconPanel p : HyconApi.panels()) {
             if (r.admin.level().rank >= p.minLevel()) {
-                j.beginObject().field("id", p.id()).field("title", p.title()).endObject();
+                j.beginObject().field("id", p.id()).field("title", p.title());
+                String icon = p.icon();
+                if (icon != null && HyconApi.ICONS.contains(icon)) {
+                    j.field("icon", icon);
+                }
+                j.endObject();
             }
         }
         r.ok(j.endArray().endObject());

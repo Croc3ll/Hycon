@@ -96,6 +96,9 @@ public final class HyconPlugin extends JavaPlugin {
     private PlayerActivity activity;
     private PositionLog positions;
     private Reports reports;
+    private com.hycon.game.Schedule schedule;
+    private com.hycon.game.Mutes mutes;
+    private com.hycon.game.Presets presets;
     private BugReports bugs;
     private Ties ties;
     private GeoIp geo;
@@ -145,6 +148,13 @@ public final class HyconPlugin extends JavaPlugin {
         killLog = new KillLog(dir);
         getEntityStoreRegistry().registerSystem(killLog.new Tracker());
         chatLog = new ChatLog(dir);
+        mutes = new com.hycon.game.Mutes(dir);
+        presets = new com.hycon.game.Presets(dir);
+        // First, so a muted player's line is cancelled before any plugin formats, translates or sends it.
+        getEventRegistry().registerAsyncGlobal(com.hypixel.hytale.event.EventPriority.FIRST, PlayerChatEvent.class, f -> f.thenApply(e -> {
+            mutes.onChat(e);
+            return e;
+        }));
         getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, f -> f.thenApply(e -> {
             chatLog.onChat(e);
             return e;
@@ -209,6 +219,8 @@ public final class HyconPlugin extends JavaPlugin {
             killLog.open();
             chatLog.open();
             reports.load();
+            mutes.load();
+            presets.load();
             bugs.load();
             ties.load();
             geo.load();
@@ -231,17 +243,24 @@ public final class HyconPlugin extends JavaPlugin {
             web = new WebServer(liveConfig, sessions, admins, getLogger());
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
             ConsoleRunner consoleRunner = new ConsoleRunner(() -> liveConfig.get().blockedCommands());
-            new GameRoutes(web, moderation, consoleRunner, logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
+            new GameRoutes(web, moderation, consoleRunner, logTap, audit, admins, known, records, sharing, pingLog, killLog, mutes, presets).register();
             new IntelRoutes(web, reports, ties, killLog, known, moderation, sharing, records, audit).register();
             new GeoRoutes(web, geo, known, moderation, pingLog, () -> liveConfig.get().serverLocation()).register();
             new BugRoutes(web, bugs, audit).register();
             new ChatRoutes(web, chatLog, moderation).register();
-            new ConsoleRoutes(web, logTap, audit, consoleRunner,
-                    new com.hycon.game.AmpClient(liveConfig)).register();
+            com.hycon.game.AmpClient amp = new com.hycon.game.AmpClient(liveConfig);
+            new ConsoleRoutes(web, logTap, audit, consoleRunner, amp).register();
+            schedule = new com.hycon.game.Schedule(getDataDirectory(), log, () -> restartServer(amp), text -> {
+                logTap.addText("[Hycon] " + text);
+                audit.record("Schedule", "-", "server.restart", "", text, true);
+            });
+            schedule.load();
+            new com.hycon.web.ScheduleRoutes(web, schedule, consoleRunner, amp, audit).register();
             banSync = new BanSync(sharing, known, audit);
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
             new SyncRoutes(web, sharing, banSync, shareServer, audit).register();
+            new com.hycon.web.SecurityRoutes(web, liveConfig, admins, shareServer, () -> updates == null ? null : updates.notice()).register();
             web.start();
         } catch (IOException e) {
             ((HytaleLogger.Api) log.at(Level.SEVERE).withCause(e)).log("Hycon could not start the panel on %s:%d (see hycon.json)",
@@ -266,6 +285,7 @@ public final class HyconPlugin extends JavaPlugin {
         HyconApi.registerProfileSection(new ActivitySection(known, pingLog, killLog, records, reports));
         HyconApi.registerProfileSection(new com.hycon.analytics.RiskSection(known, records, reports, ties, moderation));
         banSync.start();
+        schedule.start();
         shareServer.update(); // opens the share port only if share keys exist
         if (shareServer.error() != null) {
             log.at(Level.WARNING).log("Hycon: %s", shareServer.error());
@@ -356,6 +376,9 @@ public final class HyconPlugin extends JavaPlugin {
         }
         if (banSync != null) {
             banSync.stop();
+            if (schedule != null) {
+                schedule.stop();
+            }
         }
         if (shareServer != null) {
             shareServer.stop();
@@ -490,6 +513,18 @@ public final class HyconPlugin extends JavaPlugin {
         out.append("Task ").append(name).append(": ")
                 .append(f == null ? "not scheduled" : f.isCancelled() ? "cancelled" : f.isDone() ? "STOPPED (threw?)" : "scheduled")
                 .append('\n');
+    }
+
+    /** A scheduled restart: through AMP when it's set up (AMP starts the server again), else a clean stop for the host to restart. */
+    private void restartServer(com.hycon.game.AmpClient amp) {
+        if (amp.configured()) {
+            String err = amp.run("Restart");
+            if (err == null) {
+                return;
+            }
+            getLogger().at(Level.WARNING).log("Hycon: AMP restart failed (%s); stopping the server instead", err);
+        }
+        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> HytaleServer.get().shutdownServer(), 1, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     public Path resetPasswordToFile(String name) throws IOException {

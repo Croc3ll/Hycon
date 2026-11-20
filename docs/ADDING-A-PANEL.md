@@ -59,6 +59,7 @@ public final class ShopPanel implements HyconPanel {
     @Override public String id() { return "shop"; }        // letters, digits, - _ .
     @Override public String title() { return "Shop"; }     // tab name
     @Override public int minLevel() { return HyconApi.VIEWER; } // VIEWER, MODERATOR, ADMIN or OWNER
+    @Override public String icon() { return "coins"; }      // optional, API 16: one of HyconApi.ICONS
 
     /** Called on a Hycon web thread each time the tab refreshes (about every 15 s). Keep it quick. */
     @Override
@@ -160,6 +161,12 @@ straight through. Each tab is capped (100 blocks, 5000 chart points, 1000 table 
   (counters, caches, your own database), never from the world or entities directly.
 - Keep it fast: it runs on every refresh of every open browser tab.
 - Exceptions in `render` show as an error on your tab; they don't affect Hycon or the server.
+
+## A tab icon (API 16)
+
+`icon()` picks the tab's icon in the sidebar: one of `HyconApi.ICONS` (`chart`, `swords`, `shield`, `coins`, `key`,
+`pickaxe`, `gift`, `eye`, `users`, `globe`, `star`, `crown`, `box`, `map`, `heart`, `bolt`, `flag`). Leave it out, or
+return null, for the plain chart. Older Hycon versions never ask, so it's safe to add.
 
 ## A section on every player's profile (API version 3)
 

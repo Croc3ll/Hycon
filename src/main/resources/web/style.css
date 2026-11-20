@@ -63,7 +63,7 @@ h3 { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: u
 /* ---------- Forms & buttons ---------- */
 label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
 input, select, button { font: inherit; color: inherit; }
-input, select { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #0d0f13;
+input, select, textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #0d0f13;
   transition: border-color .15s, box-shadow .15s; }
 input:hover, select:hover { border-color: #323743; }
 input:focus, select:focus { outline: none; border-color: var(--gold-dim); box-shadow: 0 0 0 3px var(--gold-bg); }
@@ -617,3 +617,119 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
   .row input, .row select, .panelform input, .panelform select { min-width: 0; width: 100%; flex: 1 1 100%; }
   input, select { font-size: 16px; } /* 16px stops iPhones zooming in when a field is tapped */
 }
+
+/* ---------- Sidebar (everything wider than a phone): the tabs in groups down the left, the account at the bottom ---------- */
+.navgroup { display: none; }
+.navcount { min-width: 18px; padding: 0 6px; border-radius: 999px; font: 700 11px/18px var(--mono); text-align: center;
+  color: #1a1407; background: var(--gold); }
+@media (min-width: 721px) {
+  :root { --side: 236px; }
+  body { padding-left: var(--side); background-position: calc(50% + var(--side) / 2) -220px, 0 0; }
+  header { position: fixed; inset: 0 auto 0 0; width: var(--side); height: auto; flex-direction: column; align-items: stretch;
+    flex-wrap: nowrap; gap: 14px; padding: 20px 12px 14px; border-bottom: 0; border-right: 1px solid rgba(255, 255, 255, .06);
+    overflow-y: auto; background: rgba(12, 13, 17, .9); }
+  header .brand { padding: 0 8px 8px; border-bottom: 1px solid var(--line2); }
+  nav#tabs { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 2px; flex: 1 0 auto; }
+  nav#tabs button { width: 100%; justify-content: flex-start; gap: 10px; padding: 6px 10px; border-radius: 8px; }
+  nav#tabs .tabmark { border-radius: 8px; }
+  nav#tabs button.active::before { content: ''; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0;
+    background: var(--gold); }
+  .navgroup { display: block; margin: 12px 10px 4px; font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--dim); }
+  nav#tabs > .navgroup:first-of-type { margin-top: 2px; }
+  .navlabel { flex: 1; text-align: left; }
+  .langbox { margin: 0; align-self: stretch; }
+  #lang { flex: 1; }
+  #me { flex-wrap: wrap; padding: 12px 8px 0; border-top: 1px solid var(--line2); }
+  #me button { margin-left: auto; padding: 5px 10px; font-size: 12px; }
+}
+@media (min-width: 721px) and (max-width: 999px) { :root { --side: 200px; } }
+/* Phones: the open menu shows each group's heading across the grid. */
+@media (max-width: 720px) {
+  nav#tabs .navgroup { display: block; grid-column: 1 / -1; margin: 8px 2px 0; font-size: 10px; font-weight: 700; letter-spacing: 1.4px;
+    text-transform: uppercase; color: var(--dim); }
+  nav#tabs .navlabel { flex: 1; }
+}
+
+/* ---------- Players tables: risk pill, quiet row buttons, ping colours ---------- */
+.riskpill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .3px; border: 1px solid; }
+.riskpill.low { color: #7fd9a0; border-color: rgba(79, 191, 122, .35); background: rgba(79, 191, 122, .1); }
+.riskpill.mid { color: var(--gold2); border-color: rgba(226, 181, 75, .4); background: var(--gold-bg); }
+.riskpill.high { color: #ffb37a; border-color: rgba(240, 140, 60, .45); background: rgba(240, 140, 60, .12); }
+.riskpill.vhigh { color: #ffb3ae; border-color: rgba(229, 83, 75, .5); background: var(--danger-bg); }
+td.num.pg-good { color: #4fbf7a; } td.num.pg-mid { color: #e2b54b; } td.num.pg-bad { color: #e5534b; } td.num.pg-none { color: var(--muted); }
+.playertable td { vertical-align: middle; }
+.playertable td.num { white-space: nowrap; }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+button.ghost:hover { color: var(--text); background: rgba(255, 255, 255, .05); border-color: var(--line); }
+/* On a mouse screen the buttons float over the end of the row being pointed at, so they take no column of their own. */
+@media (hover: hover) and (min-width: 721px) {
+  .playertable tbody tr { position: relative; }
+  .playertable td.actions { position: absolute; top: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px;
+    padding: 0 8px 0 48px; border: 0; background: linear-gradient(90deg, transparent, #16191f 40px); opacity: 0; pointer-events: none;
+    transition: opacity .15s; }
+  .playertable td.actions button { margin: 0; }
+  .playertable tr:hover td.actions, .playertable tr:focus-within td.actions { opacity: 1; pointer-events: auto; }
+  .playertable tbody tr:hover td { background-color: rgba(255, 255, 255, .025); }
+  .playertable th:last-child { width: 0; padding: 0; }
+}
+
+/* ---------- Needs attention: one line above every page ---------- */
+.attention { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid rgba(226, 181, 75, .3); background: linear-gradient(90deg, rgba(226, 181, 75, .1), rgba(226, 181, 75, .02)); }
+.attention.calm { border-color: rgba(79, 191, 122, .25); background: linear-gradient(90deg, rgba(79, 191, 122, .08), transparent); }
+.attn-h { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--gold2); margin-right: 4px; }
+.attention.calm .attn-h { color: #7fd9a0; }
+.attn-h i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(226, 181, 75, .18); }
+.attention:not(.calm) .attn-h i { animation: pulse 1.6s ease-in-out infinite; }
+button.attn { padding: 3px 11px; border-radius: 999px; font-size: 12px; border-color: rgba(226, 181, 75, .35); background: rgba(226, 181, 75, .08); color: var(--text); }
+button.attn:hover { background: var(--gold-bg); border-color: var(--gold); }
+button.attn.bad { border-color: rgba(229, 83, 75, .5); background: var(--danger-bg); color: #ffb3ae; }
+.attn-meta { margin-left: auto; color: var(--muted); font: 12px var(--mono); }
+
+/* Ping card: "More" opens the rest of the numbers. */
+.chips-stat[hidden] { display: none; }
+button.chip-more { align-self: stretch; min-width: 76px; border-radius: 4px; border: 1px dashed #3a404c; color: var(--muted); background: transparent;
+  font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+button.chip-more:hover { color: var(--gold2); border-color: var(--gold-dim); }
+/* Phones: a player card shows its numbers two to a row, under the name. */
+@media (max-width: 720px) {
+  main .playertable tr { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+  main .playertable td:first-child, main .playertable td.actions, main .playertable td[colspan] { grid-column: 1 / -1; }
+}
+
+/* ---------- Punish dialog and presets ---------- */
+dialog.moddlg { width: min(520px, calc(100vw - 32px)); }
+dialog.moddlg .seg { margin: 4px 0 14px; flex-wrap: wrap; }
+.stepchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.stepchip { padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); color: var(--muted); }
+.stepchip.past { opacity: .55; text-decoration: line-through; }
+.stepchip.next { color: var(--gold2); border-color: var(--gold); background: var(--gold-bg); font-weight: 700; }
+.badge.mutebadge { margin-left: 8px; color: #c9b8ff; border-color: rgba(150, 120, 255, .45); background: rgba(150, 120, 255, .12); }
+textarea { resize: vertical; font: 13px/1.6 var(--mono); }
+textarea:focus { outline: none; border-color: var(--gold-dim); box-shadow: 0 0 0 3px var(--gold-bg); }
+
+/* ---------- My account: two-factor setup ---------- */
+.setupkey { margin: 6px 0 10px; padding: 12px 14px; border: 1px dashed var(--gold-dim); border-radius: var(--radius-sm); background: var(--gold-bg);
+  color: var(--gold2); font-size: 18px; letter-spacing: 2px; word-break: break-all; user-select: all; }
+form.twofa label { margin-top: 6px; }
+#me a.who:hover { color: var(--gold2); text-decoration: none; }
+
+/* ---------- Security checklist ---------- */
+.pill.bad { color: #ffb3ae; border-color: rgba(229, 83, 75, .5); background: var(--danger-bg); }
+.checks { display: grid; gap: 8px; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line2); border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .015); }
+.check .mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 12px/1 var(--sans);
+  color: #0a0b0e; background: var(--ok); }
+.check.bad { border-color: rgba(229, 83, 75, .45); background: var(--danger-bg); }
+.check.bad .mark { background: var(--danger); color: #fff; }
+.check.warn { border-color: rgba(226, 181, 75, .35); }
+.check.warn .mark { background: var(--gold); }
+.check.info .mark { background: var(--blue); }
+.check .ctitle { font-weight: 600; margin-bottom: 2px; }
+
+/* ---------- Schedule ---------- */
+.annlist { display: grid; gap: 8px; margin-bottom: 8px; }
+.row.annrow input.every, .row input[type="number"] { flex: 0 0 90px; min-width: 0; width: 90px; }

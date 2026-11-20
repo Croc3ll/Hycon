@@ -90,19 +90,21 @@ public final class RiskSection implements HyconProfileSection {
         };
 
         long now = System.currentTimeMillis(), cleared = records.clearedAt(player);
-        double warns = 0, kicks = 0, bans = 0;
-        int warnsAll = 0, kicksAll = 0, bansAll = 0;
+        double warns = 0, kicks = 0, bans = 0, mutes = 0;
+        int warnsAll = 0, kicksAll = 0, bansAll = 0, mutesAll = 0;
         for (PlayerRecords.Entry e : records.history(player)) {
             double w = weight(e.time(), now, cleared);
             switch (e.type()) {
                 case WARN -> { warns += w; warnsAll++; }
                 case KICK -> { kicks += w; kicksAll++; }
                 case BAN -> { bans += w; bansAll++; }
+                case MUTE -> { mutes += w; mutesAll++; }
                 default -> { }
             }
         }
         add.add("Warnings", (int) Math.min(30, Math.round(warns * 10)), counted(warnsAll, warns));
         add.add("Kicks", (int) Math.min(16, Math.round(kicks * 8)), counted(kicksAll, kicks));
+        add.add("Mutes", (int) Math.min(16, Math.round(mutes * 6)), counted(mutesAll, mutes));
         add.add("Bans", (int) Math.min(50, Math.round(bans * 25)), counted(bansAll, bans));
         if (moderation.ban(player) != null) {
             add.add("Banned now", 30, null);

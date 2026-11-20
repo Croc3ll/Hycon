@@ -104,6 +104,20 @@ public final class Moderation {
         return ConnectionRegistry.get().disconnect(t.uuid(), msg) > 0;
     }
 
+    /** A red chat line to an online player (a mute starting or ending). Runs on their world thread. */
+    public void tell(Target t, String text) {
+        PlayerRef p = t.online();
+        World w = p == null || p.getWorldUuid() == null ? null : Universe.get().getWorld(p.getWorldUuid());
+        if (w == null) {
+            return;
+        }
+        w.execute(() -> {
+            if (p.isValid()) {
+                p.sendMessage(Message.raw(text).color("#FF5555"));
+            }
+        });
+    }
+
     /**
      * Adds a ban (and Hytale disconnects the player if online). {@code duration == null} is
      * permanent. Returns false if the player is already banned.

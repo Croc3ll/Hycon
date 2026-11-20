@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PlayerRecords {
 
     /** {@code CLEAR}: staff cleared the risk score; older records stop counting toward it. */
-    public enum Type { WARN, KICK, BAN, UNBAN, NOTE, CLEAR }
+    public enum Type { WARN, KICK, BAN, UNBAN, NOTE, CLEAR, MUTE, UNMUTE }
 
     /** {@code detail}: ban length ("7d", "permanent") or empty. */
     public record Entry(long time, UUID player, Type type, String by, String reason, String detail) {

@@ -1,0 +1,6 @@
+/* The live demo's ribbon (make_demo_site.py): says the data is made up and links to the download. */
+.demo-ribbon { position: fixed; z-index: 50; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100vw - 24px);
+  padding: 8px 16px; border-radius: 999px; font-size: 13px; color: #1a1407; text-align: center;
+  background: linear-gradient(180deg, #f3d27c, #e2b54b); box-shadow: 0 8px 30px -8px rgba(0, 0, 0, .7); }
+.demo-ribbon:hover { color: #1a1407; text-decoration: none; filter: brightness(1.05); }
+.demo-ribbon b { margin-left: 6px; text-decoration: underline; }

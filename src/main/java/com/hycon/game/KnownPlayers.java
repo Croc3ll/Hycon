@@ -148,6 +148,11 @@ public final class KnownPlayers {
         }
     }
 
+    /** When this player's current session began, or null when they aren't online. */
+    public Long sessionStart(UUID uuid) {
+        return joinedAt.get(uuid);
+    }
+
     /** Playtime including the current session, for live tables. */
     public long playtimeNow(Info i) {
         Long start = joinedAt.get(i.uuid());

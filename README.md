@@ -34,8 +34,14 @@ These are made with demo data by `py tools/promo/make_promo.py` (no real players
 
 - **Players**: who's online and where, plus a searchable directory of everyone who has ever joined
   (online or offline, first and last seen).
-- **Moderation**: warn, kick, ban (temporary or permanent, with a reason) and unban. Each player has a
-  **record** of warnings, kicks, bans and staff notes on their profile.
+- **Moderation**: warn, mute, kick, ban (temporary or permanent, with a reason), unmute and unban, all from one
+  **Punish** dialog. Each player has a **record** of warnings, mutes, kicks, bans and staff notes on their profile.
+- **Punishment presets**: ready-made punishments per offence that get harsher for repeat offenders
+  ("Spam: warn, mute 30m, mute 1d, ban 1d"); Hycon picks the player's next step.
+- **Scheduled restarts and announcements**: daily restarts with a countdown in chat (through AMP when it's set up),
+  a one-off "restart in 10 minutes", and announcements that repeat on their own timer.
+- **Two-factor login** with any authenticator app, and a **Security** checklist that says in plain words what to
+  fix in your setup.
 - **Player profiles**: playtime, sessions, minutes online per day and by hour, PvP kills and deaths,
   moderation record, and any sections other plugins add.
 - **Risk score**: every profile gets a 0-100 score (Low / Medium / High / Very high) built from warnings,
@@ -100,9 +106,9 @@ stays private, and codes are never sent over the network (requests are signed). 
 | Level     | Can                                                            |
 |-----------|----------------------------------------------------------------|
 | VIEWER    | see players, bans, plugin dashboards                           |
-| MODERATOR | + kick, ban, unban, read the live console                      |
-| ADMIN     | + run console commands (full console rights), read audit log   |
-| OWNER     | + manage panel accounts, download log files                    |
+| MODERATOR | + warn, mute, kick, ban, unban, read the live console          |
+| ADMIN     | + console commands, restart schedule, read audit log           |
+| OWNER     | + accounts, presets, security checklist, download log files    |
 
 ## Security
 
@@ -119,7 +125,9 @@ The panel can ban players and run commands, so:
   hash (`remember.txt`), so a copy of that file can't be used to log in.
 - Every POST (login included) needs the session's CSRF token, JSON content and a same-origin
   `Origin`. Unknown `Host` headers are refused (DNS rebinding).
-- Failed logins are limited per address and per account name (`LoginAttempts` per `LoginWindowMinutes`).
+- Failed logins are limited per address and per account name (`LoginAttempts` per `LoginWindowMinutes`). An address
+  that logged into an account before isn't locked out by failures from elsewhere.
+- Two-factor login (time-based codes, RFC 6238) for every account; one code can't be used twice.
 - A strict Content-Security-Policy; all text is put on the page as text, never as HTML.
 - Every login, failed login, kick, ban, unban, command and account change goes to `audit.log`
   (append-only, one JSON object per line).

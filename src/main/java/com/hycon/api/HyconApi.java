@@ -27,7 +27,11 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 15; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts; 14: block sources; 15: risk cleared time
+    public static final int API_VERSION = 16; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts; 14: block sources; 15: risk cleared time; 16: tab icons
+
+    /** Icons a tab may pick with {@link HyconPanel#icon()}. Since API version 16. */
+    public static final java.util.Set<String> ICONS = java.util.Set.of("chart", "swords", "shield", "coins", "key", "pickaxe", "gift",
+            "eye", "users", "globe", "star", "crown", "box", "map", "heart", "bolt", "flag");
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();

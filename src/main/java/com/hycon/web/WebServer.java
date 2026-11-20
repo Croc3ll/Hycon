@@ -97,6 +97,8 @@ public final class WebServer {
     private final HytaleLogger log;
     /** Warns once per start about proxy headers from an address that isn't a trusted proxy. */
     private final AtomicBoolean warnedUntrustedProxy = new AtomicBoolean();
+    /** The last address that sent proxy headers without being trusted, for the Security tab; null if none. */
+    private volatile String untrustedProxy;
     private final Map<String, Route> routes = new HashMap<>();
     private final Map<String, byte[]> files = new HashMap<>();
     private HttpServer server;
@@ -371,11 +373,19 @@ public final class WebServer {
             return true;
         }
         boolean sentHeader = PROXY_HEADERS.stream().anyMatch(ex.getRequestHeaders()::containsKey);
+        if (sentHeader) {
+            untrustedProxy = peer.getHostAddress();
+        }
         if (sentHeader && warnedUntrustedProxy.compareAndSet(false, true)) {
             log.at(java.util.logging.Level.WARNING).log("Hycon: ignored proxy headers from %s. If that is your proxy, add it to TrustedProxies in hycon.json.",
                     peer.getHostAddress());
         }
         return false;
+    }
+
+    /** The last untrusted address that sent proxy headers, or null. */
+    public String untrustedProxy() {
+        return untrustedProxy;
     }
 
     /** IPv6 unique-local (fc00::/7) and carrier-grade NAT (100.64.0.0/10, used by Tailscale). */

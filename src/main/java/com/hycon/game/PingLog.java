@@ -11,7 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -32,6 +34,8 @@ public final class PingLog {
     }
 
     private final Path dir;
+    /** Each online player's newest one-minute ping, for the Players table; replaced every sample. */
+    private volatile Map<UUID, Integer> latest = Map.of();
 
     public PingLog(Path dataDir) {
         this.dir = dataDir.resolve("ping");
@@ -40,6 +44,7 @@ public final class PingLog {
     /** Called every minute from the scheduler: one sample per online player. */
     public void sample() {
         long now = System.currentTimeMillis();
+        Map<UUID, Integer> fresh = new HashMap<>();
         for (PlayerRef p : Universe.get().getPlayers()) {
             try {
                 PacketHandler h = p.getPacketHandler();
@@ -51,11 +56,19 @@ public final class PingLog {
                 if (!(us > 0) || Double.isInfinite(us)) {
                     continue; // just joined: no measurement yet
                 }
-                append(p.getUuid(), now, (int) Math.round(us / 1000.0));
+                int ms = (int) Math.round(us / 1000.0);
+                fresh.put(p.getUuid(), ms);
+                append(p.getUuid(), now, ms);
             } catch (RuntimeException | IOException ignored) {
                 // a player leaving mid-sample, or a full disk; the next minute tries again
             }
         }
+        latest = fresh;
+    }
+
+    /** The player's newest ping in milliseconds, or null before their first full minute online. */
+    public Integer latest(UUID player) {
+        return latest.get(player);
     }
 
     /** Samples newer than {@code since}, oldest first. Rewrites the file when old lines are dropped. */

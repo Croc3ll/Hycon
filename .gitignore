@@ -23,6 +23,10 @@ src/main/resources/ties.json
 src/main/resources/activity/
 src/main/resources/positions/
 src/main/resources/heat.json
+src/main/resources/mutes.json
+src/main/resources/presets.json
+src/main/resources/schedule.json
+src/main/resources/remember.txt
 
 # Python bytecode caches
 __pycache__/

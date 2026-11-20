@@ -56,6 +56,7 @@ async function boot() {
   if (can('MODERATOR')) { try { S.openBugs = (await api('GET', '/api/bugs?status=open')).open; } catch (e) { S.openBugs = 0; } }
   const start = decodeURIComponent(location.hash.slice(1));
   if (start) S.tab = start; // a reload or a shared link opens the same page
+  watchAttention();
   history.replaceState({ tab: S.tab, back: S.back }, '', '#' + S.tab);
   render();
 }
@@ -88,19 +89,26 @@ function showLogin() {
   const pw = el('input', { type: 'password', autocomplete: 'current-password', required: true });
   const msg = el('p', { class: 'bad' });
   const remember = el('input', { type: 'checkbox', checked: true });
+  const code = el('input', { inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, placeholder: '123456' });
+  const codeRow = el('div', { hidden: true }, el('label', {}, 'Code from your authenticator app'), code);
   const form = el('form', { class: 'card narrow', on: { submit: async (e) => {
     e.preventDefault();
     msg.textContent = '';
     try {
-      const r = await api('POST', '/api/login', { name: name.value.trim(), password: pw.value, remember: remember.checked ? '1' : '' });
+      const r = await api('POST', '/api/login', { name: name.value.trim(), password: pw.value, remember: remember.checked ? '1' : '',
+        code: codeRow.hidden ? undefined : code.value });
+      if (r.need2fa) { codeRow.hidden = false; code.focus(); return; } // password right: now the code
       S.csrf = r.csrf;
       await boot();
-    } catch (err) { msg.textContent = err.message; pw.value = ''; }
+    } catch (err) {
+      msg.textContent = err.message;
+      if (codeRow.hidden) pw.value = ''; else { code.value = ''; code.focus(); }
+    }
   } } }, el('img', { src: 'emblem.svg', class: 'login-logo', alt: '' }),
     el('div', { class: 'login-word' }, el('span', { class: 'brand' }, el('span', { class: 'word' }, 'Hycon'))),
     S.setup ? el('p', { class: 'secret' }, 'First start: log in as ', el('b', {}, S.setup[0]), ' with password ', el('b', { class: 'mono' }, S.setup[1]),
       ' from the server machine, then choose your own password.') : null,
-    el('label', {}, 'Account'), name, el('label', {}, 'Password'), pw,
+    el('label', {}, 'Account'), name, el('label', {}, 'Password'), pw, codeRow,
     el('label', { class: 'remember' }, remember, ' Remember me on this browser (30 days; only on your own computer)'),
     el('p', {}, el('button', { class: 'primary', type: 'submit' }, 'Log in')), msg);
   $('view').replaceChildren(form);
@@ -110,6 +118,13 @@ function showLogin() {
 function showPassword(forced) {
   stop();
   if (forced) { $('tabs').replaceChildren(); if ($('menubtn')) $('menubtn').hidden = true; }
+  const form = passwordForm(forced);
+  renderMe();
+  $('view').replaceChildren(form);
+  form.querySelector('input').focus();
+}
+
+function passwordForm(forced) {
   const cur = el('input', { type: 'password', autocomplete: 'current-password' });
   const n1 = el('input', { type: 'password', autocomplete: 'new-password', minlength: 10 });
   const n2 = el('input', { type: 'password', autocomplete: 'new-password' });
@@ -128,28 +143,45 @@ function showPassword(forced) {
     forced ? el('p', { class: 'muted' }, 'This account still has a password Hycon made up. Pick a new one (at least 10 characters) to continue.') : null,
     el('label', {}, 'Current password'), cur, el('label', {}, 'New password'), n1, el('label', {}, 'New password again'), n2,
     el('p', {}, el('button', { class: 'primary', type: 'submit' }, 'Save')), msg);
-  renderMe();
-  $('view').replaceChildren(form);
-  cur.focus();
+  return form;
 }
 
 function renderMe() {
   $('me').replaceChildren(
-    el('span', { class: 'who' }, S.me.name), el('span', { class: 'lvl' }, S.me.level),
+    el('a', { href: '#me', class: 'who', title: 'My account', on: { click: (e) => { e.preventDefault(); if (!S.me.mustChange) go('me'); } } }, S.me.name),
+    el('span', { class: 'lvl' }, S.me.level),
     el('button', { on: { click: async () => { await api('POST', '/api/logout'); await boot(); } } }, 'Log out'));
 }
 
+// Sidebar groups, in order. Hycon's own dashboards sit under Server; tabs from other plugins under Plugins.
+const GROUPS = ['Moderation', 'Server', 'Plugins', 'Admin'];
+const SERVER_PANELS = new Set(['analytics', 'performance']);
+
+// Each tab: [id, title, lowest level, group, count badge, plugin icon].
 function tabs() {
-  const list = [['players', 'Players', 'VIEWER']];
-  for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER']);
-  list.push(['bans', 'Bans', 'VIEWER'], ['reports', S.openReports ? 'Reports (' + S.openReports + ')' : 'Reports', 'MODERATOR'],
-    ['bugs', S.openBugs ? 'Bugs (' + S.openBugs + ')' : 'Bugs', 'MODERATOR'],
-    ['chat', 'Chat', 'MODERATOR'], ['console', 'Console', 'MODERATOR']);
-  list.push(['audit', 'Audit log', 'ADMIN'], ['sharing', 'Ban sharing', 'OWNER'], ['accounts', 'Accounts', 'OWNER']);
-  return list.filter((t) => can(t[2]));
+  const list = [['players', 'Players', 'VIEWER', 'Moderation'], ['bans', 'Bans', 'VIEWER', 'Moderation'],
+    ['reports', 'Reports', 'MODERATOR', 'Moderation', S.openReports], ['bugs', 'Bugs', 'MODERATOR', 'Moderation', S.openBugs],
+    ['chat', 'Chat', 'MODERATOR', 'Moderation']];
+  for (const p of S.panels) list.push(['panel:' + p.id, p.title, 'VIEWER', SERVER_PANELS.has(p.id) ? 'Server' : 'Plugins', 0, p.icon]);
+  list.push(['console', 'Console', 'MODERATOR', 'Server'], ['schedule', 'Schedule', 'ADMIN', 'Server'],
+    ['security', 'Security', 'OWNER', 'Admin', S.securityIssues], ['presets', 'Presets', 'OWNER', 'Admin'], ['audit', 'Audit log', 'ADMIN', 'Admin'], ['sharing', 'Ban sharing', 'OWNER', 'Admin'], ['accounts', 'Accounts', 'OWNER', 'Admin']);
+  // A stable sort: tabs keep their order inside each group.
+  return list.filter((t) => can(t[2])).sort((a, b) => GROUPS.indexOf(a[3]) - GROUPS.indexOf(b[3]));
 }
 
-// Line icons for the tab bar (24x24 paths, drawn with the text colour). Plugin tabs share one.
+// The tab list with a heading above each group and a gold count on Reports and Bugs.
+function drawNav(list) {
+  const kids = [];
+  let group = null;
+  for (const [id, title, , g, count, icon] of list) {
+    if (g !== group) { group = g; kids.push(el('div', { class: 'navgroup' }, g)); }
+    kids.push(el('button', { class: id === S.tab ? 'active' : '', on: { click: () => go(id) } },
+      tabIcon(id, icon), el('span', { class: 'navlabel' }, title), count ? el('span', { class: 'navcount' }, String(count)) : null));
+  }
+  $('tabs').replaceChildren(...kids);
+}
+
+// Line icons for the tabs (24x24 paths, drawn with the text colour). Other plugins' tabs share one.
 const TAB_ICONS = {
   players: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
   bans: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M4.9 4.9l14.2 14.2',
@@ -160,16 +192,42 @@ const TAB_ICONS = {
   audit: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8',
   sharing: 'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6M6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6M8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
   accounts: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10',
+  presets: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  schedule: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 6v6l4 2',
+  security: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10M12 8v4M12 16h.01',
   panel: 'M3 3v18h18M7 16l4-4 4 4 6-6',
+  'panel:analytics': 'M18 20V10M12 20V4M6 20v-6',
+  'panel:performance': 'M12 14l4-4M3.3 19a10 10 0 1 1 17.4 0',
 };
 
-function tabIcon(id) {
+// Icons a plugin's tab can pick (HyconPanel.icon(), the same names as HyconApi.ICONS).
+const PLUGIN_ICONS = {
+  chart: TAB_ICONS.panel,
+  swords: 'M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5L13 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10M9 12l2 2 4-4',
+  coins: 'M8 13A5 5 0 1 0 8 3a5 5 0 0 0 0 10M16 21a5 5 0 1 0 0-10 5 5 0 0 0 0 10',
+  key: 'M7.5 21a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11M11.5 11.5L21 2M16 7l3 3M18.5 4.5l2 2',
+  pickaxe: 'M3 21l9-9M5 6c4-3 10-3 13 0s3 9 0 13M12 12l3-3',
+  gift: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+  users: TAB_ICONS.players,
+  globe: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20',
+  star: 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z',
+  crown: 'M2 18h20M3 7l5 4 4-7 4 7 5-4-2 11H5z',
+  box: 'M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+  map: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4zM8 2v16M16 6v16',
+  heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z',
+  bolt: 'M13 2L3 14h9l-1 8 10-12h-9z',
+  flag: TAB_ICONS.reports,
+};
+
+function tabIcon(id, icon) {
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('class', 'tabicon');
   const path = document.createElementNS(NS, 'path');
-  path.setAttribute('d', TAB_ICONS[id.startsWith('panel:') ? 'panel' : id] || TAB_ICONS.panel);
+  path.setAttribute('d', PLUGIN_ICONS[icon] || TAB_ICONS[id] || TAB_ICONS.panel);
   svg.append(path);
   return svg;
 }
@@ -282,15 +340,16 @@ function render() {
   document.body.classList.remove('riskpage'); // only a profile tints the page
   renderMe();
   const list = tabs();
-  if (!S.tab.startsWith('profile:') && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
-  $('tabs').replaceChildren(...list.map(([id, title]) =>
-    el('button', { class: id === S.tab ? 'active' : '', on: { click: () => go(id) } }, tabIcon(id), title)));
+  if (!S.tab.startsWith('profile:') && S.tab !== 'me' && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
+  drawNav(list);
   phoneMenu(list);
   slideTabMark();
   const view = $('view');
   view.replaceChildren();
   playIntro(view);
   const tab = S.tab;
+  const strip = attention();
+  if (strip) view.append(strip);
   const head = PAGES[tab];
   if (head) view.append(el('div', { class: 'pagehead' }, el('h1', {}, head[0]), el('p', {}, head[1])));
   if (tab === 'players') players(view);
@@ -299,6 +358,10 @@ function render() {
   else if (tab === 'console') consoleView(view);
   else if (tab === 'audit') audit(view);
   else if (tab === 'accounts') accounts(view);
+  else if (tab === 'presets') presetsView(view);
+  else if (tab === 'me') myAccount(view);
+  else if (tab === 'security') securityView(view);
+  else if (tab === 'schedule') scheduleView(view);
   else if (tab === 'sharing') sharing(view);
   else if (tab === 'reports') reportsView(view);
   else if (tab === 'bugs') bugsView(view);
@@ -309,7 +372,7 @@ function render() {
 // Title and one line for each built-in tab (plugin tabs and profiles bring their own).
 const PAGES = {
   players: ['Players', 'Who is online now, and everyone who has ever played here.'],
-  bans: ['Bans', 'Ban a player, and every ban that is still active.'],
+  bans: ['Bans', 'Every ban and mute still in effect, and a quick way to punish a player.'],
   reports: ['Reports', 'What players reported with /report, newest first.'],
   bugs: ['Bugs', 'Bugs players sent with /bug, with the server log from that moment.'],
   chat: ['Chat', 'Everything players said in chat, newest first. Kept as long as ping history.'],
@@ -317,9 +380,58 @@ const PAGES = {
   audit: ['Audit log', 'Everything staff did in this panel, and every login.'],
   sharing: ['Ban sharing', 'Share your ban list with other Hycon servers and import theirs.'],
   accounts: ['Accounts', 'Who can log in to this panel, and what each person may do.'],
+  schedule: ['Schedule', 'Daily restarts with a countdown in chat, and announcements that repeat on their own.'],
+  security: ['Security', 'How safely this panel is set up, worst first, with what to change.'],
+  me: ['My account', 'Your password and two-factor login.'],
+  presets: ['Presets', 'Ready-made punishments that get harsher for repeat offenders.'],
 };
 
 function every(ms, fn) { fn(); S.timer = setInterval(fn, ms); }
+
+// ---------- Needs attention ----------
+// One line above every page with what needs staff now: open reports and bugs, and the server when it
+// struggles. It refreshes on its own every 30 seconds, apart from the page's own timer.
+const ATTENTION_MS = 30000;
+let attentionTimer = null;
+
+function attention() {
+  if (!can('MODERATOR')) return null;
+  const has = (id) => tabs().some((t) => t[0] === id);
+  const items = [];
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  if (S.openReports) items.push(['reports', plural(S.openReports, 'open report', 'open reports')]);
+  if (S.openBugs) items.push(['bugs', plural(S.openBugs, 'open bug', 'open bugs')]);
+  if (S.securityIssues) items.push(['security', plural(S.securityIssues, 'security problem', 'security problems'), true]);
+  const st = S.status;
+  if (st && st.tps >= 0 && st.targetTps && st.tps < st.targetTps * 0.9) items.push(['console', 'Server lagging: TPS ' + st.tps + ' / ' + st.targetTps, true]);
+  if (st && st.memoryMaxMb && st.memoryMb / st.memoryMaxMb > 0.9) {
+    items.push([has('panel:performance') ? 'panel:performance' : 'console', 'Memory ' + Math.round(st.memoryMb * 100 / st.memoryMaxMb) + '% full', true]);
+  }
+  return el('div', { id: 'attention', class: 'attention' + (items.length ? '' : ' calm') },
+    el('span', { class: 'attn-h' }, el('i'), items.length ? 'Needs attention' : 'All clear'),
+    items.map(([tab, text, bad]) => el('button', { class: 'attn' + (bad ? ' bad' : ''), on: { click: () => go(tab) } }, text)),
+    st ? el('span', { class: 'attn-meta' }, st.online + ' online \u00b7 TPS ' + st.tps) : null);
+}
+
+async function refreshAttention() {
+  if (!S.me || !can('MODERATOR')) return;
+  const paths = ['/api/reports?status=open', '/api/bugs?status=open', '/api/status', can('OWNER') ? '/api/security' : null];
+  const [reports, bugs, status, security] = await Promise.all(paths.map((path) => path ? api('GET', path).catch(() => null) : null));
+  const counts = [S.openReports, S.openBugs, S.securityIssues].join();
+  if (reports) S.openReports = reports.open;
+  if (bugs) S.openBugs = bugs.open;
+  if (status) S.status = status;
+  if (security) S.securityIssues = security.checks.filter((c) => c.level === 'bad').length;
+  if ([S.openReports, S.openBugs, S.securityIssues].join() !== counts) { drawNav(tabs()); slideTabMark(); }
+  const old = $('attention'), fresh = attention();
+  if (old && fresh) old.replaceWith(fresh);
+}
+
+function watchAttention() {
+  clearInterval(attentionTimer);
+  refreshAttention();
+  attentionTimer = setInterval(refreshAttention, ATTENTION_MS);
+}
 
 // A new Hycon version (the server was updated): reload the page so nobody runs the old one.
 // Waits while someone is typing, so a half-filled form isn't lost.
@@ -339,22 +451,71 @@ function every(ms, fn) { fn(); S.timer = setInterval(fn, ms); }
 
 // ---------- Players / kick / ban ----------
 
+// How long something has lasted: "12 min", "3h 05m", "31h 20m", "4 days".
+function span(ms) {
+  if (!(ms >= 0)) return '\u2014';
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  return h < 100 ? h + 'h ' + String(m % 60).padStart(2, '0') + 'm' : Math.round(h / 24) + ' days';
+}
+
+// Total playtime in hours, so a column of them compares at a glance: "35 min", "6 h", "141 h".
+function played(ms) {
+  if (!(ms >= 0)) return '—';
+  return ms < 3600000 ? Math.floor(ms / 60000) + ' min' : Math.floor(ms / 3600000) + ' h';
+}
+
+// How long ago: "5 min ago", "3 h ago", "41 days ago". The full date goes in the cell's tooltip.
+function ago(ms) {
+  if (!ms) return 'unknown';
+  const m = Math.round((Date.now() - ms) / 60000);
+  return m < 60 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago';
+}
+
+// Risk as a small coloured word (Low green to Very high red), with the score in its tooltip.
+const RISK_CLASS = { Low: 'low', Medium: 'mid', High: 'high', 'Very high': 'vhigh' };
+function riskPill(score, level) {
+  if (score === undefined) return el('span', { class: 'muted' }, '\u2014');
+  return el('span', { class: 'riskpill ' + (RISK_CLASS[level] || 'low'), title: 'Risk ' + score + ' / 100' }, level);
+}
+
+function copyUuid(uuid) {
+  navigator.clipboard.writeText(uuid).then(() => toast('UUID copied'), () => prompt('UUID', uuid));
+}
+
+// A player's row buttons. On a mouse screen they show when the row is pointed at, so the table stays calm.
+function rowActions(p, online, banned, muted) {
+  if (!can('MODERATOR')) return el('td', { class: 'actions' });
+  return el('td', { class: 'actions' },
+    el('button', { class: 'ghost', on: { click: () => copyUuid(p.uuid) } }, 'Copy UUID'),
+    muted ? el('button', { on: { click: () => lift('unmute', p) } }, 'Unmute') : null,
+    banned ? el('button', { on: { click: () => lift('unban', p) } }, 'Unban') : null,
+    el('button', { class: 'danger', on: { click: () => modDialog('punish', p.uuid, p.name, online) } }, 'Punish'));
+}
+
 function players(view) {
   const body = el('tbody');
   const count = el('span', { class: 'muted' });
   view.append(el('div', { class: 'card' }, el('div', { class: 'row' }, el('h2', {}, 'Online players '), count),
-    el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'World'), el('th', {}, 'UUID'), el('th', {}))), body)));
+    el('table', { class: 'playertable' }, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'World'), el('th', { class: 'num' }, 'Session'),
+      el('th', { class: 'num' }, 'Playtime'), el('th', { class: 'num' }, 'Ping'), el('th', {}, 'Risk'), el('th', {}))), body)));
   view.append(directory());
   every(5000, async () => {
     try {
       const d = await api('GET', '/api/players');
       count.textContent = '(' + d.players.length + ')';
-      body.replaceChildren(...d.players.map((p) => el('tr', {}, el('td', {}, nameLink(p.name, p.uuid)), el('td', {}, p.world), el('td', { class: 'mono' }, p.uuid),
-        el('td', { class: 'actions' }, can('MODERATOR') ? [
-          el('button', { on: { click: () => modDialog('warn', p.uuid, p.name) } }, 'Warn'),
-          el('button', { on: { click: () => modDialog('kick', p.name) } }, 'Kick'),
-          el('button', { class: 'danger', on: { click: () => modDialog('ban', p.name) } }, 'Ban')] : null))));
-      if (!d.players.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Nobody online.')));
+      body.replaceChildren(...d.players.map((p) => {
+        const name = nameLink(p.name, p.uuid);
+        name.title = p.uuid;
+        return el('tr', {}, el('td', {}, name, p.muted ? el('span', { class: 'badge mutebadge' }, 'Muted') : null), el('td', {}, p.world),
+          el('td', { class: 'num', title: p.since ? 'Joined ' + fmtTime(p.since) : '' }, p.since ? span(Date.now() - p.since) : '\u2014'),
+          el('td', { class: 'num' }, played(p.playtimeMs)),
+          el('td', { class: 'num ' + pingClass(p.ping === undefined ? -1 : p.ping) }, p.ping === undefined ? '\u2014' : p.ping + ' ms'),
+          el('td', {}, riskPill(p.risk, p.riskLevel)),
+          rowActions(p, true, false, p.muted));
+      }));
+      if (!d.players.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 7, class: 'muted' }, 'Nobody online.')));
     } catch (e) { count.textContent = e.message; }
   });
 }
@@ -365,60 +526,136 @@ function directory() {
   const body = el('tbody');
   const info = el('span', { class: 'muted' });
   let t = null;
-  const ago = (ms) => { if (!ms) return 'unknown'; const m = Math.round((Date.now() - ms) / 60000);
-    return m < 60 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
   async function load() {
     try {
       const d = await api('GET', '/api/directory?q=' + encodeURIComponent(q.value.trim()));
       info.textContent = '(' + d.total + ' known' + (d.players.length < d.total ? ', showing ' + d.players.length : '') + ')';
-      body.replaceChildren(...d.players.map((p) => el('tr', {},
-        el('td', {}, nameLink(p.name, p.uuid)),
-        el('td', { class: p.banned ? 'bad' : p.online ? 'good' : 'muted', title: p.last ? fmtTime(p.last) : '' },
-          p.banned ? 'Banned' + (p.banEnds ? ' · ' + left(p.banEnds) + ' left' : ' · permanent') : p.online ? 'Online' : 'Last seen ' + ago(p.last)),
-        el('td', { class: 'mono' }, p.uuid),
-        el('td', { class: 'muted' }, p.first ? fmtTime(p.first) : ''),
-        el('td', { class: 'actions' }, can('MODERATOR') ? [
-          el('button', { on: { click: () => modDialog('warn', p.uuid, p.name) } }, 'Warn'),
-          p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
-          p.banned ? el('button', { on: { click: async () => {
-            if (!confirm('Unban ' + p.name + '?')) return;
-            try { toast((await api('POST', '/api/unban', { player: p.uuid })).message); render(); } catch (e) { toast(e.message, true); }
-          } } }, 'Unban')
-            : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')] : null))));
+      body.replaceChildren(...d.players.map((p) => {
+        const name = nameLink(p.name, p.uuid);
+        name.title = p.uuid;
+        return el('tr', {}, el('td', {}, name),
+          el('td', { class: p.banned ? 'bad' : p.online ? 'good' : 'muted', title: p.last ? fmtTime(p.last) : '' },
+            p.banned ? 'Banned' + (p.banEnds ? ' · ' + left(p.banEnds) + ' left' : ' · permanent')
+              : p.muted ? 'Muted' + (p.muteEnds ? ' · ' + left(p.muteEnds) + ' left' : ' · permanent')
+                : p.online ? 'Online' : ['Last seen', ' ', ago(p.last)]), // two pieces, so each translates
+          el('td', { class: 'num' }, played(p.playtimeMs)),
+          el('td', { class: 'muted', title: p.first ? fmtTime(p.first) : '' }, p.first ? ago(p.first) : ''),
+          rowActions(p, p.online, p.banned, p.muted));
+      }));
       if (!d.players.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 5, class: 'muted' }, 'No player matches.')));
     } catch (e) { info.textContent = e.message; }
   }
   q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(load, 250); });
   load();
   return el('div', { class: 'card' }, el('div', { class: 'row' }, el('h2', {}, 'All players '), info), q,
-    el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Status'), el('th', {}, 'UUID'), el('th', {}, 'First seen'), el('th', {}))), body),
-    el('p', { class: 'muted' }, 'Everyone who has joined, including players saved by the server before Hycon was installed. The UUID is the permanent ID of the account; it stays the same if the player changes their name.'));
+    el('table', { class: 'playertable' }, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Status'), el('th', { class: 'num' }, 'Playtime'),
+      el('th', {}, 'First seen'), el('th', {}))), body),
+    el('p', { class: 'muted' }, 'Everyone who has joined, including players saved by the server before Hycon was installed. Point at a name to see its UUID, the permanent ID of the account. It stays the same if the player changes their name.'));
 }
 
-function modDialog(action, player, shownAs) {
-  const reason = el('input', { maxlength: 200, placeholder: 'Shown to the player and saved in the audit log' });
-  const dur = el('select', {}, ...[['permanent', 'Permanent'], ['30m', '30 minutes'], ['1h', '1 hour'], ['12h', '12 hours'],
-    ['1d', '1 day'], ['3d', '3 days'], ['7d', '7 days'], ['30d', '30 days']].map(([v, t]) => el('option', { value: v }, t)));
+// Durations the dialog offers for mutes and bans (presets may use any, e.g. 2w).
+const DURATIONS = [['10m', '10 minutes'], ['30m', '30 minutes'], ['1h', '1 hour'], ['12h', '12 hours'], ['1d', '1 day'],
+  ['3d', '3 days'], ['7d', '7 days'], ['30d', '30 days'], ['permanent', 'Permanent']];
+const ACTION_NAMES = { punish: 'Preset', warn: 'Warn', mute: 'Mute', kick: 'Kick', ban: 'Ban' };
+
+// "30m" in words: "30 minutes".
+function durationText(code) {
+  const listed = DURATIONS.find((d) => d[0] === code);
+  if (listed) return listed[1];
+  const m = /^(\d+)([mhdw])$/.exec(code || '');
+  if (!m) return code || '';
+  return m[1] + ' ' + { m: 'minute', h: 'hour', d: 'day', w: 'week' }[m[2]] + (m[1] === '1' ? '' : 's');
+}
+
+// A preset step in words, as separate pieces so each one translates: "Mute", "30 minutes".
+function stepText(s) {
+  const name = { warn: 'Warning', kick: 'Kick', mute: 'Mute', ban: 'Ban' }[s.action] || s.action;
+  return s.duration ? [name, ' ', durationText(s.duration)] : [name];
+}
+
+/**
+ * One dialog for every punishment: a preset (the player's next step for that offence) or a plain
+ * warn, mute, kick or ban. {@code online === false} leaves out Kick.
+ */
+function modDialog(action, player, shownAs, online) {
+  const modes = ['punish', 'warn', 'mute', online === false ? null : 'kick', 'ban'].filter(Boolean);
+  let mode = modes.includes(action) ? action : 'warn';
+  let presets = [];
+  let drawnMode = null;
+  const dlg = el('dialog', { class: 'moddlg' });
+  const seg = el('div', { class: 'seg' });
+  const body = el('div');
+  const reason = el('input', { maxlength: 200 });
+  const dur = el('select');
+  const pick = el('select', { on: { change: () => draw() } });
+  const steps = el('div', { class: 'presetsteps' });
   const msg = el('p', { class: 'bad' });
-  const dlg = el('dialog', {});
-  const label = { ban: 'Ban', kick: 'Kick', warn: 'Warn' }[action];
-  if (action === 'warn') reason.placeholder = 'Shown to the player on screen and saved in their profile';
-  const go = el('button', { class: action === 'ban' ? 'primary danger' : 'primary', on: { click: async () => {
+  const go = el('button', { class: 'primary' });
+  const chosen = () => presets.find((p) => p.name === pick.value);
+
+  function drawSteps() {
+    const p = chosen();
+    if (!p) { steps.replaceChildren(); return; }
+    steps.replaceChildren(
+      el('div', { class: 'stepchips' }, p.steps.map((s, i) =>
+        el('span', { class: 'stepchip' + (i === p.next ? ' next' : i < p.next ? ' past' : '') }, stepText(s)))),
+      el('p', { class: 'muted small' }, p.done ? ['Offence', ' ', String(p.done + 1), ' · '] : ['First offence', ' · '],
+        'Next step:', ' ', el('b', {}, stepText(p.steps[p.next]))));
+  }
+
+  function draw() {
+    seg.replaceChildren(...modes.map((m) => el('button', { type: 'button', class: m === mode ? 'on' : '',
+      on: { click: () => { mode = m; draw(); } } }, ACTION_NAMES[m])));
+    const timed = mode === 'mute' || mode === 'ban';
+    if (mode !== drawnMode) { // each tab starts at its own default: an hour's mute, a permanent ban
+      dur.replaceChildren(...DURATIONS.map(([v, t]) => el('option', { value: v }, t)));
+      dur.value = mode === 'mute' ? '1h' : 'permanent';
+      drawnMode = mode;
+    }
+    reason.placeholder = mode === 'punish' ? 'Optional, added after the preset name'
+      : mode === 'warn' ? 'Shown to the player on screen and saved in their profile' : 'Shown to the player and saved in the audit log';
+    body.replaceChildren(...[
+      mode === 'punish' ? [el('label', {}, 'Offence'),
+        presets.length ? pick : el('p', { class: 'muted' }, 'No presets yet. An owner can add them on the Presets tab.'), steps] : [],
+      el('label', {}, mode === 'punish' ? 'Note' : 'Reason'), reason,
+      timed ? [el('label', {}, 'How long'), dur] : []].flat());
+    const next = mode === 'punish' && chosen() ? chosen().steps[chosen().next] : null;
+    go.className = 'primary' + (mode === 'ban' || (next && next.action === 'ban') ? ' danger' : '');
+    go.textContent = mode === 'punish' ? 'Apply' : ACTION_NAMES[mode];
+    go.disabled = mode === 'punish' && !presets.length;
+    if (mode === 'punish') drawSteps();
+  }
+
+  go.addEventListener('click', async () => {
     go.disabled = true;
     try {
-      const r = await api('POST', '/api/' + action, { player, reason: reason.value, duration: dur.value });
+      const r = mode === 'punish'
+        ? await api('POST', '/api/punish', { player, preset: pick.value, reason: reason.value })
+        : await api('POST', '/api/' + mode, { player, reason: reason.value, duration: dur.value });
       toast(r.message);
       dlg.close();
       render();
     } catch (e) { msg.textContent = e.message; go.disabled = false; }
-  } } }, label);
-  dlg.append(el('h2', {}, label + ' ' + (shownAs || player)), el('label', {}, 'Reason'), reason,
-    ...(action === 'ban' ? [el('label', {}, 'How long'), dur] : []), // the browser's own append() would print null
+  });
+  dlg.append(el('h2', {}, 'Punish', ' ', shownAs || player), seg, body,
     el('p', { class: 'row' }, go, el('button', { on: { click: () => dlg.close() } }, 'Cancel')), msg);
   dlg.addEventListener('close', () => dlg.remove());
   document.body.append(dlg);
+  draw();
   dlg.showModal();
   reason.focus();
+  api('GET', '/api/presets?player=' + encodeURIComponent(player)).then((d) => {
+    presets = d.presets;
+    pick.replaceChildren(...presets.map((p) => el('option', { value: p.name }, p.name)));
+    if (mode === 'punish' && !presets.length) mode = 'warn';
+    draw();
+  }).catch(() => {});
+}
+
+// Lifts a mute or a ban after asking; then redraws the page.
+async function lift(kind, p) {
+  if (!confirm((kind === 'unban' ? 'Unban ' : 'Unmute ') + p.name + '?')) return;
+  try { toast((await api('POST', '/api/' + kind, { player: p.uuid })).message); render(); } catch (e) { toast(e.message, true); }
 }
 
 // Time left until a ban ends, e.g. "2d 4h", "35 min".
@@ -453,15 +690,32 @@ function bans(view) {
     if (!rows.length) body.replaceChildren(el('tr', {}, el('td', { colspan: 7, class: 'muted' }, 'No bans here.')));
   };
   const who = el('input', { placeholder: 'Exact name or UUID (online or offline)' });
+  const muteBody = el('tbody');
+  const drawMutes = (list) => {
+    muteBody.replaceChildren(...list.map((m) => el('tr', {},
+      el('td', {}, nameLink(m.name || m.player, m.player)),
+      el('td', { class: 'mono', title: m.until ? fmtTime(m.until) : '' }, m.until ? left(m.until) : 'Permanent'),
+      el('td', {}, m.reason || ''), el('td', {}, m.by), el('td', {}, fmtTime(m.since)),
+      el('td', { class: 'actions' }, can('MODERATOR') ? el('button', { on: { click: () => lift('unmute', { name: m.name, uuid: m.player }) } }, 'Unmute') : null))));
+    if (!list.length) muteBody.replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'muted' }, 'Nobody is muted.')));
+  };
   view.append(
-    can('MODERATOR') ? el('div', { class: 'card' }, el('h3', {}, 'Ban a player'),
-      el('div', { class: 'row' }, who, el('button', { class: 'danger', on: { click: () => who.value.trim() && modDialog('ban', who.value.trim()) } }, 'Ban…'))) : null,
+    can('MODERATOR') ? el('div', { class: 'card' }, el('h3', {}, 'Punish a player'),
+      el('div', { class: 'row' }, who, el('button', { class: 'danger', on: { click: () => who.value.trim() && modDialog('punish', who.value.trim()) } }, 'Punish…'))) : null,
     el('div', { class: 'card' }, el('div', { class: 'spread' }, el('div', {}, el('h2', {}, 'Bans'), counts), seg),
       el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Player'), el('th', {}, 'Type'), el('th', {}, 'Time left'),
-        el('th', {}, 'Reason'), el('th', {}, 'By'), el('th', {}, 'Since'), el('th', {}))), body))));
-  // Refreshing every 30 s keeps "time left" counting down and drops bans that just ended.
+        el('th', {}, 'Reason'), el('th', {}, 'By'), el('th', {}, 'Since'), el('th', {}))), body))),
+    el('div', { class: 'card' }, el('h2', {}, 'Mutes'),
+      el('div', { class: 'tablebox' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Player'), el('th', {}, 'Time left'),
+        el('th', {}, 'Reason'), el('th', {}, 'By'), el('th', {}, 'Since'), el('th', {}))), muteBody))));
+  // Refreshing every 30 s keeps "time left" counting down and drops bans and mutes that just ended.
   every(30000, async () => {
-    try { data = (await api('GET', '/api/bans')).bans; draw(); } catch (e) { toast(e.message, true); }
+    try {
+      const [b, m] = await Promise.all([api('GET', '/api/bans'), api('GET', '/api/mutes')]);
+      data = b.bans;
+      draw();
+      drawMutes(m.mutes);
+    } catch (e) { toast(e.message, true); }
   });
 }
 
@@ -496,20 +750,17 @@ function avatar(name, uuid, size) {
   return svg;
 }
 
+const count = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 const heroStat = (label, value) => el('div', { class: 'herostat' }, el('div', { class: 'l' }, label), el('div', { class: 't' }, value));
 
 function profile(view, uuid) {
   const out = el('div');
   const back = tabs().find((t) => t[0] === S.back) || tabs()[0];
   view.append(el('p', {}, el('a', { href: '#', on: { click: (e) => { e.preventDefault(); go(back[0]); } } }, '\u2190 ' + back[1])), out);
-  const TYPE = { WARN: 'Warning', KICK: 'Kick', BAN: 'Ban', UNBAN: 'Unban', NOTE: 'Note', CLEAR: 'Risk cleared' };
+  const TYPE = { WARN: 'Warning', KICK: 'Kick', BAN: 'Ban', UNBAN: 'Unban', NOTE: 'Note', CLEAR: 'Risk cleared', MUTE: 'Mute', UNMUTE: 'Unmute' };
   (async () => {
     const p = await api('GET', '/api/profile?player=' + encodeURIComponent(uuid));
     const note = el('input', { maxlength: 500, placeholder: 'Staff note (never shown to the player)' });
-    const unban = async () => {
-      if (!confirm('Unban ' + p.name + '?')) return;
-      try { toast((await api('POST', '/api/unban', { player: p.uuid })).message); render(); } catch (e) { toast(e.message, true); }
-    };
     // The whole page glows in the risk colour (green at 0 to red), fading off down the page,
     // so the risk shows the moment a profile opens.
     const risk = p.risk || { score: 0, level: 'Low', reasons: [] };
@@ -541,20 +792,27 @@ function profile(view, uuid) {
           el('div', { class: 'heroname' }, el('h2', { class: 'big' }, p.name),
             el('div', { class: 'row' }, el('span', { class: 'pill ' + (p.online ? 'good' : 'dim') }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline'),
               p.edition ? editionBadge(p.edition) : null,
-              p.ban ? el('span', { class: 'badge red' }, 'Banned') : null),
+              p.ban ? el('span', { class: 'badge red' }, 'Banned') : null,
+              p.mute ? el('span', { class: 'badge mutebadge' }, 'Muted') : null),
             el('div', { class: 'mono muted small' }, p.uuid))),
         el('div', { class: 'herostats' },
-          heroStat('First seen', p.first ? fmtTime(p.first) : 'unknown'),
-          heroStat('Last seen', p.online ? 'now' : p.last ? fmtTime(p.last) : 'unknown'),
+          heroStat('First seen', p.first ? el('span', { title: fmtTime(p.first) }, ago(p.first)) : 'unknown'),
+          heroStat('Last seen', p.online ? 'now' : p.last ? el('span', { title: fmtTime(p.last) }, ago(p.last)) : 'unknown'),
           heroStat('Last world', p.world || '—'),
-          heroStat('Record', p.warnings + ' warns · ' + p.kicks + ' kicks · ' + p.bans + ' bans')),
+          // Separate pieces, so each one translates on its own.
+          heroStat('Record', el('span', {}, count(p.warnings, 'warning', 'warnings'), ' · ', count(p.mutes || 0, 'mute', 'mutes'), ' · ', count(p.kicks, 'kick', 'kicks'), ' · ', count(p.bans, 'ban', 'bans')))),
         p.ban ? el('p', { class: 'secret bad' }, 'Banned ' + (p.ban.expires ? 'until ' + fmtTime(p.ban.expires) : 'permanently')
           + ' by ' + p.ban.by + ': ' + (p.ban.reason || '')) : null,
+        p.mute ? el('p', { class: 'secret bad' }, 'Muted ' + (p.mute.expires ? 'until ' + fmtTime(p.mute.expires) : 'permanently')
+          + ' by ' + p.mute.by + ': ' + (p.mute.reason || '')) : null,
         can('MODERATOR') ? el('p', { class: 'row' },
-          el('button', { on: { click: () => modDialog('warn', p.uuid, p.name) } }, 'Warn'),
-          p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name) } }, 'Kick') : null,
-          p.ban ? el('button', { on: { click: unban } }, 'Unban')
-            : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name) } }, 'Ban')) : null), riskCard),
+          el('button', { class: 'primary', on: { click: () => modDialog('punish', p.uuid, p.name, p.online) } }, 'Punish'),
+          el('button', { on: { click: () => modDialog('warn', p.uuid, p.name, p.online) } }, 'Warn'),
+          p.mute ? el('button', { on: { click: () => lift('unmute', p) } }, 'Unmute')
+            : el('button', { on: { click: () => modDialog('mute', p.uuid, p.name, p.online) } }, 'Mute'),
+          p.online ? el('button', { on: { click: () => modDialog('kick', p.uuid, p.name, p.online) } }, 'Kick') : null,
+          p.ban ? el('button', { on: { click: () => lift('unban', p) } }, 'Unban')
+            : el('button', { class: 'danger', on: { click: () => modDialog('ban', p.uuid, p.name, p.online) } }, 'Ban')) : null), riskCard),
       profileSections(p.uuid, [
         ['Ping', () => pingCard(p.uuid)],
         can('MODERATOR') ? ['Chat', () => chatCard(p.uuid)] : null,
@@ -567,7 +825,7 @@ function profile(view, uuid) {
         } } }, note, el('button', { type: 'submit' }, 'Add note')) : null,
         el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'When'), el('th', {}, 'What'), el('th', {}, 'By'), el('th', {}, 'Reason'))),
           el('tbody', {}, p.history.length ? p.history.map((h) => el('tr', {}, el('td', {}, fmtTime(h.time)),
-            el('td', { class: h.type === 'BAN' || h.type === 'WARN' ? 'bad' : '' }, TYPE[h.type] + (h.detail ? ' (' + h.detail + ')' : '')),
+            el('td', { class: h.type === 'BAN' || h.type === 'WARN' || h.type === 'MUTE' ? 'bad' : '' }, TYPE[h.type] + (h.detail ? ' (' + h.detail + ')' : '')),
             el('td', {}, h.by), el('td', {}, h.reason)))
             : el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Clean record.')))))],
       ].filter(Boolean)));
@@ -653,12 +911,15 @@ function pingCard(uuid) {
       : el('div', { class: 'verdict ' + (d.lagSuspect ? 'warn' : 'ok') }, d.lagSuspect
         ? d.highPingKills + ' of ' + d.killCount + ' kills came during high ping (over 150 ms), ' + d.spikeKills + ' on a spike. Worth an eye.'
         : 'Only ' + d.highPingKills + ' of ' + d.killCount + ' kills came during high ping - no sign of kills riding the lag.');
+    const extra = el('div', { class: 'chips-stat', hidden: true },
+      chip(d.average, 'ms', 'Average'), chip(d.best, 'ms', 'Best'), chip(d.jitter, 'ms', 'Jitter', d.jitter >= 30),
+      chip(d.over150, '%', '≥ 150 ms', d.over150 > 5), chip(d.over250, '%', '≥ 250 ms', d.over250 > 1), chip(d.samples, '', 'Samples'));
+    const more = el('button', { class: 'chip-more', on: { click: () => { extra.hidden = !extra.hidden; more.textContent = extra.hidden ? 'More' : 'Less'; } } }, 'More');
     body.replaceChildren(
       el('div', { class: 'chips-stat' },
-        chip(d.median, 'ms', 'Median'), chip(d.average, 'ms', 'Average'), chip(d.p95, 'ms', '95% under', d.p95 >= 150),
-        chip(d.worst, 'ms', 'Worst', d.worst >= 250), chip(d.best, 'ms', 'Best'), chip(d.jitter, 'ms', 'Jitter', d.jitter >= 30),
-        chip(d.over150, '%', '≥ 150 ms', d.over150 > 5), chip(d.over250, '%', '≥ 250 ms', d.over250 > 1),
-        chip(d.spikes, '', 'Spikes', d.spikes > 0), chip(d.samples, '', 'Samples')),
+        chip(d.median, 'ms', 'Median'), chip(d.p95, 'ms', '95% under', d.p95 >= 150),
+        chip(d.worst, 'ms', 'Worst', d.worst >= 250), chip(d.spikes, '', 'Spikes', d.spikes > 0), more),
+      extra,
       el('p', { class: 'muted' }, 'Last ' + d.days + ' days. Each point is a one-minute average; red bands are spikes (a short lag burst of 250 ms or more). '
         + 'Click the chart, then scroll to zoom; drag to pan.'),
       chart(series),
@@ -850,6 +1111,149 @@ function audit(view) {
   })().catch((e) => toast(e.message, true));
 }
 
+// ---------- Schedule: restarts and repeating announcements ----------
+
+function scheduleView(view) {
+  const times = el('input', { placeholder: 'e.g. 04:00, 16:00 (empty = no daily restart)' });
+  const warns = el('input', { placeholder: 'e.g. 15, 5, 1' });
+  const next = el('p', { class: 'muted' });
+  const how = el('p', { class: 'muted small' });
+  const soon = el('input', { type: 'number', min: 1, max: 1440, value: 10 });
+  const oneOff = el('div');
+  const annBody = el('div', { class: 'annlist' });
+  const annRow = (a = { text: '', everyMinutes: 30 }) => {
+    const text = el('input', { maxlength: 300, placeholder: 'Announcement text', value: a.text });
+    const every = el('input', { type: 'number', min: 1, max: 1440, value: a.everyMinutes, class: 'every' });
+    const row = el('div', { class: 'row annrow' }, text, el('span', { class: 'muted' }, 'every'), every, el('span', { class: 'muted' }, 'min'),
+      el('button', { type: 'button', class: 'ghost', on: { click: () => row.remove() } }, 'Remove'));
+    row.read = () => ({ text: text.value.trim(), everyMinutes: Number(every.value) });
+    return row;
+  };
+  const list = (input) => input.value.split(/[,\s]+/).map((v) => v.trim()).filter(Boolean);
+  const save = async () => {
+    try {
+      const r = await api('POST', '/api/schedule/save', { restartTimes: list(times), warnMinutes: list(warns).map(Number),
+        announcements: [...annBody.children].map((row) => row.read()).filter((a) => a.text) });
+      toast(r.message);
+      load();
+    } catch (e) { toast(e.message, true); }
+  };
+  const restartSoon = async () => {
+    try { toast((await api('POST', '/api/schedule/restart-in', { minutes: Number(soon.value) })).message); load(); } catch (e) { toast(e.message, true); }
+  };
+  async function load() {
+    const d = await api('GET', '/api/schedule');
+    times.value = d.restartTimes.join(', ');
+    warns.value = d.warnMinutes.join(', ');
+    next.replaceChildren(...(d.next > 0 ? ['Next restart:', ' ', el('b', {}, fmtTime(d.next)), ' (' + span(d.next - Date.now()) + ')'] : ['No restart planned.']));
+    how.textContent = (d.amp ? 'Restarts go through AMP, which starts the server again.'
+      : 'AMP isn\'t set up, so a restart stops the server: your host must start it again by itself.') + ' Times are in ' + d.zone + '.';
+    oneOff.replaceChildren(d.oneOff > Date.now()
+      ? el('p', { class: 'row' }, el('span', {}, 'Restart planned for ', el('b', {}, fmtTime(d.oneOff))),
+        el('button', { on: { click: async () => { try { toast((await api('POST', '/api/schedule/cancel')).message); load(); } catch (e) { toast(e.message, true); } } } }, 'Cancel'))
+      : el('p', { class: 'row' }, el('span', {}, 'Restart in'), soon, el('span', { class: 'muted' }, 'minutes'),
+        el('button', { class: 'danger', disabled: d.blocked, on: { click: restartSoon } }, 'Schedule restart')));
+    annBody.replaceChildren(...d.announcements.map(annRow));
+  }
+  view.append(
+    el('div', { class: 'card' }, el('h2', {}, 'Daily restarts'),
+      el('label', {}, 'Restart at (24-hour times)'), times,
+      el('label', {}, 'Warn players this many minutes before'), warns,
+      el('p', { class: 'muted small' }, 'Players also get a last warning 30 and 10 seconds before.'), next, how),
+    el('div', { class: 'card' }, el('h2', {}, 'Restart soon'), oneOff),
+    el('div', { class: 'card' }, el('h2', {}, 'Announcements'),
+      el('p', { class: 'muted' }, 'Each one is sent to every player\'s chat on its own timer.'), annBody,
+      el('p', {}, el('button', { type: 'button', on: { click: () => annBody.append(annRow()) } }, 'Add announcement'))),
+    el('p', {}, el('button', { class: 'primary', on: { click: save } }, 'Save schedule')));
+  load().catch((e) => toast(e.message, true));
+}
+
+// ---------- Security checklist (owners) ----------
+
+const CHECK_MARK = { bad: '!', warn: '!', info: 'i', ok: '\u2713' };
+
+function securityView(view) {
+  const list = el('div', { class: 'checks' }, el('p', { class: 'muted' }, 'Checking…'));
+  const summary = el('div', { class: 'checksum' });
+  view.append(el('div', { class: 'card' }, el('div', { class: 'spread' }, el('h2', {}, 'Security checklist'), summary), list));
+  api('GET', '/api/security').then((d) => {
+    const bad = d.checks.filter((c) => c.level === 'bad').length, warn = d.checks.filter((c) => c.level === 'warn').length;
+    S.securityIssues = bad;
+    summary.replaceChildren(el('span', { class: 'pill ' + (bad ? 'bad' : warn ? 'warn' : 'good') },
+      bad ? count(bad, 'problem', 'problems') : warn ? count(warn, 'suggestion', 'suggestions') : 'All good'));
+    list.replaceChildren(...d.checks.map((c) => el('div', { class: 'check ' + c.level },
+      el('span', { class: 'mark' }, CHECK_MARK[c.level] || ''),
+      el('div', {}, el('div', { class: 'ctitle' }, c.title), el('div', { class: 'muted' }, c.detail)))));
+  }).catch((e) => list.replaceChildren(el('p', { class: 'bad' }, e.message)));
+}
+
+// ---------- My account: password and two-factor login ----------
+
+function myAccount(view) {
+  const pw = passwordForm(false);
+  pw.classList.remove('narrow');
+  view.append(pw, twoFactorCard());
+}
+
+// Two-factor: off shows a Turn on button that walks through the app setup; on shows how to turn it off.
+function twoFactorCard() {
+  const card = el('div', { class: 'card' });
+  const on = S.me.twoFactor;
+  const head = el('div', { class: 'spread' }, el('h2', {}, 'Two-factor login'), el('span', { class: 'pill ' + (on ? 'good' : 'dim') }, on ? 'On' : 'Off'));
+  const why = el('p', { class: 'muted' }, 'With two-factor on, logging in also needs the 6-digit code from an authenticator app on your phone '
+    + '(Google Authenticator, Microsoft Authenticator, Authy, 1Password and others). A stolen password alone is then not enough.');
+  const password = el('input', { type: 'password', autocomplete: 'current-password' });
+  const code = el('input', { inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, placeholder: '123456' });
+  const msg = el('p', { class: 'bad' });
+  const send = (path) => async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api('POST', path, { password: password.value, code: code.value });
+      if (r.csrf) S.csrf = r.csrf;
+      toast(r.message);
+      await boot();
+    } catch (err) { msg.textContent = err.message; code.value = ''; }
+  };
+  if (on) {
+    card.append(head, why, el('form', { on: { submit: send('/api/2fa/disable') } },
+      el('label', {}, 'Your password'), password, el('label', {}, 'Code from your app'), code,
+      el('p', {}, el('button', { class: 'danger', type: 'submit' }, 'Turn off')), msg));
+    return card;
+  }
+  const start = el('button', { class: 'primary', on: { click: async () => {
+    try {
+      const d = await api('POST', '/api/2fa/start');
+      const grouped = d.secret.match(/.{1,4}/g).join(' ');
+      start.replaceWith(el('form', { class: 'twofa', on: { submit: send('/api/2fa/enable') } },
+        el('p', {}, el('b', {}, '1.'), ' ', 'In your authenticator app, add an account and type this setup key (or open the link on your phone):'),
+        el('div', { class: 'setupkey mono' }, grouped),
+        el('p', { class: 'row' }, el('button', { type: 'button', on: { click: () => navigator.clipboard.writeText(d.secret).then(() => toast('Key copied')) } }, 'Copy key'),
+          el('a', { class: 'button', href: d.uri }, 'Open in authenticator app')),
+        el('p', {}, el('b', {}, '2.'), ' ', 'Type the 6-digit code the app shows, and your password:'),
+        el('label', {}, 'Code from your app'), code, el('label', {}, 'Your password'), password,
+        el('p', {}, el('button', { class: 'primary', type: 'submit' }, 'Turn on')), msg));
+      code.focus();
+    } catch (err) { toast(err.message, true); }
+  } } }, 'Turn on two-factor');
+  card.append(head, why, el('p', {}, start));
+  return card;
+}
+
+// Owners write the presets as text, one offence per line; the server checks every step before saving.
+function presetsView(view) {
+  const text = el('textarea', { rows: 10, spellcheck: 'false', class: 'mono presettext' });
+  const save = async () => {
+    try { toast((await api('POST', '/api/presets/save', { text: text.value })).message); } catch (e) { toast(e.message, true); }
+  };
+  view.append(el('div', { class: 'card' }, el('h2', {}, 'Punishment presets'),
+    el('p', { class: 'muted' }, 'One offence per line: its name, a colon, then its steps from the first offence to the last. '
+      + 'Steps are warn, kick, mute <time> or ban <time>, with times like 30m, 12h, 7d, 2w or permanent. '
+      + 'Past the last step, a player gets the last step again.'),
+    el('p', { class: 'mono small muted' }, 'Spam: warn, mute 30m, mute 1d, ban 1d'),
+    text, el('p', { class: 'row' }, el('button', { class: 'primary', on: { click: save } }, 'Save presets'))));
+  api('GET', '/api/presets').then((d) => { text.value = d.text; }).catch((e) => toast(e.message, true));
+}
+
 function accounts(view) {
   const body = el('tbody');
   const secret = el('div');
@@ -864,7 +1268,7 @@ function accounts(view) {
     return s;
   };
   view.append(el('div', { class: 'card' }, el('h2', {}, 'Panel accounts'),
-    el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Level'), el('th', {}, 'Status'), el('th', {}))), body),
+    el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Level'), el('th', {}, 'Two-factor'), el('th', {}, 'Status'), el('th', {}))), body),
     el('h3', {}, 'Add account'),
     el('div', { class: 'row' }, name, lvl, el('button', { class: 'primary', on: { click: async () => {
       try { const r = await api('POST', '/api/accounts/create', { name: name.value.trim(), level: lvl.value }); showSecret(name.value.trim(), r.password); name.value = ''; load(); } catch (e) { toast(e.message, true); }
@@ -873,8 +1277,13 @@ function accounts(view) {
   async function load() {
     const d = await api('GET', '/api/accounts');
     body.replaceChildren(...d.accounts.map((a) => el('tr', {}, el('td', {}, a.name), el('td', {}, levelSelect(a)),
+      el('td', {}, el('span', { class: 'pill ' + (a.twoFactor ? 'good' : 'dim') }, a.twoFactor ? 'On' : 'Off')),
       el('td', { class: 'muted' }, a.mustChange ? 'must change password' : ''),
       el('td', { class: 'actions' },
+        a.twoFactor ? el('button', { on: { click: async () => {
+          if (!confirm('Remove two-factor from ' + a.name + "? Use this when they lost their phone. They are logged out.")) return;
+          try { toast((await api('POST', '/api/accounts/2fa-reset', { name: a.name })).message); load(); } catch (e) { toast(e.message, true); }
+        } } }, 'Remove two-factor') : null,
         el('button', { on: { click: async () => {
           if (!confirm('Give ' + a.name + ' a new temporary password? They are logged out.')) return;
           try { showSecret(a.name, (await api('POST', '/api/accounts/reset', { name: a.name })).password); load(); } catch (e) { toast(e.message, true); }

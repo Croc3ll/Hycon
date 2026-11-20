@@ -22,6 +22,14 @@ public interface HyconPanel {
         return HyconApi.VIEWER;
     }
 
+    /**
+     * The tab's icon, one of {@link HyconApi#ICONS} (e.g. {@code "swords"}), or null for the plain chart.
+     * Since API version 16; older Hycon versions never ask.
+     */
+    default String icon() {
+        return null;
+    }
+
     /** Fills in the tab's content. */
     void render(PanelData out);
 

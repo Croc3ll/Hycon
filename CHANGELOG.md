@@ -3,6 +3,31 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.2.0 (2026-11-20)
+A new look and a big moderation update. Updating from 0.1.48 or older? Read **Action needed** under 0.1.49.
+
+- **Sidebar**: the tabs moved from the two-row top bar into a sidebar, grouped under Moderation, Server, Plugins and
+  Admin, with the open count on Reports and Bugs. Phones keep the menu button, now with the same groups.
+- **Players table**: session length, total playtime, live ping and a risk pill for everyone online. The UUID moved into
+  the name's tooltip and a **Copy UUID** button. Row buttons show when you point at the row. The All players list
+  shows playtime and "first seen 41 days ago".
+- **Needs attention**: one line above every page with open reports and bugs, a lagging server, memory almost full
+  and (owners) security problems. Click an item to go there.
+- **Mute**: muted players can't chat until it ends, and are told why and for how long. Mutes are on the Bans tab,
+  on profiles and in the risk score.
+- **Punish dialog**: one dialog for every punishment: a preset, or a plain warn, mute, kick or ban.
+- **Punishment presets** (Presets tab, owners): per offence, steps that get harsher for repeat offenders,
+  e.g. "Spam: warn, mute 30m, mute 1d, ban 1d". Hycon picks each player's next step. Six presets to start with.
+- **Two-factor login**: turn it on under My account (click your name) with any authenticator app. Owners can remove
+  it for someone who lost their phone, and the console's `/hycon resetpassword` resets it too.
+- **Security checklist** (Security tab, owners): what to fix in your setup, worst first, in plain words.
+- **Schedule** (admins): daily restarts with countdown warnings in chat (through AMP when it's set up), a one-off
+  restart, and announcements that repeat on their own timer.
+- **My account**: change your own password without asking an owner.
+- Profiles: "1 warning" instead of "1 warns", "40 days ago" with the full date on hover, and the ping card shows the
+  four numbers that matter with the rest behind **More**.
+- API 16: plugins can give their tab an icon (`HyconPanel.icon()`).
+
 ## 0.1.51 (2026-11-20)
 Updating from 0.1.48 or older? Read **Action needed** under 0.1.49.
 

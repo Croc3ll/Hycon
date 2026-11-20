@@ -20,11 +20,18 @@
     ['Vancouver', 'British Columbia', 'Canada', 'CA', 49.28, -123.12, 64], ['Miami', 'Florida', 'United States', 'US', 25.76, -80.19, 38],
     ['Manila', 'Metro Manila', 'Philippines', 'PH', 14.6, 120.98, 238], ['Mexico City', 'CDMX', 'Mexico', 'MX', 19.43, -99.13, 61]];
 
+  // A few players stand out on the Players table (the rest get low scores): Grimsby is the Economy Guard case.
+  const RISK = { 0: 12, 6: 34, 10: 62, 11: 24, 16: 88 };
   const players = NAMES.map((name, i) => {
     const place = PLACES[i % PLACES.length];
     return { name, uuid: uuid(i + 1), online: i < 18, world: WORLDS[i % WORLDS.length], first: NOW - (40 - i) * DAY - i * 3 * HOUR,
-      last: i < 18 ? NOW : NOW - (i - 17) * 5 * HOUR, place, ping: Math.round(place[6] * (0.85 + rnd() * 0.3)) };
+      last: i < 18 ? NOW : NOW - (i - 17) * 5 * HOUR, place, ping: Math.round(place[6] * (0.85 + rnd() * 0.3)),
+      since: NOW - (6 + (i * 37) % 170) * MIN, playtimeMs: Math.round((140 - i * 4.3) * HOUR + (i * 17 % 60) * MIN), risk: RISK[i] ?? (i * 7) % 18 };
   });
+  const PRESETS = [['Spam', ['warn', 'mute 30m', 'mute 1d', 'ban 1d']], ['Toxicity', ['warn', 'mute 1h', 'mute 1d', 'ban 3d', 'ban 30d']],
+    ['Advertising', ['mute 1d', 'ban 7d', 'ban permanent']], ['Griefing', ['warn', 'ban 1d', 'ban 7d', 'ban permanent']],
+    ['Hacking', ['ban 30d', 'ban permanent']]];
+  const riskLevel = (r) => (r >= 80 ? 'Very high' : r >= 50 ? 'High' : r >= 20 ? 'Medium' : 'Low');
   const hero = players[0];
 
   // Players online through the day: quiet at night, busiest in the evening.
@@ -150,14 +157,27 @@
 
   const ROUTES = {
     '/api/session': () => ({ loggedIn: true, name: 'admin', level: 'OWNER', rank: 4, mustChange: false, csrf: 'demo' }),
-    '/api/panels': () => ({ panels: [{ id: 'analytics', title: 'Analytics' }, { id: 'arena', title: 'Arena' }, { id: 'guard', title: 'Economy Guard' },
-      { id: 'performance', title: 'Performance' },
-      { id: 'perms', title: 'Permissions' }, { id: 'prison', title: 'Prison' }] }),
+    '/api/panels': () => ({ panels: [{ id: 'analytics', title: 'Analytics' }, { id: 'arena', title: 'Arena', icon: 'swords' },
+      { id: 'guard', title: 'Economy Guard', icon: 'coins' }, { id: 'performance', title: 'Performance' },
+      { id: 'perms', title: 'Permissions', icon: 'key' }, { id: 'prison', title: 'Prison', icon: 'pickaxe' }] }),
     '/api/reports': () => ({ open: 2, reports: [] }),
+    '/api/schedule': () => ({ amp: true, blocked: false, zone: 'America/Toronto', next: NOW + 5 * HOUR + 12 * MIN, oneOff: 0,
+      restartTimes: ['04:00', '16:00'], warnMinutes: [15, 5, 1],
+      announcements: [{ text: 'Vote for us with /vote and get a crate key!', everyMinutes: 30 }, { text: 'Join our Discord: discord.gg/example', everyMinutes: 45 }] }),
+    '/api/security': () => ({ checks: [
+      { level: 'warn', title: 'Admins without two-factor: Juniper', detail: 'These accounts can run console commands. Each person turns two-factor on under My account (click your name).' },
+      { level: 'info', title: 'No console commands are blocked', detail: 'ADMIN accounts can run any command. List ones they never need in BlockedCommands in hycon.json, e.g. ["stop", "op"].' },
+      { level: 'ok', title: 'Reached over HTTPS', detail: 'Logins only travel encrypted (SecureCookie is on).' }] }),
+    '/api/mutes': () => ({ mutes: [{ player: players[16].uuid, name: players[16].name, by: 'admin', reason: '[Toxicity] insults in chat',
+      since: NOW - 2 * HOUR, until: NOW + 22 * HOUR }] }),
+    '/api/presets': () => ({ text: PRESETS.map(([n, steps]) => n + ': ' + steps.join(', ')).join('\n'),
+      presets: PRESETS.map(([name, steps], i) => ({ name, steps: steps.map((st) => { const [action, duration] = st.split(' '); return { action, duration }; }),
+        done: i % 3, next: Math.min(i % 3, steps.length - 1) })) }),
     '/api/bugs': () => ({ open: 1, bugs: [] }),
-    '/api/players': () => ({ players: players.filter((p) => p.online).map((p) => ({ name: p.name, uuid: p.uuid, world: p.world })) }),
+    '/api/players': () => ({ players: players.filter((p) => p.online).map((p) => ({ name: p.name, uuid: p.uuid, world: p.world,
+      since: p.since, playtimeMs: p.playtimeMs, ping: p.ping, risk: p.risk, riskLevel: riskLevel(p.risk), muted: p === players[16] || undefined })) }),
     '/api/directory': () => ({ total: players.length, players: players.map((p) => ({ name: p.name, uuid: p.uuid, online: p.online, world: p.world,
-      first: p.first, last: p.last })) }),
+      first: p.first, last: p.last, playtimeMs: p.playtimeMs, banned: p.name === 'Marrow' || undefined })) }),
     '/api/status': () => ({ amp: false, tps: 30, targetTps: 30, memoryMb: 3184, memoryMaxMb: 8192, online: 18, uptimeMs: 6 * DAY + 4 * HOUR }),
     '/api/log': (q) => (q.get('after') === '-1' ? { lines: logLines, latest: logLines.length - 1 } : { lines: [], latest: logLines.length - 1 }),
     '/api/profile': (q) => profile(players.find((p) => p.uuid === q.get('player')) || hero),
@@ -170,12 +190,19 @@
     '/api/bans': () => ({ bans: [] }),
   };
 
+  // POSTs that must answer with data for the page to go on; every other POST changes nothing.
+  const POST_ROUTES = {
+    '/api/2fa/start': () => ({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', uri: 'otpauth://totp/Hycon:admin?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Hycon' }),
+  };
   const real = window.fetch.bind(window);
   window.fetch = (input, opt) => {
     const url = new URL(typeof input === 'string' ? input : input.url, location.href);
     const route = ROUTES[url.pathname];
     if (!url.pathname.startsWith('/api/')) return real(input, opt);
-    const body = route ? JSON.stringify(route(url.searchParams)) : '{}';
+    const post = (opt && opt.method === 'POST') || (input && input.method === 'POST');
+    const body = post && POST_ROUTES[url.pathname] ? JSON.stringify(POST_ROUTES[url.pathname]())
+      : post ? JSON.stringify({ ok: true, message: 'Demo panel: nothing was changed.' })
+      : route ? JSON.stringify(route(url.searchParams)) : '{}';
     // Answer a moment later, like a real server: app.js boots before the deferred globe.js has run.
     return new Promise((done) => setTimeout(() => done(new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } })), 40));
   };

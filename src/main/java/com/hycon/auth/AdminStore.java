@@ -33,8 +33,9 @@ public final class AdminStore {
 
     /**
      * @param defaultPassword still has {@link #DEFAULT_PASSWORD}: only usable from the server machine
+     * @param totp            the two-factor secret (base32), or null when the account logs in with a password alone
      */
-    public record Admin(String name, Level level, String hash, boolean mustChange, boolean defaultPassword) {
+    public record Admin(String name, Level level, String hash, boolean mustChange, boolean defaultPassword, String totp) {
         /** Stable id used as "banned by" in Hytale's ban list, so bans can be traced back to an account. */
         public UUID uuid() {
             return uuidFor(name);
@@ -73,13 +74,14 @@ public final class AdminStore {
                     if (o instanceof Map<?, ?> m && m.get("name") instanceof String n && m.get("hash") instanceof String h) {
                         Level level = Level.parse(m.get("level") instanceof String s ? s : null);
                         admins.put(key(n), new Admin(n, level == null ? Level.VIEWER : level, h,
-                                Boolean.TRUE.equals(m.get("mustChange")), Boolean.TRUE.equals(m.get("defaultPassword"))));
+                                Boolean.TRUE.equals(m.get("mustChange")), Boolean.TRUE.equals(m.get("defaultPassword")),
+                                m.get("totp") instanceof String t && !t.isBlank() ? t : null));
                     }
                 }
             }
         }
         if (admins.isEmpty()) {
-            admins.put(DEFAULT_NAME, new Admin(DEFAULT_NAME, Level.OWNER, Passwords.hash(DEFAULT_PASSWORD), true, true));
+            admins.put(DEFAULT_NAME, new Admin(DEFAULT_NAME, Level.OWNER, Passwords.hash(DEFAULT_PASSWORD), true, true, null));
             save();
             return true;
         }
@@ -110,14 +112,14 @@ public final class AdminStore {
             throw new IllegalArgumentException("That account already exists");
         }
         String pw = Passwords.generate();
-        admins.put(key(name), new Admin(name, level, Passwords.hash(pw), true, false));
+        admins.put(key(name), new Admin(name, level, Passwords.hash(pw), true, false, null));
         save();
         return pw;
     }
 
     public synchronized void setPassword(String name, String password) throws IOException {
         Admin a = require(name);
-        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(password), false, false));
+        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(password), false, false, a.totp()));
         save();
         // The made-up password is no longer valid, so its file only causes confusion.
         if (Files.exists(loginFile) && Files.readString(loginFile).contains("Account:  " + a.name() + "\n")) {
@@ -129,7 +131,8 @@ public final class AdminStore {
     public synchronized String resetPassword(String name) throws IOException {
         Admin a = require(name);
         String pw = Passwords.generate();
-        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(pw), true, false));
+        // A reset is for someone who lost access, often with their phone: two-factor starts over too.
+        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(pw), true, false, null));
         save();
         return pw;
     }
@@ -153,7 +156,7 @@ public final class AdminStore {
         if (a.level() == Level.OWNER && level != Level.OWNER && owners() == 1) {
             throw new IllegalArgumentException("The last OWNER can't be demoted");
         }
-        admins.put(key(name), new Admin(a.name(), level, a.hash(), a.mustChange(), a.defaultPassword()));
+        admins.put(key(name), new Admin(a.name(), level, a.hash(), a.mustChange(), a.defaultPassword(), a.totp()));
         save();
     }
 
@@ -186,12 +189,23 @@ public final class AdminStore {
         Files.writeString(loginFile, text, StandardCharsets.UTF_8);
     }
 
+    /** Turns two-factor on with this secret, or off with null. */
+    public synchronized void setTotp(String name, String secret) throws IOException {
+        Admin a = require(name);
+        admins.put(key(name), new Admin(a.name(), a.level(), a.hash(), a.mustChange(), a.defaultPassword(), secret));
+        save();
+    }
+
     /** Writes to a temp file and moves it over, so a crash mid-write never leaves a broken file. */
     private void save() throws IOException {
         Json j = new Json().beginObject().name("admins").beginArray();
         for (Admin a : all()) {
             j.beginObject().field("name", a.name()).field("level", a.level().name()).field("hash", a.hash())
-                    .field("mustChange", a.mustChange()).field("defaultPassword", a.defaultPassword()).endObject();
+                    .field("mustChange", a.mustChange()).field("defaultPassword", a.defaultPassword());
+            if (a.totp() != null) {
+                j.field("totp", a.totp());
+            }
+            j.endObject();
         }
         j.endArray().endObject();
         Files.createDirectories(file.getParent());

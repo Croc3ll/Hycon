@@ -6,8 +6,12 @@ import com.hycon.auth.Level;
 import com.hycon.auth.LoginLimiter;
 import com.hycon.auth.Passwords;
 import com.hycon.auth.Sessions;
+import com.hycon.auth.Totp;
 
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Login, logout, own password, and the OWNER-only account management. */
 public final class AuthRoutes {
@@ -17,6 +21,12 @@ public final class AuthRoutes {
     private final Sessions sessions;
     private final LoginLimiter limiter;
     private final AuditLog audit;
+    /** Setups started but never confirmed that are kept at most. */
+    private static final int MAX_PENDING = 500;
+    /** A secret being set up, by session id, until the first code from the app confirms it. */
+    private final Map<String, String> pendingTotp = new ConcurrentHashMap<>();
+    /** The last code step each account used, so one code can't log in twice. */
+    private final Map<String, Long> usedStep = new ConcurrentHashMap<>();
 
     public AuthRoutes(WebServer web, AdminStore admins, Sessions sessions, LoginLimiter limiter, AuditLog audit) {
         this.web = web;
@@ -36,6 +46,10 @@ public final class AuthRoutes {
         web.post("/api/accounts/level", Level.OWNER, this::level);
         web.post("/api/accounts/reset", Level.OWNER, this::reset);
         web.post("/api/accounts/delete", Level.OWNER, this::delete);
+        web.post("/api/accounts/2fa-reset", Level.OWNER, this::resetTwoFactor);
+        web.post("/api/2fa/start", Level.VIEWER, this::startTwoFactor);
+        web.post("/api/2fa/enable", Level.VIEWER, this::enableTwoFactor);
+        web.post("/api/2fa/disable", Level.VIEWER, this::disableTwoFactor);
     }
 
     private void session(Req r) throws IOException {
@@ -46,7 +60,7 @@ public final class AuthRoutes {
         }
         if (r.admin != null) {
             j.field("name", r.admin.name()).field("level", r.admin.level().name()).field("rank", r.admin.level().rank)
-                    .field("mustChange", r.admin.mustChange());
+                    .field("mustChange", r.admin.mustChange()).field("twoFactor", r.admin.totp() != null);
         }
         r.ok(j.endObject());
     }
@@ -78,6 +92,20 @@ public final class AuthRoutes {
             audit.record(a.name(), r.ip, "login", null, "default password used from another machine", false);
             r.error(403, "Log in from the server machine itself until the default password is changed");
             return;
+        }
+        if (a.totp() != null) {
+            String code = r.str("code");
+            if (code == null || code.isBlank()) {
+                // The password was right: the page now asks for the code and sends both again.
+                r.ok(new Json().beginObject().field("ok", false).field("need2fa", true).endObject());
+                return;
+            }
+            if (!codeOk(a, code)) {
+                limiter.fail(r.ip, name);
+                audit.record(a.name(), r.ip, "login", null, "wrong two-factor code", false);
+                r.error(401, "Wrong code. Use the newest one from your app.");
+                return;
+            }
         }
         limiter.succeeded(r.ip, a.name());
         // New session id at login, so an id an attacker planted or saw beforehand is useless.
@@ -130,7 +158,8 @@ public final class AuthRoutes {
     private void accounts(Req r) throws IOException {
         Json j = new Json().beginObject().name("accounts").beginArray();
         for (AdminStore.Admin a : admins.all()) {
-            j.beginObject().field("name", a.name()).field("level", a.level().name()).field("mustChange", a.mustChange()).endObject();
+            j.beginObject().field("name", a.name()).field("level", a.level().name()).field("mustChange", a.mustChange())
+                    .field("twoFactor", a.totp() != null).endObject();
         }
         r.ok(j.endArray().endObject());
     }
@@ -191,6 +220,86 @@ public final class AuthRoutes {
         } catch (IllegalArgumentException e) {
             r.error(400, e.getMessage());
         }
+    }
+
+    /** True when the code is the account's current one and hasn't been used yet. */
+    private boolean codeOk(AdminStore.Admin a, String code) {
+        String key = a.name().toLowerCase(Locale.ROOT);
+        long step = Totp.verify(a.totp(), code, usedStep.getOrDefault(key, -1L));
+        if (step < 0) {
+            return false;
+        }
+        usedStep.put(key, step);
+        return true;
+    }
+
+    /** A fresh secret for this browser to show; it only takes effect once a code from the app confirms it. */
+    private void startTwoFactor(Req r) throws IOException {
+        if (r.admin.totp() != null) {
+            r.error(400, "Two-factor is already on");
+            return;
+        }
+        if (pendingTotp.size() > MAX_PENDING) {
+            pendingTotp.clear(); // abandoned setups; anyone mid-setup just starts again
+        }
+        String secret = Totp.newSecret();
+        pendingTotp.put(r.session.id, secret);
+        r.ok(new Json().beginObject().field("secret", secret).field("uri", Totp.uri(r.admin.name(), secret)).endObject());
+    }
+
+    private void enableTwoFactor(Req r) throws IOException {
+        String secret = pendingTotp.get(r.session.id);
+        if (secret == null) {
+            r.error(400, "Start the setup again");
+            return;
+        }
+        if (!Passwords.verify(r.str("password") == null ? "" : r.str("password"), r.admin.hash())) {
+            audit.record(r.who(), r.ip, "2fa.enable", r.who(), "wrong password", false);
+            r.error(403, "Your password is wrong");
+            return;
+        }
+        long step = Totp.verify(secret, r.str("code"), -1);
+        if (step < 0) {
+            r.error(400, "That code doesn't match. Check the phone's clock and type the newest code.");
+            return;
+        }
+        pendingTotp.remove(r.session.id);
+        admins.setTotp(r.admin.name(), secret);
+        usedStep.put(r.admin.name().toLowerCase(Locale.ROOT), step);
+        // Every other browser and saved login has to log in again, now with a code.
+        sessions.removeAdmin(r.admin.name());
+        web.issueCookie(r, sessions.create(r.admin.name(), r.ip));
+        audit.record(r.who(), r.ip, "2fa.enable", r.who(), null, true);
+        r.ok(new Json().beginObject().field("ok", true).field("csrf", r.session.csrf).field("message", "Two-factor login is on").endObject());
+    }
+
+    private void disableTwoFactor(Req r) throws IOException {
+        if (r.admin.totp() == null) {
+            r.error(400, "Two-factor is already off");
+            return;
+        }
+        if (!Passwords.verify(r.str("password") == null ? "" : r.str("password"), r.admin.hash()) || !codeOk(r.admin, r.str("code"))) {
+            audit.record(r.who(), r.ip, "2fa.disable", r.who(), "wrong password or code", false);
+            r.error(403, "Wrong password or code");
+            return;
+        }
+        admins.setTotp(r.admin.name(), null);
+        audit.record(r.who(), r.ip, "2fa.disable", r.who(), null, true);
+        r.ok(new Json().beginObject().field("ok", true).field("message", "Two-factor login is off").endObject());
+    }
+
+    /** For staff who lost their phone: the owner turns their two-factor off, and they set it up again. */
+    private void resetTwoFactor(Req r) throws IOException {
+        String name = r.str("name");
+        AdminStore.Admin a = admins.get(name);
+        if (a == null || a.totp() == null) {
+            r.error(400, a == null ? "No such account" : "That account has no two-factor");
+            return;
+        }
+        admins.setTotp(a.name(), null);
+        sessions.removeAdmin(a.name());
+        audit.record(r.who(), r.ip, "2fa.reset", a.name(), null, true);
+        r.ok(new Json().beginObject().field("ok", true).field("message", "Two-factor removed for " + a.name()).endObject());
     }
 
     /** Null when acceptable, else what's wrong. Length matters far more than character rules. */

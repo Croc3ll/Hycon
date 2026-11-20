@@ -48,7 +48,14 @@ and then open `http://127.0.0.1:8096/` on your own PC, or set up HTTPS access as
 
 ## 3. Using the panel
 
-The tabs you see depend on your account level (see [section 4](#4-staff-accounts)).
+The tabs you see depend on your account level (see [section 4](#4-staff-accounts)). They sit in a sidebar in
+four groups: **Moderation** (Players, Bans, Reports, Bugs, Chat), **Server** (Analytics, Performance, Console,
+Schedule), **Plugins** (tabs other plugins add) and **Admin** (Security, Presets, Audit log, Ban sharing, Accounts).
+Reports and Bugs show how many are open. On a phone the tabs sit behind a menu button.
+
+**Needs attention**: moderators and up see one line above every page with what needs them now: open reports and
+bugs, the server lagging (TPS under 90%) or memory over 90% full, and (owners) security problems. Click an item to
+open its tab. When nothing is waiting it says "All clear". It refreshes every 30 seconds.
 
 **Language**: the dropdown at the top right switches the panel between English, Spanish, German, French,
 Portuguese, Polish, Russian, Italian, Dutch and Turkish (the same languages as hytaleserver.xyz). It starts in your
@@ -56,16 +63,23 @@ browser's language and remembers your pick. Player names, chat and logs stay as 
 `src/main/resources/web/lang/<code>.json`, keyed by the English text; `py tools/make_lang.py` fills new lines through DeepL.
 
 ### Players
-Everyone online, with their world and UUID. Refreshes every 5 seconds.
+Everyone online, with their world, how long they've been on (**Session**), their total **Playtime**, their
+**Ping** (green, gold or red) and their **Risk** (Low to Very high; hover for the score). Refreshes every 5
+seconds. Point at a name to see the UUID. Point at a row and its buttons appear: **Copy UUID**, **Punish**,
+and **Unmute** or **Unban** when that applies. Muted players have a purple **Muted** badge.
 
-- **Kick**: enter an optional reason; the player sees it when disconnected.
-- **Ban**: enter a reason and pick how long: 30 minutes up to 30 days, or **Permanent**.
-- **Banned players** show "Banned · 2d 4h left" (or "permanent") in red, with an **Unban** button.
+- **Punish** opens one dialog with five choices:
+  - **Preset**: pick the offence ("Spam", "Hacking", ...). The dialog shows the steps for that offence and which one
+    this player gets next (a first offence gets the first step). See [Presets](#presets-owner).
+  - **Warn**, **Mute**, **Kick** or **Ban** with your own reason. Mutes and bans take a time: 10 minutes up to 30 days,
+    or **Permanent**.
+- **Mute**: the player can't chat until it ends. Each line they try is stopped before it reaches anyone, and they
+  are told why and for how long.
+- **Banned players** show "Banned · 2d 4h left" (or "permanent") in red, muted ones "Muted · 1h 20m left".
 - **All players**: below the online list is everyone who has ever joined, online or offline,
-  with their status ("Online" or "Last seen 3 h ago"), UUID and first-seen date. Type in the search
-  box to find someone by part of their name or the start of their UUID, then **Ban** (or **Kick** if
-  they're online). On first start Hycon also reads the players the server saved before Hycon was
-  installed (`universe/players`), so they can be found too.
+  with their status ("Online" or "Last seen 3 h ago"), playtime and when they first joined. Type in the search
+  box to find someone by part of their name or the start of their UUID. On first start Hycon also reads the
+  players the server saved before Hycon was installed (`universe/players`), so they can be found too.
 
 - **Warn**: type a reason. If the player is online, a big "Warning" title appears in the middle of
   their screen, the reason shows in a red notification popup ("Warning #2"), and a chat line
@@ -130,7 +144,8 @@ can't ban the wrong player.
 ### Bans
 Every active ban, with a **Temporary** or **Permanent** badge and, for temporary bans, the
 **time left** (counts down; hover for the exact end). Filter with All / Temporary / Permanent,
-ban someone by name or UUID from the box at the top, and **Unban** to lift a ban.
+punish someone by name or UUID from the box at the top, and **Unban** to lift a ban. Below the bans is
+every active **mute**, with an **Unmute** button.
 
 Hycon uses the server's own ban list (`bans.json`), so bans made with `/ban` in game show up here
 and the other way round. Temporary bans end on their own. Bans from the panel show
@@ -261,10 +276,46 @@ The newest 200 actions: logins (and failed ones), kicks, bans, unbans, commands 
 with the account and the address they came from. Failed or refused actions are marked ✗.
 The full history is in `audit.log` ([section 7](#7-files-hycon-keeps)).
 
+### Schedule (ADMIN and up)
+- **Daily restarts**: type times like `04:00, 16:00` (24-hour, the server's time zone) and how many minutes before
+  to warn players (e.g. `15, 5, 1`). Players also get a last warning 30 and 10 seconds before. With AMP set up
+  (`AmpUrl` in `hycon.json`), the restart goes through AMP, which starts the server again. Without AMP the server
+  stops, and your host has to start it again by itself.
+- **Restart soon**: a one-off restart in a few minutes, with the same countdown. **Cancel** takes it back.
+- **Announcements**: lines sent to every player's chat, each on its own timer (every 30 minutes, every hour, ...).
+
+Restarts are refused while `BlockedCommands` blocks `stop` or `restart`.
+
+### Security (OWNER)
+A checklist of how safely the panel is set up, worst first, each with what to change: the default password still in
+use, the panel open to the network without HTTPS, a proxy whose visitor addresses are ignored, admins and owners
+without two-factor, no blocked commands, the ban sharing port being open, and a newer Hycon being out. Problems
+also show in the needs-attention line.
+
+### Presets (OWNER)
+Ready-made punishments that get harsher for repeat offenders, one offence per line:
+
+```
+Spam: warn, mute 30m, mute 1d, ban 1d
+Hacking: ban 30d, ban permanent
+```
+
+Steps are `warn`, `kick`, `mute <time>` or `ban <time>`, with times like `30m`, `12h`, `7d`, `2w` or `permanent`.
+A punishment from a preset starts its reason with the preset's name (`[Spam] ...`), which is how Hycon counts
+earlier offences: a player's next step is the number of times they were already punished for it. Past the last
+step, they get the last step again. A new server starts with six presets to change as you like.
+
 ### Your account
-Top right: **Log out** ends the session. To change a password, an OWNER uses **Reset password**
-in the Accounts tab; the person then logs in with the temporary password and chooses a new one. Sessions also end by themselves after 30 idle minutes
-or 12 hours, whichever comes first (both can be changed in `hycon.json`).
+Click your name at the bottom of the sidebar for **My account**:
+- **Change password**.
+- **Two-factor login**: **Turn on two-factor**, add the setup key to an authenticator app on your phone (Google
+  Authenticator, Microsoft Authenticator, Authy, 1Password and others), and type the 6-digit code it shows. From then
+  on, logging in asks for the code after your password. A browser where you ticked **Remember me** keeps logging
+  in by itself. Turning two-factor on logs every other browser out. Lost your phone? An OWNER clicks
+  **Remove two-factor** on the Accounts tab, or `/hycon resetpassword <name>` in the console resets both.
+
+**Log out** ends the session. Sessions also end by themselves after 30 idle minutes or 12 hours, whichever comes
+first (both can be changed in `hycon.json`).
 
 ## 4. Staff accounts
 
@@ -273,9 +324,9 @@ Each staff member should have their own account, so the audit log shows who did 
 | Level     | Can                                                                         |
 |-----------|-----------------------------------------------------------------------------|
 | VIEWER    | See players, bans and dashboards                                            |
-| MODERATOR | Also kick, ban, unban, and watch the live console                           |
-| ADMIN     | Also run console commands (full console rights) and read the audit log      |
-| OWNER     | Also create, change and remove panel accounts, and download log files       |
+| MODERATOR | Also warn, mute, kick, ban, unban, and watch the live console               |
+| ADMIN     | Also run console commands, set the restart schedule, read the audit log     |
+| OWNER     | Also manage accounts, presets and security, and download log files          |
 
 Give out ADMIN carefully: it is the same as access to the server console.
 
@@ -451,6 +502,9 @@ All in Hycon's data folder:
 | `kills.log`       | Player-versus-player kills with the killer's ping, kept 14 days.                              |
 | `ping/`           | One small file per player with their ping every minute, kept 14 days.                          |
 | `reports.json`    | Player reports and what staff did with them.                                                  |
+| `mutes.json`      | Mutes in effect: who, by whom, why and until when.                                              |
+| `presets.json`    | Punishment presets (edit them on the Presets tab).                                              |
+| `schedule.json`   | Daily restart times, warnings and announcements (edit them on the Schedule tab).               |
 | `ties.json`       | Same-connection (hashed) and co-join ties for the connection map. Keep it private.            |
 | `activity/`       | Per player: blocks broken, placed and used, things crafted, zones found.                     |
 | `positions/`      | Per player: where they were each minute, kept 14 days.                                        |
