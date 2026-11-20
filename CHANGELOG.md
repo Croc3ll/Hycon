@@ -3,6 +3,11 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.45 (2026-11-19)
+- Phones: the header is one row (logo, account, Log out) and the language picker moved into the tab menu, under the tabs.
+- Phones: dropdowns open the phone's own picker instead of the desktop-styled list. Dropdowns and text fields in forms
+  fill the width instead of being squeezed side by side, and fields are 16px so iPhones don't zoom in when tapped.
+
 ## 0.1.44 (2026-11-19)
 - Phones: the tabs are behind a menu button that names the open tab. Tapping it shows every tab as a grid of large
   buttons, so none are hidden off the edge of the screen. Picking a tab, tapping the button again or Esc closes it.

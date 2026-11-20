@@ -604,4 +604,14 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
   nav#tabs button.active { color: var(--gold2); background: var(--gold-bg); border-color: rgba(226, 181, 75, .35); }
   nav#tabs .tabicon { width: 18px; height: 18px; }
   main h1 { font-size: 24px; }
+  /* Row 1 is the logo and the account; the language picker lives in the open menu, under the tabs. */
+  .brand { order: 0; }
+  #me { order: 1; }
+  .langbox { display: none; order: 11; flex: 0 0 100%; margin: 0 0 6px; border-radius: 10px; padding: 4px 4px 4px 8px; }
+  header.menuopen .langbox { display: flex; }
+  #lang { flex: 1; font-size: 16px; padding: 8px 30px 8px 8px; }
+  /* Phones get their own dropdown picker (a sheet or wheel), not the desktop-styled list. */
+  select, select::picker(select) { appearance: none; -webkit-appearance: none; }
+  .row input, .row select, .panelform input, .panelform select { min-width: 0; width: 100%; flex: 1 1 100%; }
+  input, select { font-size: 16px; } /* 16px stops iPhones zooming in when a field is tapped */
 }
