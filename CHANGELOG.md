@@ -3,6 +3,9 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.41 (2026-11-19)
+- Translations for the new Performance, At a glance and alert wording in every panel language.
+
 ## 0.1.40 (2026-11-19)
 - New **At a glance** tab for staff on a phone: health, players online, open reports and bugs, who is where.
 - Performance: Server health charts (chosen range and the last 7 days), and each lag spike lists the players in that world.
