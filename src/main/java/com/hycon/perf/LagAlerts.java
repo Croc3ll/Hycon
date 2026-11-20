@@ -79,6 +79,39 @@ final class LagAlerts {
         streaks.putAll(next);
     }
 
+    /** Minutes in a row the 10-minute health has been under AlertHealthBelow. */
+    private int healthStreak;
+    private static final int HEALTH_STREAK = 10;
+
+    /** Called each minute with the last 10 minutes' health score and what cost it points. */
+    void health(int score, java.util.List<String> reasons) {
+        int below = config.get().alertHealthBelow();
+        if (config.get().lagAlertPercent() <= 0 || below <= 0 || score < 0) {
+            healthStreak = 0;
+            return;
+        }
+        healthStreak = score < below ? healthStreak + 1 : 0;
+        if (healthStreak >= HEALTH_STREAK) {
+            send("health", String.format("Server health has been under %d for %d minutes (now %d / 100)%s", below, healthStreak, score,
+                    reasons.isEmpty() ? "." : ": " + String.join(", ", reasons.subList(0, Math.min(3, reasons.size()))) + "."));
+        }
+    }
+
+    /** Posts a line to the Discord webhook, if one is set. Never blocks. */
+    void webhook(String text) {
+        String webhook = config.get().lagWebhook();
+        if (!webhook.startsWith("https://")) {
+            return;
+        }
+        String body = new Json().beginObject().field("content", text).endObject().toString();
+        HttpRequest req = HttpRequest.newBuilder(URI.create(webhook)).timeout(Duration.ofSeconds(10))
+                .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        http.sendAsync(req, HttpResponse.BodyHandlers.discarding()).exceptionally(e -> {
+            log.at(Level.FINE).log("Hycon webhook failed: %s", e);
+            return null;
+        });
+    }
+
     void spike(Spike s) {
         int limit = config.get().alertSpikeMs();
         if (config.get().lagAlertPercent() > 0 && limit > 0 && s.ms() >= limit) {
@@ -100,15 +133,6 @@ final class LagAlerts {
                 p.sendMessage(note);
             }
         }
-        String webhook = config.get().lagWebhook();
-        if (webhook.startsWith("https://")) {
-            String body = new Json().beginObject().field("content", "[Lag] " + text).endObject().toString();
-            HttpRequest req = HttpRequest.newBuilder(URI.create(webhook)).timeout(Duration.ofSeconds(10))
-                    .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build();
-            http.sendAsync(req, HttpResponse.BodyHandlers.discarding()).exceptionally(e -> {
-                log.at(Level.FINE).log("Hycon lag webhook failed: %s", e);
-                return null;
-            });
-        }
+        webhook("[Lag] " + text);
     }
 }

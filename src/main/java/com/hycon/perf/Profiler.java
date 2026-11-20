@@ -473,6 +473,37 @@ public final class Profiler {
         return c.substring(c.lastIndexOf('.') + 1);
     }
 
+    /**
+     * Who was there when a spike ended: the players in that world (for the scheduler, everyone online), at most 8
+     * names and a count of the rest. Helps tie a spike to a busy arena, a mine reset or one player's base.
+     */
+    private static List<String> playersIn(Lane lane) {
+        List<String> names = new ArrayList<>();
+        int more = 0;
+        try {
+            for (PlayerRef p : Universe.get().getPlayers()) {
+                if (lane.world) {
+                    UUID wid = p.getWorldUuid();
+                    World w = wid == null ? null : Universe.get().getWorld(wid);
+                    if (w == null || !w.getName().equals(lane.name)) {
+                        continue;
+                    }
+                }
+                if (names.size() < 8) {
+                    names.add(p.getUsername());
+                } else {
+                    more++;
+                }
+            }
+        } catch (RuntimeException e) {
+            return List.of();
+        }
+        if (more > 0) {
+            names.add("+" + more + " more");
+        }
+        return List.copyOf(names);
+    }
+
     /** Records the longest single stop-the-world pause, from the JVM's own GC notifications. */
     private void listenForGcPauses() {
         for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
@@ -501,7 +532,7 @@ public final class Profiler {
         List<String> phases = s.phases.entrySet().stream().filter(e -> e.getValue() >= Math.max(1, s.samples * PHASE_SHARE))
                 .map(Map.Entry::getKey).sorted().toList();
         Spike spike = new Spike(System.currentTimeMillis(), lane.name, ms, shares(s.owners, s.samples, 5),
-                shares(s.where, s.samples, 5), Math.max(0, gcMillis() - s.gcAtStart), system, phases);
+                shares(s.where, s.samples, 5), Math.max(0, gcMillis() - s.gcAtStart), system, phases, playersIn(lane));
         cur.spikes++;
         synchronized (spikes) {
             spikes.addLast(spike);

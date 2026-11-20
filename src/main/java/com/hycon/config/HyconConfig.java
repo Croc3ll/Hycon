@@ -43,7 +43,9 @@ public record HyconConfig(
         String lagWebhook,
         int alertSpikeMs,
         int alertSpikesPerMinute,
-        int alertMemoryPercent) {
+        int alertMemoryPercent,
+        int alertHealthBelow,
+        boolean weeklyReport) {
 
     public static HyconConfig load(Path dataDir) throws IOException {
         Path file = dataDir.resolve("hycon.json");
@@ -88,7 +90,9 @@ public record HyconConfig(
                 str(m, "LagWebhook", ""),
                 (int) Math.max(0, Math.min(60_000, num(m, "AlertSpikeMs", 1000))),
                 (int) Math.max(0, Math.min(10_000, num(m, "AlertSpikesPerMinute", 10))),
-                (int) Math.max(0, Math.min(100, num(m, "AlertMemoryPercent", 90))));
+                (int) Math.max(0, Math.min(100, num(m, "AlertMemoryPercent", 90))),
+                (int) Math.max(0, Math.min(100, num(m, "AlertHealthBelow", 60))),
+                bool(m, "WeeklyReport", true));
     }
 
     /** True when {@code next} changes an option that is only read when the panel starts. */

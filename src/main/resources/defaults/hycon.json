@@ -107,5 +107,11 @@
   "AlertSpikesPerMinute": 10,
   // Alert when memory in use stays over this share (percent) of the
   // maximum for 3 minutes. 0 = off.
-  "AlertMemoryPercent": 90
+  "AlertMemoryPercent": 90,
+  // Alert when the Performance tab's Server health (0-100, 75 and up is
+  // good) stays under this for 10 minutes. 0 = off.
+  "AlertHealthBelow": 60,
+  // Every Monday at 12:00 UTC, post a short weekly summary (health, lag
+  // spikes, peak players, memory, busiest plugin) to LagWebhook.
+  "WeeklyReport": true
 }

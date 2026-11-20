@@ -53,7 +53,7 @@ final class PerfData {
      * ECS system (or scheduler task) seen most, {@code phases} what else showed up (chunk load, save, world gen).
      */
     record Spike(long time, String lane, long ms, Map<String, Double> owners, Map<String, Double> where, long gcMs,
-                 String system, List<String> phases) {
+                 String system, List<String> phases, List<String> players) {
 
         /** The plugin that ran most during the spike, or "garbage collection" when that took most of it. */
         String cause() {

@@ -256,6 +256,7 @@ public final class HyconPlugin extends JavaPlugin {
         });
         HyconApi.setRecorder((player, type, by, reason, detail) -> records.record(player,
                 "WARN".equalsIgnoreCase(type) ? PlayerRecords.Type.WARN : PlayerRecords.Type.NOTE, by, reason, detail));
+        HyconApi.register(new com.hycon.analytics.GlancePanel(moderation, reports, bugs, () -> perf == null ? null : perf.glance()));
         HyconApi.register(new AnalyticsPanel(samples, known, positions));
         if (perf != null) {
             HyconApi.register(new PerformancePanel(perf));

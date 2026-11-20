@@ -84,6 +84,7 @@ public final class PerformancePanel implements HyconPanel {
                 + "\"Hytale\" is the game itself. A plugin that alone takes more than about 10% is worth a closer look.");
         shareBars(out, "Who uses the world threads", r.worldShare, r.busy);
         shareBars(out, "Who uses the shared scheduler thread", r.schedShare, r.schedBusy);
+        healthCharts(out, list);
         charts(out, list, r);
         history(out, list);
         spikes(out);
@@ -158,6 +159,26 @@ public final class PerformancePanel implements HyconPanel {
         }
     }
 
+    /** The health score over the chosen range (a point per few minutes) and over the last 7 days (hourly averages). */
+    private void healthCharts(PanelData out, List<Minute> list) {
+        long bucket = bucket(list);
+        Map<Long, List<Minute>> byBucket = new LinkedHashMap<>();
+        for (Minute m : list) {
+            byBucket.computeIfAbsent(m.time() / bucket * bucket + bucket / 2, k -> new java.util.ArrayList<>()).add(m);
+        }
+        PanelData.Series h = out.series("Server health", "/ 100").subtitle("75 and up is good standing; per " + bucket / 60_000 + " min");
+        h.line("Health");
+        byBucket.forEach((b, ms) -> {
+            Minute last = ms.get(ms.size() - 1);
+            h.point(b, Math.max(0, Report.of(ms).health(Perf.memPct(last))));
+        });
+        List<HealthHistory.Hour> week = perf.health().since(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7));
+        PanelData.Series w = out.series("Server health, last 7 days", "/ 100").subtitle(week.isEmpty()
+                ? "fills in hour by hour" : "hourly average");
+        w.line("Health");
+        week.forEach(x -> w.point(x.time() + TimeUnit.MINUTES.toMillis(30), x.health()));
+    }
+
     /** Points per bucket for the history charts: a minute for an hour, 2 minutes up to 6 hours, 10 for a day. */
     private static long bucket(List<Minute> list) {
         return list.size() > 360 ? TimeUnit.MINUTES.toMillis(10) : list.size() > 60 ? TimeUnit.MINUTES.toMillis(2) : 60_000;
@@ -217,10 +238,11 @@ public final class PerformancePanel implements HyconPanel {
         out.note("Lag spikes: each slow game step. \"Cause\" is the plugin that ran most during it; \"System or task\" the part of it; "
                 + "\"Also\" shows chunk loading, world generation or saving, which are normal in small amounts. GC is memory clean-up.");
         PanelData.Table t = out.table("Lag spikes (newest first)", "When", "Where", "Length", "Cause", "System or task", "Also",
-                "Running", "GC");
+                "Running", "GC", "Players there");
         for (Spike s : perf.profiler().spikes()) {
             t.row(PanelData.time(s.time()), s.lane(), s.ms() + " ms", s.cause(), s.system() == null ? "" : s.system(),
-                    s.phases() == null ? "" : String.join(", ", s.phases()), joinShares(s.where()), s.gcMs() + " ms");
+                    s.phases() == null ? "" : String.join(", ", s.phases()), joinShares(s.where()), s.gcMs() + " ms",
+                    s.players() == null || s.players().isEmpty() ? "nobody" : String.join(", ", s.players()));
         }
     }
 

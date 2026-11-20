@@ -7,6 +7,8 @@ import com.hycon.config.HyconConfig;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
+import com.hycon.perf.PerfData.Minute;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 
@@ -18,14 +20,28 @@ public final class Perf {
 
     private final Profiler profiler;
     private final PerfHistory history;
+    private final HealthHistory health;
 
     public Perf(Path dataDir, HytaleLogger log, Supplier<HyconConfig> config) {
         history = new PerfHistory(dataDir);
+        health = new HealthHistory(dataDir);
         LagAlerts alerts = new LagAlerts(log, config);
+        WeeklyReport weekly = new WeeklyReport(dataDir, log);
         profiler = new Profiler(log, () -> config.get().lagSpikeMs(), m -> {
             history.add(m);
             alerts.minute(m);
+            health.add(m, Report.of(List.of(m)).health(memPct(m)));
+            // Alerts look at the last 10 minutes, so one bad minute doesn't page anyone.
+            Report recent = recent(10);
+            Minute last = m;
+            alerts.health(recent.health(memPct(last)), recent.healthReasons);
+            weekly.minute(config.get().weeklyReport(), health, history, alerts::webhook);
         }, alerts::spike);
+        try {
+            health.load();
+        } catch (IOException e) {
+            log.at(Level.WARNING).log("Hycon: could not read health-history.jsonl (%s); starting a new one", e.getMessage());
+        }
         try {
             history.load();
         } catch (IOException e) {
@@ -50,6 +66,14 @@ public final class Perf {
         return profiler;
     }
 
+    HealthHistory health() {
+        return health;
+    }
+
+    static double memPct(Minute m) {
+        return m.heapMaxMb() <= 0 ? 0 : m.heapMb() * 100.0 / m.heapMaxMb();
+    }
+
     PerfHistory history() {
         return history;
     }
@@ -57,6 +81,14 @@ public final class Perf {
     /** The last {@code minutes} minutes, added up. */
     Report recent(int minutes) {
         return Report.of(profiler.minutes(System.currentTimeMillis() - minutes * 60_000L - 30_000));
+    }
+
+    /** The last 10 minutes' health for the At a glance tab. */
+    public com.hycon.analytics.GlancePanel.Health glance() {
+        Report r = recent(10);
+        List<Minute> list = profiler.minutes(System.currentTimeMillis() - 11 * 60_000L);
+        int score = list.isEmpty() ? -1 : r.health(memPct(list.get(list.size() - 1)));
+        return new com.hycon.analytics.GlancePanel.Health(score, Report.healthWord(score), List.copyOf(r.healthReasons));
     }
 
     /** A few lines for {@code /hycon debug}. */

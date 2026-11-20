@@ -208,13 +208,18 @@ and can be wrong. Addresses themselves aren't shown. Set `GeoIp` to `false` to t
 Hycon samples every 30 seconds and keeps 31 days (`samples.log`). Playtime counts from when Hycon
 was installed. Other plugins can add their own tabs next to Analytics.
 
+### At a glance (MODERATOR and up)
+A short page for checking in from a phone: Server health, players online, open reports and bug reports, and who is on
+in which world. Read only; kick, ban and the details stay on their own tabs.
+
 ### Performance (MODERATOR and up) and /lag
 Hycon's profiler is always on and costs well under 1% of the server. It shows which plugins use the
 server's time and what caused each lag spike, so you can tell a slow plugin from a busy server.
 
 - **Server health**, 0 to 100, for a quick look: 90+ excellent, 75+ good (in good standing), 50+ fair, below that poor.
   It starts at 100 and loses points for slow or frozen ticks, lag spikes, full memory, a slow shared scheduler and file
-  or database waits on game threads, and lists what cost the points.
+  or database waits on game threads, and lists what cost the points. Charts show it over the chosen range and the last
+  7 days (hourly, kept 30 days in `health-history.jsonl`).
 - **Verdict** at the top in plain words: healthy, busy or lagging, the plugin using the most time, and
   any plugin that waits on files or a database on a game thread.
 - **Who uses the world threads** and **the shared scheduler thread**: each plugin's share of the time.
@@ -223,7 +228,7 @@ server's time and what caused each lag spike, so you can tell a slow plugin from
   plugin's share over time.
 - **History graphs** over the chosen range (up to a day): lag spikes, memory in use, players online, and
   each world's loaded chunks, entities and NPCs.
-- **Lag spikes**: every tick over `LagSpikeMs`, how long it took, what ran during it, the ECS system (or
+- **Lag spikes**: every tick over `LagSpikeMs`, with the players who were in that world (for the scheduler, everyone online), how long it took, what ran during it, the ECS system (or
   scheduler task) seen most, whether a chunk load, world generation or a save was running, and whether garbage
   collection caused it. During a long tick the profiler looks every 5 ms, so the cause is exact.
 - **Late scheduler tasks**: each time a task on Hytale's shared scheduler started 20 ms or more late, and the
@@ -247,7 +252,8 @@ server's time and what caused each lag spike, so you can tell a slow plugin from
 In game (or the console), **`/lag`** shows the last 5 minutes right away; **`/lag 60`** the last hour and
 **`/lag spikes`** the latest spikes. It needs the `hycon.lag` permission. Staff with `hycon.lag.alerts` are told when
 a plugin uses over `LagAlertPercent` of the world threads for 3 minutes, a spike lasts over `AlertSpikeMs`, a
-minute has `AlertSpikesPerMinute` spikes, or memory stays over `AlertMemoryPercent` for 3 minutes
+minute has `AlertSpikesPerMinute` spikes, memory stays over `AlertMemoryPercent` for 3 minutes, or Server health stays
+under `AlertHealthBelow` for 10 minutes
 (also sent to `LagWebhook` if set; each alert repeats at most every 15 minutes). `/lag` and the alerts work even with the panel turned off.
 
 How it stays light: tick and system times are timers Hytale already keeps. On top of that one Hycon
@@ -369,6 +375,8 @@ Most changes apply within 5 seconds of saving the file, no restart needed (the s
 | `AlertSpikeMs`       | `1000`        | Alert when one tick or scheduler task freezes longer than this (ms). `0` = off.                   |
 | `AlertSpikesPerMinute` | `10`        | Alert when a minute has this many lag spikes. `0` = off.                                          |
 | `AlertMemoryPercent` | `90`          | Alert when memory in use stays over this share of the maximum for 3 minutes. `0` = off.           |
+| `AlertHealthBelow`   | `60`          | Alert when Server health (Performance tab) stays under this for 10 minutes. `0` = off.            |
+| `WeeklyReport`       | `true`        | Every Monday 12:00 UTC, post a weekly summary (health, spikes, peak players, memory, busiest plugin) to `LagWebhook`. |
 
 ## 6. Opening the panel from another computer
 
