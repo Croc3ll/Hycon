@@ -12,6 +12,8 @@ A web admin panel (RCON-style) for Hytale servers, running as a server plugin. O
 on the same machine: see who's online, kick, ban and unban (temporary or permanent, with a reason),
 run console commands, watch the live log, and view dashboards other plugins add. It works on a phone too.
 
+**Try it first: [live demo](https://demo.crocellsworkshop.dev)** with made-up players (nothing there changes anything).
+
 **Rented server?** Put the panel on your own domain (`https://panel.yourdomain.com`) and open it from
 any browser: [docs/WEB-PANEL.md](docs/WEB-PANEL.md).
 
