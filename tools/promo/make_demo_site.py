@@ -4,7 +4,7 @@ button that would change something only says so.
 
     py tools/promo/make_demo_site.py      # writes build/demo-site/
 
-Live at https://demo.crocellsworkshop.dev: the VPS (root@107.173.85.141) serves the files from
+Live at https://demo.crocellsworkshop.dev: the store's VPS serves the files from
 /var/www/demo.crocellsworkshop.dev through Apache site demo.crocellsworkshop.dev.conf, behind Cloudflare.
 To update it, rebuild and copy build/demo-site/ over that folder; Cloudflare caches .js and .css, so purge
 them there (or wait) when they change.
