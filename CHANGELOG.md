@@ -3,6 +3,10 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.48 (2026-11-20)
+- Hycon now has a license (`LICENSE`, also inside the jar): free to use on your servers, no reselling or
+  redistributing the jar.
+
 ## 0.1.47 (2026-11-19)
 - The README is translated into every panel language (German, Spanish, French, Italian, Dutch, Polish, Portuguese,
   Russian, Turkish), with a language bar at the top.

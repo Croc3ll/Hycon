@@ -46,6 +46,8 @@ tasks.named<ProcessResources>("processResources") {
 tasks.named<Jar>("jar") {
     archiveBaseName.set(project.property("mod_name").toString())
     archiveVersion.set(project.property("version").toString())
+    // Ships the license with every jar, so a copy passed around still carries its terms.
+    from(rootDir) { include("LICENSE") }
 }
 
 // Copies the jar into a test server's mods folder after every build, so the next server start
