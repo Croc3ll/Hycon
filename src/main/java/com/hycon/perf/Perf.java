@@ -83,14 +83,6 @@ public final class Perf {
         return Report.of(profiler.minutes(System.currentTimeMillis() - minutes * 60_000L - 30_000));
     }
 
-    /** The last 10 minutes' health for the At a glance tab. */
-    public com.hycon.analytics.GlancePanel.Health glance() {
-        Report r = recent(10);
-        List<Minute> list = profiler.minutes(System.currentTimeMillis() - 11 * 60_000L);
-        int score = list.isEmpty() ? -1 : r.health(memPct(list.get(list.size() - 1)));
-        return new com.hycon.analytics.GlancePanel.Health(score, Report.healthWord(score), List.copyOf(r.healthReasons));
-    }
-
     /** A few lines for {@code /hycon debug}. */
     public String debugSummary() {
         Report r = recent(5);

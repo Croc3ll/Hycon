@@ -2,7 +2,6 @@ package com.hycon.commands;
 
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.CommandUtil;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -20,6 +19,7 @@ import java.io.IOException;
 public final class BugCommand extends CommandBase {
 
     private static final int MAX_TEXT = 500;
+    private static final int MIN_TEXT = 3;
 
     private final BugReports bugs;
 
@@ -36,9 +36,13 @@ public final class BugCommand extends CommandBase {
             ctx.sendMessage(Message.raw("Only players can report bugs."));
             return;
         }
-        String text = CommandUtil.stripCommandName(ctx.getInputString()).strip().replaceAll("[\\r\\n\\t]+", " ");
+        String text = CommandText.argsAfterName(ctx.getInputString(), this).replaceAll("[\\r\\n\\t]+", " ");
         if (text.isEmpty()) {
             ctx.sendMessage(Message.raw("Usage: /bug <what happened>"));
+            return;
+        }
+        if (text.length() < MIN_TEXT) {
+            ctx.sendMessage(Message.raw("Please say a bit more about what happened: /bug <what happened>"));
             return;
         }
         if (text.length() > MAX_TEXT) {

@@ -3,6 +3,11 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.42 (2026-11-19)
+- `/bug` with nothing after it shows the usage line instead of filing a report that just says "bug", and reports under
+  3 characters are refused. `/report` reads its text the same way.
+- The At a glance tab is gone.
+
 ## 0.1.41 (2026-11-19)
 - Translations for the new Performance, At a glance and alert wording in every panel language.
 

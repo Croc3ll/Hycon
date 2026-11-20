@@ -208,10 +208,6 @@ and can be wrong. Addresses themselves aren't shown. Set `GeoIp` to `false` to t
 Hycon samples every 30 seconds and keeps 31 days (`samples.log`). Playtime counts from when Hycon
 was installed. Other plugins can add their own tabs next to Analytics.
 
-### At a glance (MODERATOR and up)
-A short page for checking in from a phone: Server health, players online, open reports and bug reports, and who is on
-in which world. Read only; kick, ban and the details stay on their own tabs.
-
 ### Performance (MODERATOR and up) and /lag
 Hycon's profiler is always on and costs well under 1% of the server. It shows which plugins use the
 server's time and what caused each lag spike, so you can tell a slow plugin from a busy server.

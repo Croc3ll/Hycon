@@ -2,7 +2,6 @@ package com.hycon.commands;
 
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.CommandUtil;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -43,7 +42,7 @@ public final class ReportCommand extends CommandBase {
             ctx.sendMessage(Message.raw("Only players can report."));
             return;
         }
-        String raw = CommandUtil.stripCommandName(ctx.getInputString()).strip();
+        String raw = CommandText.argsAfterName(ctx.getInputString(), this);
         int sp = raw.indexOf(' ');
         String name = sp < 0 ? raw : raw.substring(0, sp);
         String reason = sp < 0 ? "" : raw.substring(sp + 1).strip().replaceAll("[\\r\\n\\t]+", " ");
