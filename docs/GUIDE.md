@@ -356,11 +356,12 @@ Most changes apply within 5 seconds of saving the file, no restart needed (the s
 | `AllowedHosts`       | `[]`          | Extra host names the panel may be opened under, e.g. `["admin.example.com"]`.                     |
 | `SecureCookie`       | `false`       | Set `true` when the panel is only reached over HTTPS.                                             |
 | `TrustProxy`         | `false`       | Set `true` only behind your own reverse proxy, so real client addresses are logged and limited.   |
+| `TrustedProxies`     | `[]`          | Proxy addresses believed besides this machine and private networks (a VPS in front).             |
 | `SessionIdleMinutes` | `30`          | Log out after this long without activity.                                                         |
 | `SessionMaxHours`    | `12`          | Log out at the latest this long after logging in.                                                 |
 | `LoginAttempts`      | `5`           | Failed logins allowed per address and per account name...                                         |
 | `LoginWindowMinutes` | `10`          | ...within this many minutes. After that, logins wait until the window has passed.                 |
-| `BlockedCommands`    | `[]`          | Commands the panel refuses even for ADMIN, e.g. `["stop", "op"]`.                                 |
+| `BlockedCommands`    | `[]`          | Commands the panel refuses even for ADMIN, e.g. `["stop", "op"]`. Aliases are blocked too.        |
 | `LogLines`           | `2000`        | How many recent log lines the Console tab keeps.                                                  |
 | `GeoIp`              | `true`        | Look up players' rough location for the globe (downloads the DB-IP database once a month).       |
 | `ServerLocation`     | `""`          | The server's `"lat,lon"`, e.g. `"50.11,8.68"`, so the globe draws lines to it and shows distances. |

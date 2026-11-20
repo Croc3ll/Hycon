@@ -1,7 +1,7 @@
 {
     "Group": "Hycon",
     "Name": "Hycon",
-    "Version": "0.1.48",
+    "Version": "0.1.49",
     "Description": "Web admin panel: players, kick, ban, console and plugin dashboards.",
     "Authors": [
         {

@@ -64,7 +64,13 @@ public final class IntelRoutes {
 
     private void list(Req r) throws IOException {
         String s = r.query("status");
-        Reports.Status status = s == null || s.equals("all") ? null : Reports.Status.valueOf(s.toUpperCase());
+        Reports.Status status;
+        try {
+            status = s == null || s.equals("all") ? null : Reports.Status.valueOf(s.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            r.error(400, "Unknown status");
+            return;
+        }
         Json j = new Json().beginObject().field("open", reports.list(Reports.Status.OPEN, 10_000).size()).name("reports").beginArray();
         for (Reports.Report rep : reports.list(status, 500)) {
             Reports.write(j.beginObject(), rep).field("againstTotal", reports.against(rep.target())).endObject();

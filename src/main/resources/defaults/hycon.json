@@ -39,6 +39,12 @@
   // is read from X-Forwarded-For (for the login limit and the audit log).
   "TrustProxy": false,
 
+  // With TrustProxy on, the forwarded address is only believed from this
+  // machine, a private network (LAN, VPN, WireGuard, Tailscale) or the
+  // addresses listed here. Put your proxy's public IP here if it reaches
+  // Hycon over the internet, e.g. ["203.0.113.7"].
+  "TrustedProxies": [],
+
   // Logged-in sessions end after this many idle minutes...
   "SessionIdleMinutes": 30,
   // ...and at the latest this many hours after logging in.

@@ -102,9 +102,7 @@ public final class GeoIp {
             // Each month gets its own file name: on Windows a memory-mapped file can't be replaced or
             // deleted while open, so the new one is opened beside it and older ones go on a later start.
             Path tmp = dir.resolve("download.mmdb");
-            try (InputStream in = new GZIPInputStream(Files.newInputStream(gz))) {
-                Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
-            }
+            unpack(gz, tmp);
             Files.deleteIfExists(gz);
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
             reader = new Reader(target);
@@ -113,6 +111,25 @@ public final class GeoIp {
             return;
         }
         throw last;
+    }
+
+    /** The real database is about 130 MB unpacked; a bigger one is a broken or hostile file, not a database. */
+    private static final long MAX_UNPACKED_BYTES = 1L << 30;
+
+    /** Unzips the download, stopping at {@link #MAX_UNPACKED_BYTES} so a "zip bomb" can't fill the disk. */
+    private static void unpack(Path gz, Path out) throws IOException {
+        try (InputStream in = new GZIPInputStream(Files.newInputStream(gz));
+             java.io.OutputStream o = Files.newOutputStream(out)) {
+            byte[] buf = new byte[1 << 16];
+            long total = 0;
+            for (int n; (n = in.read(buf)) > 0; ) {
+                total += n;
+                if (total > MAX_UNPACKED_BYTES) {
+                    throw new IOException("GeoIP download unpacks to over 1 GB; refused");
+                }
+                o.write(buf, 0, n);
+            }
+        }
     }
 
     private Path newest() throws IOException {

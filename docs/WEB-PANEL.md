@@ -67,7 +67,11 @@ domain at it, and it passes visitors on to Hycon on your game server.
    "AllowedHosts": ["panel.yourdomain.com"],
    "SecureCookie": true,
    "TrustProxy": true,
+   "TrustedProxies": ["VPS.IP.ADDRESS"],
    ```
+
+   `TrustedProxies` is your VPS's public IP. Hycon only believes the visitor address a proxy
+   sends when it comes from there (or from this machine or a private network such as WireGuard).
 
 2. **Open port `8096`** in your host's panel (often under "Ports" or "Network"). If the host lets
    you limit who can connect, allow only your VPS's IP address.
@@ -108,7 +112,7 @@ for both configs.
 |---|---|
 | "Unknown host name; add it to AllowedHosts" | The address isn't in `AllowedHosts`. Add it exactly, without `https://`. It applies within a few seconds. |
 | You log in, then get sent back to the login page | `SecureCookie` is `true` but the address isn't HTTPS. Open it with `https://`. |
-| "Too many failed logins" for everyone at once | `TrustProxy` is off behind a proxy, so all visitors share the proxy's address. Turn it on. |
+| "Too many failed logins" for everyone at once | `TrustProxy` is off behind a proxy, so all visitors share the proxy's address. Turn it on. If the server log says "ignored proxy headers from ...", add that address to `TrustedProxies`. |
 | The page doesn't load (Option B) | Port `8096` isn't open on your host, or the IP in the Caddyfile is wrong. |
 | The default password doesn't work | That's expected away from the server machine. Use [Step 1](#step-1-log-in-for-the-first-time-without-local-access). |
 

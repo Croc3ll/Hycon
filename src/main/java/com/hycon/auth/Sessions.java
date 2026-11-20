@@ -46,6 +46,8 @@ public final class Sessions {
     /** Anonymous sessions live briefly, and their number is capped so nobody can fill memory with them. */
     private static final long ANON_MS = 15 * 60_000;
     private static final int MAX_SESSIONS = 2000;
+    /** Login-page sessions one address may hold at once (a few browsers and tabs). */
+    private static final int MAX_ANON_PER_IP = 20;
 
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final long idleMs;
@@ -80,6 +82,9 @@ public final class Sessions {
     }
 
     public Session create(String admin, String ip) {
+        if (admin == null) {
+            dropOldestAnonymous(ip);
+        }
         if (sessions.size() >= MAX_SESSIONS) {
             sweep();
             if (sessions.size() >= MAX_SESSIONS) {
@@ -90,6 +95,17 @@ public final class Sessions {
         Session s = new Session(admin, ip);
         sessions.put(s.id, s);
         return s;
+    }
+
+    /**
+     * Keeps one address under {@link #MAX_ANON_PER_IP} login-page sessions. Without it, one client
+     * asking for sessions in a loop filled the table, which then dropped everyone's login page.
+     */
+    private void dropOldestAnonymous(String ip) {
+        List<Session> mine = sessions.values().stream().filter(s -> s.admin == null && s.ip.equals(ip)).toList();
+        if (mine.size() >= MAX_ANON_PER_IP) {
+            mine.stream().min(java.util.Comparator.comparingLong(s -> s.created)).ifPresent(this::remove);
+        }
     }
 
     public void remove(Session s) {

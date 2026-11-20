@@ -95,13 +95,15 @@ public final class ShareServer {
                 send(ex, 404, "{\"error\":\"Not found\"}");
                 return;
             }
-            if (limiter.retryAfter(ip, "share-feed") > 0) {
+            // Counted per address only: one shared name would let anyone lock every follower out.
+            String perAddress = "share-feed " + ip;
+            if (limiter.retryAfter(ip, perAddress) > 0) {
                 send(ex, 429, "{\"error\":\"Too many bad requests\"}");
                 return;
             }
             String who = store.verify(ex.getRequestHeaders().getFirst("Authorization"), PATH);
             if (who == null) {
-                limiter.fail(ip, "share-feed");
+                limiter.fail(ip, perAddress);
                 audit.record("-", ip, "share.feed", null, "bad or missing signature (or clocks more than 5 min apart)", false);
                 send(ex, 401, "{\"error\":\"Bad signature\"}");
                 return;

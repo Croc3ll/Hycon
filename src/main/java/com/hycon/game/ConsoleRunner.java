@@ -1,5 +1,6 @@
 package com.hycon.game;
 
+import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandManager;
 
 import java.util.List;
@@ -32,8 +33,26 @@ public final class ConsoleRunner {
         return c.split("\\s", 2)[0].toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Also checks the command the word resolves to, under all its names: blocking "stop" must block
+     * its aliases too, and blocking an alias must block the command behind it.
+     */
     public boolean isBlocked(String command) {
-        return blocked.get().contains(root(command));
+        Set<String> list = blocked.get();
+        if (list.isEmpty()) {
+            return false;
+        }
+        String word = root(command);
+        if (list.contains(word)) {
+            return true;
+        }
+        AbstractCommand resolved = CommandManager.get().resolveCommand(word);
+        if (resolved == null) {
+            return false;
+        }
+        Set<String> names = new java.util.HashSet<>(resolved.getAliases() == null ? Set.of() : resolved.getAliases());
+        names.add(resolved.getName());
+        return names.stream().anyMatch(n -> n != null && list.contains(n.toLowerCase(Locale.ROOT)));
     }
 
     /**

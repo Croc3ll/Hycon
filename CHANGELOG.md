@@ -3,6 +3,26 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.49 (2026-11-20)
+Security fixes. Updating is recommended.
+- Slow clients can no longer freeze the panel or the ban-share port. A client that sent its request one byte at a
+  time held a worker forever, so four of them froze the panel and one froze ban sharing. Requests now have 20
+  seconds to arrive and 120 seconds to be answered.
+- The ban-share port no longer locks every follower out after a few bad requests from anyone. Bad requests now
+  only lock out the address that sent them.
+- `BlockedCommands` also blocks a command's aliases (and the command behind a blocked alias). Before, an ADMIN
+  could get past a blocked command by typing one of its other names.
+- With `TrustProxy` on, the visitor address a proxy sends is only believed from this machine, a private network
+  (LAN, VPN, WireGuard, Tailscale) or the new `TrustedProxies` list. Before, anyone reaching an open panel port
+  could fake their address and get around the per-address login limit. A proxy on a public IP (Option B in
+  `docs/WEB-PANEL.md`) must now be added to `TrustedProxies`; the server log names the address if it is missing.
+- One address can hold at most 20 login-page sessions, so a client asking for sessions in a loop can't push
+  everyone else off the login page.
+- The release jar no longer carries the developer's test data (test share key, test logs). Only the panel files,
+  the default config and the license ship now.
+- The GeoIP download stops at 1 GB unpacked, so a broken or hostile file can't fill the disk.
+- A bad `status` on the Bugs or Reports list answers "Unknown status" instead of a server error.
+
 ## 0.1.48 (2026-11-20)
 - Hycon now has a license (`LICENSE`, also inside the jar): free to use on your servers, no reselling or
   redistributing the jar.

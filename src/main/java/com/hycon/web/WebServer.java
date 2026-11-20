@@ -4,11 +4,13 @@ import com.hycon.auth.AdminStore;
 import com.hycon.auth.Level;
 import com.hycon.auth.Sessions;
 import com.hycon.config.HyconConfig;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -71,18 +74,39 @@ public final class WebServer {
             Map.entry("/vendor/three.min.js", "web/vendor/three.min.js"),
             Map.entry("/vendor/OrbitControls.js", "web/vendor/OrbitControls.js"));
 
+    /**
+     * Seconds a client may take to send a request's headers, and to receive the answer. The JDK's
+     * server has no limit by default, so a client sending one byte at a time held a worker forever
+     * and four of them froze the panel ("slowloris"). Set before the first server class loads.
+     */
+    private static final String MAX_REQ_SECONDS = "20";
+    private static final String MAX_RSP_SECONDS = "120";
+
+    /**
+     * Turns on the JDK server's time limits. They are JVM-wide and read once, so this runs before any
+     * server is created, and a value the owner set on the command line wins.
+     */
+    public static void limitSlowClients() {
+        System.getProperties().putIfAbsent("sun.net.httpserver.maxReqTime", MAX_REQ_SECONDS);
+        System.getProperties().putIfAbsent("sun.net.httpserver.maxRspTime", MAX_RSP_SECONDS);
+    }
+
     private final Supplier<HyconConfig> config;
     private final Sessions sessions;
     private final AdminStore admins;
+    private final HytaleLogger log;
+    /** Warns once per start about proxy headers from an address that isn't a trusted proxy. */
+    private final AtomicBoolean warnedUntrustedProxy = new AtomicBoolean();
     private final Map<String, Route> routes = new HashMap<>();
     private final Map<String, byte[]> files = new HashMap<>();
     private HttpServer server;
     private ExecutorService executor;
 
-    public WebServer(Supplier<HyconConfig> config, Sessions sessions, AdminStore admins) throws IOException {
+    public WebServer(Supplier<HyconConfig> config, Sessions sessions, AdminStore admins, HytaleLogger log) throws IOException {
         this.config = config;
         this.sessions = sessions;
         this.admins = admins;
+        this.log = log;
         for (String res : Set.copyOf(STATIC.values())) {
             try (InputStream in = WebServer.class.getClassLoader().getResourceAsStream(res)) {
                 if (in == null) {
@@ -319,7 +343,7 @@ public final class WebServer {
     }
 
     private String clientIp(HttpExchange ex) {
-        if (config.get().trustProxy()) {
+        if (config.get().trustProxy() && trustedProxy(ex)) {
             // Cloudflare (tunnel or proxy) sends the visitor's address here; clients can't set it.
             String cf = ex.getRequestHeaders().getFirst("CF-Connecting-IP");
             if (cf != null && !cf.isBlank()) {
@@ -333,6 +357,34 @@ public final class WebServer {
             }
         }
         return ex.getRemoteAddress().getAddress().getHostAddress();
+    }
+
+    /**
+     * True when the connection comes from a proxy that may name the visitor's address: this machine,
+     * a private network (LAN, VPN, WireGuard, Tailscale) or an address in TrustedProxies. Anyone else
+     * reaching an open port could put any address in the header and dodge the login limit.
+     */
+    private boolean trustedProxy(HttpExchange ex) {
+        InetAddress peer = ex.getRemoteAddress().getAddress();
+        if (peer.isLoopbackAddress() || peer.isSiteLocalAddress() || peer.isLinkLocalAddress() || privateRange(peer)
+                || config.get().trustedProxies().contains(peer.getHostAddress().toLowerCase(Locale.ROOT))) {
+            return true;
+        }
+        boolean sentHeader = PROXY_HEADERS.stream().anyMatch(ex.getRequestHeaders()::containsKey);
+        if (sentHeader && warnedUntrustedProxy.compareAndSet(false, true)) {
+            log.at(java.util.logging.Level.WARNING).log("Hycon: ignored proxy headers from %s. If that is your proxy, add it to TrustedProxies in hycon.json.",
+                    peer.getHostAddress());
+        }
+        return false;
+    }
+
+    /** IPv6 unique-local (fc00::/7) and carrier-grade NAT (100.64.0.0/10, used by Tailscale). */
+    private static boolean privateRange(InetAddress a) {
+        byte[] b = a.getAddress();
+        if (b.length == 16) {
+            return (b[0] & 0xFE) == 0xFC;
+        }
+        return (b[0] & 0xFF) == 100 && (b[1] & 0xC0) == 64;
     }
 
     private static String cookie(HttpExchange ex) {

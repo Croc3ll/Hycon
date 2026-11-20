@@ -26,7 +26,13 @@ public final class BugRoutes {
 
     private void list(Req r) throws IOException {
         String s = r.query("status");
-        BugReports.Status status = s == null || s.equals("all") ? null : BugReports.Status.valueOf(s.toUpperCase());
+        BugReports.Status status;
+        try {
+            status = s == null || s.equals("all") ? null : BugReports.Status.valueOf(s.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            r.error(400, "Unknown status");
+            return;
+        }
         Json j = new Json().beginObject().field("open", bugs.list(BugReports.Status.OPEN, 10_000).size()).name("bugs").beginArray();
         for (BugReports.Bug b : bugs.list(status, 500)) {
             BugReports.write(j.beginObject(), b).endObject();

@@ -37,10 +37,12 @@ repositories {
 // No bundled libraries: the web server is the JDK's own (com.sun.net.httpserver) and JSON is
 // a small hand-written reader/writer, so the jar stays tiny and has nothing to shade.
 
-// The dev server writes Hycon's data (admins, audit log, config) into src/main/resources
-// (its data folder links there). Keep that out of the released jar.
+// The dev server writes Hycon's data (admins, share keys, logs, config) into src/main/resources
+// (its data folder links there). Only the files the jar needs are listed, so a new data file can
+// never ship by accident: a block list let sharing.json and its share key into every release.
 tasks.named<ProcessResources>("processResources") {
-    exclude("hycon.json", "admins.json", "audit.log", "players.json", "FIRST-LOGIN.txt", "*.tmp")
+    include("manifest.json", "defaults/**", "web/**")
+    includeEmptyDirs = false
 }
 
 tasks.named<Jar>("jar") {

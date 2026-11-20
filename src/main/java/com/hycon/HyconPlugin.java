@@ -126,6 +126,8 @@ public final class HyconPlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
+        // In setup, not start: the limits are read once, before any plugin opens a web server.
+        WebServer.limitSlowClients();
         Path dir = getDataDirectory();
         try {
             liveConfig = new LiveConfig(dir);
@@ -226,7 +228,7 @@ public final class HyconPlugin extends JavaPlugin {
         sessions.rememberIn(getDataDirectory());
         Moderation moderation = new Moderation(known);
         try {
-            web = new WebServer(liveConfig, sessions, admins);
+            web = new WebServer(liveConfig, sessions, admins, getLogger());
             new AuthRoutes(web, admins, sessions, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()), audit).register();
             ConsoleRunner consoleRunner = new ConsoleRunner(() -> liveConfig.get().blockedCommands());
             new GameRoutes(web, moderation, consoleRunner, logTap, audit, admins, known, records, sharing, pingLog, killLog).register();
