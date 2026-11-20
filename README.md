@@ -2,13 +2,15 @@
 
 # Hycon
 
+🌐 **English** · [Deutsch](README.de.md) · [Español](README.es.md) · [Français](README.fr.md) · [Italiano](README.it.md) · [Nederlands](README.nl.md) · [Polski](README.pl.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [Türkçe](README.tr.md)
+
 [![Join the Discord](https://img.shields.io/badge/Discord-Crocell's%20Workshop-5865F2?logo=discord&logoColor=white)](https://discord.gg/maZTJbSs2h)
 
 ![Hycon: run your server from anywhere](docs/promo/hycon-banner.png)
 
 A web admin panel (RCON-style) for Hytale servers, running as a server plugin. Open it in a browser
 on the same machine: see who's online, kick, ban and unban (temporary or permanent, with a reason),
-run console commands, watch the live log, and view dashboards other plugins add.
+run console commands, watch the live log, and view dashboards other plugins add. It works on a phone too.
 
 **Rented server?** Put the panel on your own domain (`https://panel.yourdomain.com`) and open it from
 any browser: [docs/WEB-PANEL.md](docs/WEB-PANEL.md).
@@ -24,6 +26,7 @@ staff accounts, all settings, remote access over HTTPS, troubleshooting).
 | ![Analytics](docs/promo/hycon-analytics.png) | ![Player globe](docs/promo/hycon-globe.png) |
 | ![Player profiles](docs/promo/hycon-profile.png) | ![Live console](docs/promo/hycon-console.png) |
 | ![Moderation](docs/promo/hycon-players.png) | ![Performance](docs/promo/hycon-performance.png) |
+| ![On your phone](docs/promo/hycon-phone.png) | |
 
 These are made with demo data by `py tools/promo/make_promo.py` (no real players).
 

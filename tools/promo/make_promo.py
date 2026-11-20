@@ -5,6 +5,7 @@ pages with headless Edge, then lays them out on branded cards (cards.html) and r
 to docs/promo/*.png.
 
     py tools/promo/make_promo.py          # shots + cards
+    py tools/promo/make_promo.py phone    # only the cards named (and the shots they use)
     py tools/promo/make_promo.py --serve  # just serve the demo panel to look at it
 """
 import functools
@@ -33,7 +34,10 @@ SHOTS = [
     ("profile", "#profile:{hero}", None, (1440, 900)),
     ("console", "#console", None, (1440, 900)),
     ("performance", "#panel:performance", None, (1440, 900)),
+    ("phone-players", "#players", None, (500, 1083)),
+    ("phone-performance", "#panel:performance", None, (500, 1083)),
 ]
+CARDS = ["banner", "analytics", "globe", "profile", "console", "players", "performance", "phone"]
 
 
 def build_site(site: Path) -> None:
@@ -101,12 +105,17 @@ def main() -> None:
     shots = site / "shots"
     shots.mkdir()
     hero = "%08x-4c1a-4b7e-9d2f-%012x" % ((1 * 2654435761) & 0xFFFFFFFF, 1 * 40503 * 977)
+    only = [a for a in sys.argv[1:] if not a.startswith("--")]
     for name, page, target, size in SHOTS:
+        if only and not any(name == o or name.startswith(o + "-") for o in only):
+            continue
         query = f"?shot={target}" if target else ""
         capture(f"{base}/index.html{query}{page.format(hero=hero)}", shots / f"{name}.png", size)
         print("shot", name)
     OUT.mkdir(parents=True, exist_ok=True)
-    for card in ["banner", "analytics", "globe", "profile", "console", "players", "performance"]:
+    for card in CARDS:
+        if only and card not in only:
+            continue
         capture(f"{base}/cards.html?card={card}", OUT / f"hycon-{card}.png", (1600, 900))
         print("card", card)
     server.shutdown()

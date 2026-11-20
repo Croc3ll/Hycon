@@ -48,6 +48,12 @@
   .fan.a { right: 150px; top: 300px; transform: perspective(2400px) rotateY(-14deg) rotateZ(-3deg); opacity: .35; }
   .fan.b { right: 30px; top: 210px; transform: perspective(2400px) rotateY(-12deg) rotateZ(-1deg); opacity: .7; }
   .fan.c { right: -110px; top: 120px; transform: perspective(2400px) rotateY(-10deg) rotateZ(1deg); }
+  /* Phone card: two phones side by side, the front one larger. */
+  .phone { position: absolute; width: 330px; padding: 12px; border-radius: 46px; background: #15171c; border: 1px solid rgba(255, 255, 255, .12);
+    box-shadow: 0 50px 120px -30px rgba(0, 0, 0, .9), 0 0 80px -20px rgba(226, 181, 75, .3); }
+  .phone img { display: block; width: 100%; border-radius: 34px; }
+  .phone.back { right: 470px; top: 150px; transform: rotate(-6deg) scale(.9); opacity: .8; }
+  .phone.front { right: 150px; top: 70px; transform: rotate(3deg); }
 </style>
 </head>
 <body>
@@ -81,6 +87,9 @@ const CARDS = {
   performance: { eyebrow: '06 · Performance', title: 'Know <em>why</em> it lags.',
     lead: 'An always-on profiler that names the plugin, system or player behind every lag spike.',
     points: ['Server health score at a glance', 'Every lag spike with its cause', 'Which plugin uses the server most', 'Alerts and a weekly report to Discord'], shot: 'performance' },
+  phone: { eyebrow: '07 · On your phone', title: 'Your server <em>in your pocket</em>.',
+    lead: 'The whole panel works on a phone: every tab, every button, no zooming.',
+    points: ['All tabs one tap away', 'Warn, kick and ban on the go', 'Big buttons, readable tables', 'Nothing to install'], phones: ['phone-performance', 'phone-players'] },
 };
 const c = CARDS[new URLSearchParams(location.search).get('card')] || CARDS.banner;
 document.getElementById('eyebrow').textContent = c.eyebrow;
@@ -93,7 +102,14 @@ const frame = (shot, cls) => {
   f.innerHTML = '<div class="bar"><i></i><i></i><i></i><span>your-server.com/hycon</span></div><img src="shots/' + shot + '.png" alt="">';
   document.body.append(f);
 };
-if (c.shots) { document.body.classList.add('banner'); frame(c.shots[0], 'fan a'); frame(c.shots[1], 'fan b'); frame(c.shots[2], 'fan c'); }
+const phone = (shot, cls) => {
+  const f = document.createElement('div');
+  f.className = 'phone ' + cls;
+  f.innerHTML = '<img src="shots/' + shot + '.png" alt="">';
+  document.body.append(f);
+};
+if (c.phones) { phone(c.phones[0], 'back'); phone(c.phones[1], 'front'); }
+else if (c.shots) { document.body.classList.add('banner'); frame(c.shots[0], 'fan a'); frame(c.shots[1], 'fan b'); frame(c.shots[2], 'fan c'); }
 else frame(c.shot, 'single');
 </script>
 </body>
