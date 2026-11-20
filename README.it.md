@@ -85,7 +85,7 @@ lì vengono revocati. I ban locali non vengono mai toccati e i codici non passan
 | VIEWER    | vedere giocatori, ban e dashboard dei plugin                   |
 | MODERATOR | + espellere, bannare, sbannare, leggere la console dal vivo    |
 | ADMIN     | + eseguire comandi da console, leggere il registro di controllo|
-| OWNER     | + creare, modificare e rimuovere gli account del pannello      |
+| OWNER     | + gestire gli account del pannello, scaricare i log            |
 
 ## Sicurezza
 

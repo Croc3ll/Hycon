@@ -102,7 +102,7 @@ stays private, and codes are never sent over the network (requests are signed). 
 | VIEWER    | see players, bans, plugin dashboards                           |
 | MODERATOR | + kick, ban, unban, read the live console                      |
 | ADMIN     | + run console commands (full console rights), read audit log   |
-| OWNER     | + create, change and remove panel accounts                     |
+| OWNER     | + manage panel accounts, download log files                    |
 
 ## Security
 

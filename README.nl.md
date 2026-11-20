@@ -86,7 +86,7 @@ als ze daar worden opgeheven. Lokale bans worden nooit aangeraakt en codes gaan 
 | VIEWER    | spelers, bans en plugindashboards bekijken                     |
 | MODERATOR | + kicken, bannen, unbannen, de live console lezen              |
 | ADMIN     | + consolecommando's uitvoeren, het auditlogboek lezen          |
-| OWNER     | + paneelaccounts aanmaken, wijzigen en verwijderen             |
+| OWNER     | + paneelaccounts beheren, logbestanden downloaden              |
 
 ## Beveiliging
 

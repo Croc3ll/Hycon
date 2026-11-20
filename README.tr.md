@@ -85,7 +85,7 @@ orada kaldırıldıklarında kaldırır. Yerel yasaklara asla dokunulmaz, kodlar
 | VIEWER    | oyuncuları, yasakları ve eklenti panolarını görmek             |
 | MODERATOR | + atmak, yasaklamak, yasak kaldırmak, canlı konsolu okumak     |
 | ADMIN     | + konsol komutları çalıştırmak, denetim kaydını okumak         |
-| OWNER     | + panel hesapları oluşturmak, değiştirmek ve silmek            |
+| OWNER     | + panel hesaplarını yönetmek, log dosyalarını indirmek         |
 
 ## Güvenlik
 

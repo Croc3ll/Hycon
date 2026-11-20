@@ -87,7 +87,7 @@ sie auf, wenn sie dort aufgehoben werden. Lokale Banns werden nie angefasst, und
 | VIEWER    | Spieler, Banns und Plugin-Dashboards sehen                     |
 | MODERATOR | + kicken, bannen, entbannen, Live-Konsole lesen                |
 | ADMIN     | + Konsolenbefehle ausführen, Audit-Log lesen                   |
-| OWNER     | + Panel-Accounts anlegen, ändern und entfernen                 |
+| OWNER     | + Panel-Accounts verwalten, Logdateien herunterladen           |
 
 ## Sicherheit
 

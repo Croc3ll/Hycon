@@ -86,7 +86,7 @@ e os remove quando são removidos lá. Banimentos locais nunca são alterados e 
 | VIEWER    | ver jogadores, banimentos e painéis de plugins                 |
 | MODERATOR | + expulsar, banir, desbanir, ler o console ao vivo             |
 | ADMIN     | + executar comandos do console, ler o registro de auditoria    |
-| OWNER     | + criar, alterar e remover contas do painel                    |
+| OWNER     | + gerir contas do painel, baixar os logs                       |
 
 ## Segurança
 

@@ -89,7 +89,7 @@ jamais par le réseau.
 | VIEWER    | voir les joueurs, les bannissements et les tableaux de bord    |
 | MODERATOR | + expulser, bannir, débannir, lire la console en direct        |
 | ADMIN     | + lancer des commandes console, lire le journal d'audit        |
-| OWNER     | + créer, modifier et supprimer les comptes du panneau          |
+| OWNER     | + gérer les comptes du panneau, télécharger les logs           |
 
 ## Sécurité
 

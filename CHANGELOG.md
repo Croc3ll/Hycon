@@ -3,6 +3,10 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.51 (2026-11-20)
+- Only OWNER accounts can download log files (last hour, today's log). Whole log files hold every player's IP
+  address. Moderators still watch the live console.
+
 ## 0.1.50 (2026-11-20)
 - Nobody can lock you out of your own account any more. Before, five wrong passwords for an account name, from
   anywhere, locked that account for everyone. Now an address that has logged into the account before (in the last

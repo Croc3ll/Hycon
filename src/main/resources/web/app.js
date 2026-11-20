@@ -779,8 +779,8 @@ function consoleView(view) {
     if ('Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification('Hycon: ' + kind, { body: text.slice(0, 180) });
   }
   const tools = el('div', { class: 'row console-tools' },
-    el('a', { class: 'button', href: '/api/log/download?range=hour' }, 'Download last hour'),
-    el('a', { class: 'button', href: '/api/log/download?range=today' }, "Download today's log"),
+    can('OWNER') ? el('a', { class: 'button', href: '/api/log/download?range=hour' }, 'Download last hour') : null,
+    can('OWNER') ? el('a', { class: 'button', href: '/api/log/download?range=today' }, "Download today's log") : null,
     el('label', { class: 'muted', title: 'A sound (and a notification while this tab is hidden) on errors, crashes and bans' }, alertBox, ' Alert me on errors and bans'));
 
   // Broadcast: an announcement in every player's chat.

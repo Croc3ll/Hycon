@@ -85,7 +85,7 @@ zostaną tam zdjęte. Lokalne bany nigdy nie są ruszane, a kody nigdy nie są w
 | VIEWER    | przeglądać graczy, bany i panele pluginów                      |
 | MODERATOR | + wyrzucać, banować, odbanowywać, czytać konsolę na żywo       |
 | ADMIN     | + wykonywać polecenia konsoli, czytać dziennik audytu          |
-| OWNER     | + tworzyć, zmieniać i usuwać konta panelu                      |
+| OWNER     | + zarządzać kontami panelu, pobierać logi                      |
 
 ## Bezpieczeństwo
 

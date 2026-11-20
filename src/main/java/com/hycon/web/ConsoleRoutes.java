@@ -43,7 +43,8 @@ public final class ConsoleRoutes {
 
     public void register() {
         web.get("/api/status", Level.MODERATOR, this::status);
-        web.get("/api/log/download", Level.MODERATOR, this::download);
+        // OWNER only: whole log files hold every player's IP address and more than a moderator needs.
+        web.get("/api/log/download", Level.OWNER, this::download);
         web.post("/api/broadcast", Level.MODERATOR, this::broadcast);
         web.post("/api/server/stop", Level.ADMIN, this::stop);
         web.post("/api/server/restart", Level.ADMIN, this::restart);

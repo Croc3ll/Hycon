@@ -87,7 +87,7 @@ levanta cuando allí se levantan. Los baneos locales nunca se tocan y los códig
 | VIEWER    | ver jugadores, baneos y paneles de plugins                     |
 | MODERATOR | + expulsar, banear, desbanear, leer la consola en directo      |
 | ADMIN     | + ejecutar comandos de consola, leer el registro de auditoría  |
-| OWNER     | + crear, cambiar y eliminar cuentas del panel                  |
+| OWNER     | + gestionar cuentas del panel, descargar registros             |
 
 ## Seguridad
 

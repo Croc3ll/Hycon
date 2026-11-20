@@ -275,7 +275,7 @@ Each staff member should have their own account, so the audit log shows who did 
 | VIEWER    | See players, bans and dashboards                                            |
 | MODERATOR | Also kick, ban, unban, and watch the live console                           |
 | ADMIN     | Also run console commands (full console rights) and read the audit log      |
-| OWNER     | Also create, change and remove panel accounts                               |
+| OWNER     | Also create, change and remove panel accounts, and download log files       |
 
 Give out ADMIN carefully: it is the same as access to the server console.
 
