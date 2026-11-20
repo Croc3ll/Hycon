@@ -23,7 +23,7 @@ staff accounts, all settings, remote access over HTTPS, troubleshooting).
 |---|---|
 | ![Analytics](docs/promo/hycon-analytics.png) | ![Player globe](docs/promo/hycon-globe.png) |
 | ![Player profiles](docs/promo/hycon-profile.png) | ![Live console](docs/promo/hycon-console.png) |
-| ![Moderation](docs/promo/hycon-players.png) | |
+| ![Moderation](docs/promo/hycon-players.png) | ![Performance](docs/promo/hycon-performance.png) |
 
 These are made with demo data by `py tools/promo/make_promo.py` (no real players).
 

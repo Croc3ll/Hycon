@@ -78,6 +78,9 @@ const CARDS = {
   players: { eyebrow: '05 · Moderation', title: 'Moderate in <em>two clicks</em>.',
     lead: 'Everyone who ever joined, searchable, with warn, kick and ban right there.',
     points: ['Search by name or UUID', 'Reports and bug reports from /report and /bug', 'Share bans with other servers', 'Staff levels and an audit log'], shot: 'players' },
+  performance: { eyebrow: '06 · Performance', title: 'Know <em>why</em> it lags.',
+    lead: 'An always-on profiler that names the plugin, system or player behind every lag spike.',
+    points: ['Server health score at a glance', 'Every lag spike with its cause', 'Which plugin uses the server most', 'Alerts and a weekly report to Discord'], shot: 'performance' },
 };
 const c = CARDS[new URLSearchParams(location.search).get('card')] || CARDS.banner;
 document.getElementById('eyebrow').textContent = c.eyebrow;

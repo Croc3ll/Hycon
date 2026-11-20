@@ -32,12 +32,16 @@ SHOTS = [
     ("players", "#players", None, (1440, 900)),
     ("profile", "#profile:{hero}", None, (1440, 900)),
     ("console", "#console", None, (1440, 900)),
+    ("performance", "#panel:performance", None, (1440, 900)),
 ]
 
 
 def build_site(site: Path) -> None:
     for f in WEB.iterdir():
-        shutil.copy(f, site / f.name)
+        if f.is_dir():
+            shutil.copytree(f, site / f.name)  # vendor/, lang/
+        else:
+            shutil.copy(f, site / f.name)
     shutil.copy(HERE / "demo.js", site / "demo.js")
     shutil.copy(HERE / "cards.html", site / "cards.html")
     page = (WEB / "index.html").read_text(encoding="utf-8")
@@ -102,7 +106,7 @@ def main() -> None:
         capture(f"{base}/index.html{query}{page.format(hero=hero)}", shots / f"{name}.png", size)
         print("shot", name)
     OUT.mkdir(parents=True, exist_ok=True)
-    for card in ["banner", "analytics", "globe", "profile", "console", "players"]:
+    for card in ["banner", "analytics", "globe", "profile", "console", "players", "performance"]:
         capture(f"{base}/cards.html?card={card}", OUT / f"hycon-{card}.png", (1600, 900))
         print("card", card)
     server.shutdown()

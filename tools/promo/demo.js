@@ -90,6 +90,30 @@
     ] };
   };
 
+  // The Performance tab of a healthy, busy prison server (made-up numbers in the shape Hycon sends).
+  const performance = () => {
+    const bar = (name, pct) => [name, Math.round(pct / 0.31) + '% of the busy time', pct, pct.toFixed(1) + '%'];
+    const health = series(DAY, 10 * MIN, (t) => Math.round(Math.min(100, 91 + 4 * Math.sin(t / (5 * HOUR)) - (Math.abs(t - (NOW - 7 * HOUR)) < 25 * MIN ? 24 : 0))));
+    const week = series(7 * DAY, HOUR, (t) => Math.round(Math.min(100, 89 + 5 * Math.sin(t / (11 * HOUR)) + 2 * Math.sin(t / (3 * HOUR)))));
+    return { title: 'Performance', blocks: [
+      { type: 'note', text: 'Healthy: ticks take 4.2 ms on average (budget 33 ms), 3 lag spikes. PrisonCore uses the most world-thread time (9%).' },
+      stat('Server health', '92 / 100', 'Excellent: in good standing at 75 and up. Points lost for: worst tick 182 ms (-4), 0.1 lag spikes a minute (-1).'),
+      stat('Tick time', '4.2 ms', 'Good: under 20 ms is good; over 33 ms the game slows down.'),
+      stat('Worst tick', '182 ms', 'Watch: under 100 ms nobody notices.'),
+      stat('Lag spikes', '3', 'Good: a few a day is normal.'),
+      stat('World threads busy', '31%', 'Good: under 50% leaves room for more players.'),
+      stat('Memory', '3,184 MB', 'Good: 39% of 8192 MB. Longest GC pause 41 ms.'),
+      { type: 'series', title: 'Server health', subtitle: '75 and up is good standing; per 10 min', unit: '/ 100', area: true, lines: ['Health'], gaps: [], points: health },
+      { type: 'bars', title: 'Who uses the world threads', items: [bar('PrisonCore', 9.4), bar('Hytale', 8.1), bar('Hycon - AntiCheat', 1.2),
+        bar('HyWorlds', 0.6), bar('Hycon', 0.3), bar('Tebex', 0.1)] },
+      { type: 'table', title: 'Lag spikes (newest first)', columns: ['When', 'Where', 'Length', 'Cause', 'System or task', 'Also', 'Players there'],
+        rows: [['@' + (NOW - 42 * MIN), 'skyworld', '182 ms', 'PrisonCore', 'MineResetSystem', 'chunk load', 'Kiwi_Rush, Ember, +6 more'],
+          ['@' + (NOW - 3 * HOUR), 'hideouts', '131 ms', 'Hytale', 'ChunkSavingSystem', 'save', 'Nova_Blade, Oakheart'],
+          ['@' + (NOW - 7 * HOUR), 'Scheduler', '118 ms', 'garbage collection', 'Autosave.run', '', 'everyone (21)']] },
+      { type: 'series', title: 'Server health, last 7 days', subtitle: 'hourly average', unit: '/ 100', area: false, lines: ['Health'], gaps: [], points: week },
+    ] };
+  };
+
   const geoOf = (p) => ({ name: p.name, uuid: p.uuid, online: p.online, ping: p.ping, city: p.place[0], region: p.place[1],
     country: p.place[2], cc: p.place[3], lat: p.place[4] + (rnd() - 0.5), lon: p.place[5] + (rnd() - 0.5) });
   const SERVER = { lat: 43.65, lon: -79.38 };
@@ -127,6 +151,7 @@
   const ROUTES = {
     '/api/session': () => ({ loggedIn: true, name: 'admin', level: 'OWNER', rank: 4, mustChange: false, csrf: 'demo' }),
     '/api/panels': () => ({ panels: [{ id: 'analytics', title: 'Analytics' }, { id: 'arena', title: 'Arena' }, { id: 'guard', title: 'Economy Guard' },
+      { id: 'performance', title: 'Performance' },
       { id: 'perms', title: 'Permissions' }, { id: 'prison', title: 'Prison' }] }),
     '/api/reports': () => ({ open: 2, reports: [] }),
     '/api/bugs': () => ({ open: 1, bugs: [] }),
@@ -141,7 +166,7 @@
     '/api/geo': () => ({ ready: true, server: SERVER, players: players.map(geoOf) }),
     '/api/geo/player': (q) => ({ ready: true, server: SERVER, player: geoOf(players.find((p) => p.uuid === q.get('player')) || hero) }),
     '/api/graph': (q) => graph(q.get('player')),
-    '/api/panel': (q) => (q.get('id') === 'analytics' ? analytics() : { title: q.get('id'), blocks: [] }),
+    '/api/panel': (q) => (q.get('id') === 'analytics' ? analytics() : q.get('id') === 'performance' ? performance() : { title: q.get('id'), blocks: [] }),
     '/api/bans': () => ({ bans: [] }),
   };
 
