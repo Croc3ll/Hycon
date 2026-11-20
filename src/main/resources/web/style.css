@@ -580,15 +580,28 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
   main td[data-label="UUID"] { display: none; }
 }
 
-/* Phones: logo, language and account on one row, then the tabs as a single strip you swipe sideways. */
+#menubtn { display: none; }
+
+/* Phones: the tabs sit behind a menu button that names the open tab; tapping it shows every tab as a grid. */
 @media (max-width: 720px) {
   header { flex-wrap: wrap; gap: 8px 10px; padding: 8px 12px; }
   header .brand .sub { display: none; }
-  #me { gap: 6px; }
+  #me { gap: 6px; margin-left: auto; }
   #me button { padding: 6px 10px; }
-  nav#tabs { order: 10; flex: 0 0 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
-    -webkit-overflow-scrolling: touch; margin: 0 -12px; padding: 0 12px; }
-  nav#tabs::-webkit-scrollbar { display: none; }
-  nav#tabs button { flex: none; }
+  #menubtn { display: flex; align-items: center; gap: 10px; order: 9; flex: 0 0 100%; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--gold-dim); background: var(--gold-bg); color: var(--gold2); font-weight: 600; font-size: 15px; text-align: left; }
+  #menubtn[hidden] { display: none; }
+  #menubtn .bars { display: grid; gap: 3px; width: 16px; }
+  #menubtn .bars i { display: block; height: 2px; border-radius: 2px; background: currentColor; transition: transform .2s var(--ease), opacity .2s; }
+  header.menuopen #menubtn .bars i:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+  header.menuopen #menubtn .bars i:nth-child(2) { opacity: 0; }
+  header.menuopen #menubtn .bars i:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
+  nav#tabs { display: none; order: 10; flex: 0 0 100%; grid-template-columns: 1fr 1fr; gap: 6px; padding: 2px 0 6px; }
+  header.menuopen nav#tabs { display: grid; }
+  nav#tabs .tabmark { display: none; }
+  nav#tabs button { justify-content: flex-start; gap: 10px; padding: 12px; border-radius: 10px; font-size: 14px;
+    border: 1px solid var(--line); background: rgba(255, 255, 255, .03); white-space: normal; text-align: left; }
+  nav#tabs button.active { color: var(--gold2); background: var(--gold-bg); border-color: rgba(226, 181, 75, .35); }
+  nav#tabs .tabicon { width: 18px; height: 18px; }
   main h1 { font-size: 24px; }
 }

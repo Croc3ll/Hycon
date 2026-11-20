@@ -82,6 +82,7 @@ function stop() { clearInterval(S.timer); S.timer = null; }
 function showLogin() {
   stop();
   $('tabs').replaceChildren();
+  if ($('menubtn')) $('menubtn').hidden = true;
   $('me').replaceChildren();
   const name = el('input', { autocomplete: 'username', required: true });
   const pw = el('input', { type: 'password', autocomplete: 'current-password', required: true });
@@ -108,7 +109,7 @@ function showLogin() {
 
 function showPassword(forced) {
   stop();
-  if (forced) $('tabs').replaceChildren();
+  if (forced) { $('tabs').replaceChildren(); if ($('menubtn')) $('menubtn').hidden = true; }
   const cur = el('input', { type: 'password', autocomplete: 'current-password' });
   const n1 = el('input', { type: 'password', autocomplete: 'new-password', minlength: 10 });
   const n2 = el('input', { type: 'password', autocomplete: 'new-password' });
@@ -195,11 +196,33 @@ let tabMarkAt = null;
 const measure = (b) => ({ offsetLeft: b.offsetLeft, offsetTop: b.offsetTop, offsetWidth: b.offsetWidth, offsetHeight: b.offsetHeight });
 const placeMark = (mark, b) => { mark.style.left = b.offsetLeft + 'px'; mark.style.top = b.offsetTop + 'px';
   mark.style.width = b.offsetWidth + 'px'; mark.style.height = b.offsetHeight + 'px'; };
+// On a phone the tab bar is hidden behind one button that names the open tab; tapping it shows
+// every tab as a grid (style.css). Picking a tab, or tapping the button again, closes it.
+function phoneMenu(list) {
+  const header = document.querySelector('header');
+  let btn = $('menubtn');
+  if (!btn) {
+    btn = el('button', { id: 'menubtn', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'tabs',
+      on: { click: () => setMenu(!header.classList.contains('menuopen')) } });
+    header.querySelector('.brand').after(btn);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+  }
+  const cur = list.find((t) => t[0] === S.tab);
+  const title = cur ? cur[1] : S.tab.startsWith('profile:') ? 'Profile' : '';
+  btn.replaceChildren(el('span', { class: 'bars' }, el('i'), el('i'), el('i')), el('span', { class: 'cur' }, title));
+  btn.hidden = !list.length;
+  setMenu(false);
+}
+
+function setMenu(open) {
+  document.querySelector('header').classList.toggle('menuopen', open);
+  const btn = $('menubtn');
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+}
+
 function slideTabMark() {
   const nav = $('tabs'), on = nav.querySelector('button.active');
   if (!on) { tabMarkAt = null; return; }
-  // On a phone the tabs are one strip that scrolls sideways: keep the open tab in view.
-  if (nav.scrollWidth > nav.clientWidth) on.scrollIntoView({ block: 'nearest', inline: 'center' });
   const mark = el('span', { class: 'tabmark' });
   nav.prepend(mark);
   const from = tabMarkAt && !calm() ? tabMarkAt : null;
@@ -262,6 +285,7 @@ function render() {
   if (!S.tab.startsWith('profile:') && !list.some((t) => t[0] === S.tab)) S.tab = 'players';
   $('tabs').replaceChildren(...list.map(([id, title]) =>
     el('button', { class: id === S.tab ? 'active' : '', on: { click: () => go(id) } }, tabIcon(id), title)));
+  phoneMenu(list);
   slideTabMark();
   const view = $('view');
   view.replaceChildren();
