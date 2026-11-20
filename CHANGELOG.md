@@ -3,6 +3,11 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.50 (2026-11-20)
+- Nobody can lock you out of your own account any more. Before, five wrong passwords for an account name, from
+  anywhere, locked that account for everyone. Now an address that has logged into the account before (in the last
+  30 days, since the last restart) can still log in; its own failed tries are still limited.
+
 ## 0.1.49 (2026-11-20)
 Security fixes. Updating is recommended.
 - Slow clients can no longer freeze the panel or the ban-share port. A client that sent its request one byte at a

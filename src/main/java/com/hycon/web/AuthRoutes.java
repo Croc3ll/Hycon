@@ -79,6 +79,7 @@ public final class AuthRoutes {
             r.error(403, "Log in from the server machine itself until the default password is changed");
             return;
         }
+        limiter.succeeded(r.ip, a.name());
         // New session id at login, so an id an attacker planted or saw beforehand is useless.
         sessions.remove(r.session);
         web.issueCookie(r, sessions.create(a.name(), r.ip));
