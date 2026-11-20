@@ -198,6 +198,8 @@ const placeMark = (mark, b) => { mark.style.left = b.offsetLeft + 'px'; mark.sty
 function slideTabMark() {
   const nav = $('tabs'), on = nav.querySelector('button.active');
   if (!on) { tabMarkAt = null; return; }
+  // On a phone the tabs are one strip that scrolls sideways: keep the open tab in view.
+  if (nav.scrollWidth > nav.clientWidth) on.scrollIntoView({ block: 'nearest', inline: 'center' });
   const mark = el('span', { class: 'tabmark' });
   nav.prepend(mark);
   const from = tabMarkAt && !calm() ? tabMarkAt : null;
@@ -1579,3 +1581,19 @@ function columnsCard(c) {
 // after app.js, and a quick server answer used to reach them before they existed.
 addEventListener('DOMContentLoaded', () => boot()
   .catch((e) => { $('view').replaceChildren(el('p', { class: 'bad' }, 'Could not reach the server: ' + e.message)); }));
+
+// On a phone, tables show each row as a small card (see style.css). Each cell gets its column's
+// header as data-label, so this also covers plugin tabs and tables that refresh live.
+function labelCells(root) {
+  for (const t of root.querySelectorAll('table')) {
+    const heads = [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+    if (!heads.length) continue;
+    for (const tr of t.querySelectorAll('tbody tr')) {
+      [...tr.children].forEach((td, i) => {
+        const h = heads[i] || '';
+        if (td.dataset.label !== h) td.dataset.label = h;
+      });
+    }
+  }
+}
+new MutationObserver(() => labelCells(document)).observe(document.body, { childList: true, subtree: true });

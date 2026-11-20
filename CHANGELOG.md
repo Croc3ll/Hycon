@@ -3,6 +3,11 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.43 (2026-11-19)
+- A cleaner panel on phones: every table shows each row as a card (label over value, buttons big enough to tap), so
+  nothing scrolls sideways. The header is one compact row and the tabs are a single strip you swipe, with the open tab
+  kept in view. Phones no longer hide each table's third column (on Bans that was "Time left"); only UUIDs are hidden.
+
 ## 0.1.42 (2026-11-19)
 - `/bug` with nothing after it shows the usage line instead of filing a report that just says "bug", and reports under
   3 characters are refused. `/report` reads its text the same way.
