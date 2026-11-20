@@ -3,6 +3,9 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.1.46 (2026-11-19)
+- Phones: dropdown lists are dark with readable text again (0.1.45 left them white with pale text).
+
 ## 0.1.45 (2026-11-19)
 - Phones: the header is one row (logo, account, Log out) and the language picker moved into the tab menu, under the tabs.
 - Phones: dropdowns open the phone's own picker instead of the desktop-styled list. Dropdowns and text fields in forms

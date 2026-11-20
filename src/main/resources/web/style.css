@@ -612,6 +612,8 @@ canvas.replay[hidden], .replay3d-box[hidden] { display: none; }
   #lang { flex: 1; font-size: 16px; padding: 8px 30px 8px 8px; }
   /* Phones get their own dropdown picker (a sheet or wheel), not the desktop-styled list. */
   select, select::picker(select) { appearance: none; -webkit-appearance: none; }
+  option, option:hover, option:focus-visible { background: var(--panel); color: var(--text); padding: 0; }
+  option:checked { background: #3a3020; color: var(--gold2); }
   .row input, .row select, .panelform input, .panelform select { min-width: 0; width: 100%; flex: 1 1 100%; }
   input, select { font-size: 16px; } /* 16px stops iPhones zooming in when a field is tapped */
 }
