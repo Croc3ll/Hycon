@@ -3,6 +3,11 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.2.1 (2026-11-21)
+- **Two-factor QR code**: setting up two-factor login under My account now shows the QR code 0.2.0's notes promised
+  (its jar was built just before it). Scan it with Google Authenticator or any authenticator app. It's drawn by your
+  own server, so the key never goes to an outside site. The setup key and Copy key stay below it.
+
 ## 0.2.0 (2026-11-20)
 A new look and a big moderation update. Updating from 0.1.48 or older? Read **Action needed** under 0.1.49.
 
