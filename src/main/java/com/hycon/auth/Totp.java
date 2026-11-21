@@ -21,6 +21,8 @@ public final class Totp {
     private static final int WINDOW = 1;
     private static final int SECRET_BYTES = 20;
     private static final String BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    /** The name authenticator apps list the account under. */
+    private static final String ISSUER = "Hycon";
 
     private Totp() {
     }
@@ -32,10 +34,14 @@ public final class Totp {
         return encode(b);
     }
 
-    /** The link an authenticator app opens: {@code otpauth://totp/Hycon:name?secret=...}. */
+    /**
+     * The link an authenticator app opens or scans: {@code otpauth://totp/Hycon:name?secret=...&issuer=Hycon},
+     * Google Authenticator's key URI format. Digits, period and SHA1 are left out: they are the defaults every
+     * app assumes, and a shorter link makes a smaller QR code that scans more easily.
+     */
     public static String uri(String account, String secret) {
-        String label = URLEncoder.encode("Hycon:" + account, StandardCharsets.UTF_8).replace("+", "%20");
-        return "otpauth://totp/" + label + "?secret=" + secret + "&issuer=Hycon&digits=" + DIGITS + "&period=" + STEP_SECONDS;
+        String name = URLEncoder.encode(account, StandardCharsets.UTF_8).replace("+", "%20");
+        return "otpauth://totp/" + ISSUER + ":" + name + "?secret=" + secret + "&issuer=" + ISSUER;
     }
 
     /**

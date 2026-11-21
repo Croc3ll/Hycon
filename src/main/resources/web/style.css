@@ -714,6 +714,8 @@ textarea:focus { outline: none; border-color: var(--gold-dim); box-shadow: 0 0 0
 .setupkey { margin: 6px 0 10px; padding: 12px 14px; border: 1px dashed var(--gold-dim); border-radius: var(--radius-sm); background: var(--gold-bg);
   color: var(--gold2); font-size: 18px; letter-spacing: 2px; word-break: break-all; user-select: all; }
 form.twofa label { margin-top: 6px; }
+/* Always black on white, even in the dark theme: phone scanners read a light background best. */
+form.twofa img.qr { display: block; max-width: 100%; height: auto; margin: 6px 0 10px; background: #fff; border-radius: var(--radius-sm); }
 #me a.who:hover { color: var(--gold2); text-decoration: none; }
 
 /* ---------- Security checklist ---------- */

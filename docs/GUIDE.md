@@ -308,9 +308,10 @@ step, they get the last step again. A new server starts with six presets to chan
 ### Your account
 Click your name at the bottom of the sidebar for **My account**:
 - **Change password**.
-- **Two-factor login**: **Turn on two-factor**, add the setup key to an authenticator app on your phone (Google
-  Authenticator, Microsoft Authenticator, Authy, 1Password and others), and type the 6-digit code it shows. From then
-  on, logging in asks for the code after your password. A browser where you ticked **Remember me** keeps logging
+- **Two-factor login**: **Turn on two-factor** and scan the QR code with an authenticator app on your phone (Google
+  Authenticator, Microsoft Authenticator, Authy, 1Password and others). Can't scan it? Type the setup key under it
+  instead. Then type the 6-digit code the app shows. Hycon draws the QR code itself, so the key never goes to an
+  outside QR service. From then on, logging in asks for the code after your password. A browser where you ticked **Remember me** keeps logging
   in by itself. Turning two-factor on logs every other browser out. Lost your phone? An OWNER clicks
   **Remove two-factor** on the Accounts tab, or `/hycon resetpassword <name>` in the console resets both.
 

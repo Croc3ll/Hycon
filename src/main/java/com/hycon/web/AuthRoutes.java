@@ -5,6 +5,7 @@ import com.hycon.auth.AdminStore;
 import com.hycon.auth.Level;
 import com.hycon.auth.LoginLimiter;
 import com.hycon.auth.Passwords;
+import com.hycon.auth.QrCode;
 import com.hycon.auth.Sessions;
 import com.hycon.auth.Totp;
 
@@ -244,7 +245,8 @@ public final class AuthRoutes {
         }
         String secret = Totp.newSecret();
         pendingTotp.put(r.session.id, secret);
-        r.ok(new Json().beginObject().field("secret", secret).field("uri", Totp.uri(r.admin.name(), secret)).endObject());
+        String uri = Totp.uri(r.admin.name(), secret);
+        r.ok(new Json().beginObject().field("secret", secret).field("uri", uri).field("qr", QrCode.svgDataUri(uri)).endObject());
     }
 
     private void enableTwoFactor(Req r) throws IOException {

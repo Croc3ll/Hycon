@@ -1224,15 +1224,18 @@ function twoFactorCard() {
     try {
       const d = await api('POST', '/api/2fa/start');
       const grouped = d.secret.match(/.{1,4}/g).join(' ');
+      // The server draws the QR code, so the key never goes to an outside QR service.
       start.replaceWith(el('form', { class: 'twofa', on: { submit: send('/api/2fa/enable') } },
-        el('p', {}, el('b', {}, '1.'), ' ', 'In your authenticator app, add an account and type this setup key (or open the link on your phone):'),
+        el('p', {}, el('b', {}, '1.'), ' ', 'Scan this QR code with your authenticator app. In Google Authenticator: tap +, then Scan a QR code.'),
+        el('img', { class: 'qr', src: d.qr, alt: 'QR code for your authenticator app' }),
+        el('p', { class: 'muted' }, "Can't scan it? Type this setup key instead, or open the link on your phone:"),
         el('div', { class: 'setupkey mono' }, grouped),
         el('p', { class: 'row' }, el('button', { type: 'button', on: { click: () => navigator.clipboard.writeText(d.secret).then(() => toast('Key copied')) } }, 'Copy key'),
           el('a', { class: 'button', href: d.uri }, 'Open in authenticator app')),
         el('p', {}, el('b', {}, '2.'), ' ', 'Type the 6-digit code the app shows, and your password:'),
         el('label', {}, 'Code from your app'), code, el('label', {}, 'Your password'), password,
         el('p', {}, el('button', { class: 'primary', type: 'submit' }, 'Turn on')), msg));
-      code.focus();
+      code.focus({ preventScroll: true }); // the QR code above must stay in view
     } catch (err) { toast(err.message, true); }
   } } }, 'Turn on two-factor');
   card.append(head, why, el('p', {}, start));

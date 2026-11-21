@@ -18,8 +18,9 @@ A new look and a big moderation update. Updating from 0.1.48 or older? Read **Ac
 - **Punish dialog**: one dialog for every punishment: a preset, or a plain warn, mute, kick or ban.
 - **Punishment presets** (Presets tab, owners): per offence, steps that get harsher for repeat offenders,
   e.g. "Spam: warn, mute 30m, mute 1d, ban 1d". Hycon picks each player's next step. Six presets to start with.
-- **Two-factor login**: turn it on under My account (click your name) with any authenticator app. Owners can remove
-  it for someone who lost their phone, and the console's `/hycon resetpassword` resets it too.
+- **Two-factor login**: turn it on under My account (click your name) with any authenticator app. Scan the QR code
+  (Google Authenticator: tap +, then Scan a QR code) or type the setup key. Owners can remove it for someone who lost
+  their phone, and the console's `/hycon resetpassword` resets it too.
 - **Security checklist** (Security tab, owners): what to fix in your setup, worst first, in plain words.
 - **Schedule** (admins): daily restarts with countdown warnings in chat (through AMP when it's set up), a one-off
   restart, and announcements that repeat on their own timer.
