@@ -3,6 +3,14 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.2.2 (2026-11-21)
+- **Account labels**: profiles show **2FA app** (the player uses an authenticator app for two-factor login on their
+  Hytale account) and **Chapter 1 boss** (a cosmetic) as small labels beside the edition, instead of
+  "Cursebreaker (security.totp)". Staff aren't alerted about them any more. Add your own under `Labels` in
+  `staff-watch.json`.
+- **Forged logins ignored**: the staff watch only keeps a player's entitlements, and only alerts, once Hytale has
+  accepted their login. A bot logging in with a fake token no longer shows up as a player with no edition.
+
 ## 0.2.1 (2026-11-21)
 - **Two-factor QR code**: setting up two-factor login under My account now shows the QR code 0.2.0's notes promised
   (its jar was built just before it). Scan it with Google Authenticator or any authenticator app. It's drawn by your

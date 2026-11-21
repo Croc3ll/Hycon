@@ -792,6 +792,7 @@ function profile(view, uuid) {
           el('div', { class: 'heroname' }, el('h2', { class: 'big' }, p.name),
             el('div', { class: 'row' }, el('span', { class: 'pill ' + (p.online ? 'good' : 'dim') }, p.online ? 'Online' + (p.world ? ' in ' + p.world : '') : 'Offline'),
               p.edition ? editionBadge(p.edition) : null,
+              ...(p.labels || []).map((label) => el('span', { class: 'pill dim', title: 'On their Hytale account' }, label)),
               p.ban ? el('span', { class: 'badge red' }, 'Banned') : null,
               p.mute ? el('span', { class: 'badge mutebadge' }, 'Muted') : null),
             el('div', { class: 'mono muted small' }, p.uuid))),

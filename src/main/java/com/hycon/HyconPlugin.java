@@ -176,6 +176,7 @@ public final class HyconPlugin extends JavaPlugin {
         staffWatch.start();
         // Joins and leaves keep the player directory's "last seen" current.
         getEventRegistry().registerAsync(PlayerConnectEvent.class, f -> f.thenApply(e -> {
+            staffWatch.joined(e.getPlayerRef().getUuid()); // only now, with the token checked, are its entitlements kept
             known.joined(e.getPlayerRef().getUuid(), e.getPlayerRef().getUsername(), e.getWorld() == null ? null : e.getWorld().getName());
             ties.joined(e.getPlayerRef().getUuid(), address(e.getPlayerRef()));
             if (config.geoIp()) {

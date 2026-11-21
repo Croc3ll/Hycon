@@ -480,12 +480,17 @@ Each profile shows the player's **game edition** as a badge next to their name: 
 orange for Supporter, purple for Cursebreaker. Hycon reads it from the player's login token when they
 join, so there's no badge until their first join after this update.
 
-If a joining player has an entitlement not listed in `staff-watch.json` under `Editions`, or is listed
-under `WatchPlayers` (`"uuid": "note"`), staff with `hycon.reports.notify` get a chat line, and it goes
+Other things Hytale lists on the account show as small labels beside it, named under `Labels`:
+**2FA app** (`security.totp`: they use an authenticator app for two-factor login on their Hytale account;
+email codes don't count) and **Chapter 1 boss** (`cosmetics.chapter_1.boss`, a cosmetic).
+
+If a joining player has an entitlement in neither `Editions` nor `Labels`, or is listed under
+`WatchPlayers` (`"uuid": "note"`), staff with `hycon.reports.notify` get a chat line, and it goes
 in the audit log and the server log. The hope is that a Hytale staff account carries an entitlement
 normal players don't. When an alert turns out to be a new edition, add it to `Editions` (lowest edition
-first) and restart. The token is read before Hytale checks it, so this only informs staff: never give
-anything based on it.
+first), or to `Labels` for anything else, and restart. Hycon reads the token before Hytale checks it, so
+it only keeps it, and only alerts, once Hytale has let the player in: a forged login (a bot with an
+unofficial login server) never shows up. Even so, this only informs staff: never give anything based on it.
 
 ## 7. Files Hycon keeps
 

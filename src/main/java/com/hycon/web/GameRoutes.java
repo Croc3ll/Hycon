@@ -472,6 +472,9 @@ public final class GameRoutes {
         String edition = watch == null ? null : watch.edition(t.uuid());
         if (edition != null) {
             j.field("edition", edition);
+            j.name("labels").beginArray();
+            watch.labels(t.uuid()).forEach(j::value);
+            j.endArray();
         }
         j.field("warnings", records.count(t.uuid(), PlayerRecords.Type.WARN))
                 .field("kicks", records.count(t.uuid(), PlayerRecords.Type.KICK))

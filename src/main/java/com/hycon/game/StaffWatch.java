@@ -31,18 +31,24 @@ import java.util.logging.Level;
  * anything else Hytale puts there. Hytale reads that list at login and then drops it, so the first
  * {@link Connect} packet is the only place a plugin can see it.
  *
- * <p>Each player's edition shows in their profile's top card. An entitlement that isn't in
- * {@code staff-watch.json}'s {@code Editions}, or a player listed under {@code WatchPlayers}, alerts
- * staff: a chat line, the audit log and a log warning. We hope a Hytale staff account carries an
- * entitlement normal players don't.
+ * <p>Each player's edition shows in their profile's top card, with a label for each other entitlement
+ * {@code staff-watch.json} names under {@code Labels} ("2FA app" for {@code security.totp}). An
+ * entitlement in neither list, or a player listed under {@code WatchPlayers}, alerts staff: a chat line,
+ * the audit log and a log warning. We hope a Hytale staff account carries an entitlement normal players
+ * don't.
  *
- * <p>The token is only decoded, not verified. Hytale verifies it a moment later and kicks a forged
- * one, but a forged token is still read first. So this only informs staff and never grants anything.
+ * <p>The token is read before Hytale verifies it, so it's only kept until the player is through: a
+ * forged one never reaches {@link #joined}. A bot tried a token signed by an unofficial login server
+ * twice a day for a month (2026-10/11); read straight away, it showed up as a player with nothing.
  */
 public final class StaffWatch {
 
     /** Known entitlements and the edition name each one stands for, lowest edition first. */
     private static final Map<String, String> DEFAULT_EDITIONS = defaultEditions();
+    /** Known entitlements that aren't editions, and the label each shows as on profiles. */
+    private static final Map<String, String> DEFAULT_LABELS = defaultLabels();
+    /** How long a read token waits for Hytale to let its player in before it's dropped. */
+    private static final long PENDING_MS = 60_000;
 
     private static volatile StaffWatch instance;
 
@@ -51,9 +57,15 @@ public final class StaffWatch {
     private final Path configFile;
     private final Path seenFile;
     private final Map<UUID, List<String>> seen = new ConcurrentHashMap<>();
+    /** Tokens read but not yet verified: their player hasn't been let in. */
+    private final Map<UUID, Pending> pending = new ConcurrentHashMap<>();
     private volatile Map<String, String> editions = DEFAULT_EDITIONS;
+    private volatile Map<String, String> labels = DEFAULT_LABELS;
     private volatile Map<String, String> watchPlayers = Map.of();
     private PacketFilter filter;
+
+    private record Pending(String name, List<String> owned, long at) {
+    }
 
     public StaffWatch(Path dataDir, HytaleLogger log, AuditLog audit) {
         this.log = log;
@@ -92,20 +104,30 @@ public final class StaffWatch {
                 return;
             }
             UUID uuid = UUID.fromString(String.valueOf(claims.get("sub")));
-            String name = String.valueOf(profile.get("username"));
             List<String> owned = new ArrayList<>();
             if (profile.get("entitlements") instanceof List<?> list) {
                 list.stream().filter(String.class::isInstance).map(String.class::cast).forEach(owned::add);
             }
-            remember(uuid, owned);
-            List<String> unusual = owned.stream().filter(e -> !editions.containsKey(e)).toList();
-            String watchNote = watchPlayers.get(uuid.toString());
-            if (!unusual.isEmpty() || watchNote != null) {
-                alert(name, uuid, unusual, watchNote);
-            }
+            long now = System.currentTimeMillis();
+            pending.values().removeIf(p -> now - p.at() > PENDING_MS); // logins Hytale turned away
+            pending.put(uuid, new Pending(String.valueOf(profile.get("username")), List.copyOf(owned), now));
         } catch (RuntimeException e) {
             // A malformed token: Hytale rejects it anyway, and the watch must never block a login.
             log.at(Level.FINE).log("Hycon staff watch could not read a token: %s", e);
+        }
+    }
+
+    /** A player Hytale let in (their token checked out): keeps their entitlements and alerts if unusual. */
+    public void joined(UUID uuid) {
+        Pending p = pending.remove(uuid);
+        if (p == null) {
+            return;
+        }
+        remember(uuid, p.owned());
+        List<String> unusual = p.owned().stream().filter(e -> !editions.containsKey(e) && !labels.containsKey(e)).toList();
+        String watchNote = watchPlayers.get(uuid.toString());
+        if (!unusual.isEmpty() || watchNote != null) {
+            alert(p.name(), uuid, unusual, watchNote);
         }
     }
 
@@ -130,8 +152,14 @@ public final class StaffWatch {
         if (owned == null) {
             return null;
         }
-        List<String> unknown = owned.stream().filter(e -> !editions.containsKey(e)).toList();
+        List<String> unknown = owned.stream().filter(e -> !editions.containsKey(e) && !labels.containsKey(e)).toList();
         return unknown.isEmpty() ? edition(owned) : edition(owned) + " (" + String.join(", ", unknown) + ")";
+    }
+
+    /** The labels of the player's known entitlements that aren't editions ("2FA app"), for their profile. */
+    public List<String> labels(UUID player) {
+        List<String> owned = seen.getOrDefault(player, List.of());
+        return labels.entrySet().stream().filter(e -> owned.contains(e.getKey())).map(Map.Entry::getValue).toList();
     }
 
     /** The highest edition the player owns, by the order in {@code Editions}. */
@@ -196,6 +224,8 @@ public final class StaffWatch {
             }
             Map<String, Object> m = JsonReader.object(Files.readString(configFile, StandardCharsets.UTF_8));
             editions = stringMap(m.get("Editions"));
+            // a config from before Labels gets the defaults
+            labels = m.containsKey("Labels") ? stringMap(m.get("Labels")) : DEFAULT_LABELS;
             watchPlayers = stringMap(m.get("WatchPlayers"));
         } catch (IOException | RuntimeException e) {
             log.at(Level.WARNING).log("Hycon could not read %s, using defaults: %s", configFile.getFileName(), e);
@@ -213,6 +243,8 @@ public final class StaffWatch {
     private static String defaultConfig() {
         Json j = new Json().beginObject().name("Editions").beginObject();
         DEFAULT_EDITIONS.forEach((k, v) -> j.name(k).value(v));
+        j.endObject().name("Labels").beginObject();
+        DEFAULT_LABELS.forEach((k, v) -> j.name(k).value(v));
         return j.endObject().name("WatchPlayers").beginObject().endObject().endObject().toString();
     }
 
@@ -221,6 +253,14 @@ public final class StaffWatch {
         m.put("game.base", "Standard");
         m.put("game.deluxe", "Supporter");
         m.put("game.founder", "Cursebreaker");
+        return m;
+    }
+
+    private static Map<String, String> defaultLabels() {
+        Map<String, String> m = new LinkedHashMap<>();
+        // an authenticator app for two-factor login on their Hytale account: email codes don't carry it
+        m.put("security.totp", "2FA app");
+        m.put("cosmetics.chapter_1.boss", "Chapter 1 boss");
         return m;
     }
 }
