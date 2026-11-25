@@ -1874,5 +1874,9 @@
  "↻ Refresh": "↻ Actualizar",
  "↻ Settle": "↻ Resolver",
  "● Unpin": "● Desanclar",
- "⛶ Fit": "⛶ Adecuado"
+ "⛶ Fit": "⛶ Adecuado",
+ "Lock": "Bloquear",
+ "Unlock": "Desbloquear",
+ "Locked": "Bloqueada",
+ "Unlocked": "Desbloqueada"
 }

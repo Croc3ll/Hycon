@@ -1859,5 +1859,9 @@
  "↻ Refresh": "↻ Odśwież",
  "↻ Settle": "↻ Rozstrzygnięcie",
  "● Unpin": "● Odpiąć",
- "⛶ Fit": "⛶ Dopasuj"
+ "⛶ Fit": "⛶ Dopasuj",
+ "Lock": "Zablokuj",
+ "Unlock": "Odblokuj",
+ "Locked": "Zablokowane",
+ "Unlocked": "Odblokowane"
 }

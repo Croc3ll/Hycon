@@ -34,8 +34,10 @@ public final class AdminStore {
     /**
      * @param defaultPassword still has {@link #DEFAULT_PASSWORD}: only usable from the server machine
      * @param totp            the two-factor secret (base32), or null when the account logs in with a password alone
+     * @param locked          can't log in until an owner unlocks it (a plugin locks staff it removed, e.g. PrisonCore's
+     *                        staff sync); the account and its level stay
      */
-    public record Admin(String name, Level level, String hash, boolean mustChange, boolean defaultPassword, String totp) {
+    public record Admin(String name, Level level, String hash, boolean mustChange, boolean defaultPassword, String totp, boolean locked) {
         /** Stable id used as "banned by" in Hytale's ban list, so bans can be traced back to an account. */
         public UUID uuid() {
             return uuidFor(name);
@@ -75,13 +77,13 @@ public final class AdminStore {
                         Level level = Level.parse(m.get("level") instanceof String s ? s : null);
                         admins.put(key(n), new Admin(n, level == null ? Level.VIEWER : level, h,
                                 Boolean.TRUE.equals(m.get("mustChange")), Boolean.TRUE.equals(m.get("defaultPassword")),
-                                m.get("totp") instanceof String t && !t.isBlank() ? t : null));
+                                m.get("totp") instanceof String t && !t.isBlank() ? t : null, Boolean.TRUE.equals(m.get("locked"))));
                     }
                 }
             }
         }
         if (admins.isEmpty()) {
-            admins.put(DEFAULT_NAME, new Admin(DEFAULT_NAME, Level.OWNER, Passwords.hash(DEFAULT_PASSWORD), true, true, null));
+            admins.put(DEFAULT_NAME, new Admin(DEFAULT_NAME, Level.OWNER, Passwords.hash(DEFAULT_PASSWORD), true, true, null, false));
             save();
             return true;
         }
@@ -112,14 +114,14 @@ public final class AdminStore {
             throw new IllegalArgumentException("That account already exists");
         }
         String pw = Passwords.generate();
-        admins.put(key(name), new Admin(name, level, Passwords.hash(pw), true, false, null));
+        admins.put(key(name), new Admin(name, level, Passwords.hash(pw), true, false, null, false));
         save();
         return pw;
     }
 
     public synchronized void setPassword(String name, String password) throws IOException {
         Admin a = require(name);
-        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(password), false, false, a.totp()));
+        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(password), false, false, a.totp(), a.locked()));
         save();
         // The made-up password is no longer valid, so its file only causes confusion.
         if (Files.exists(loginFile) && Files.readString(loginFile).contains("Account:  " + a.name() + "\n")) {
@@ -132,7 +134,7 @@ public final class AdminStore {
         Admin a = require(name);
         String pw = Passwords.generate();
         // A reset is for someone who lost access, often with their phone: two-factor starts over too.
-        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(pw), true, false, null));
+        admins.put(key(name), new Admin(a.name(), a.level(), Passwords.hash(pw), true, false, null, a.locked()));
         save();
         return pw;
     }
@@ -156,7 +158,18 @@ public final class AdminStore {
         if (a.level() == Level.OWNER && level != Level.OWNER && owners() == 1) {
             throw new IllegalArgumentException("The last OWNER can't be demoted");
         }
-        admins.put(key(name), new Admin(a.name(), level, a.hash(), a.mustChange(), a.defaultPassword(), a.totp()));
+        admins.put(key(name), new Admin(a.name(), level, a.hash(), a.mustChange(), a.defaultPassword(), a.totp(), a.locked()));
+        save();
+    }
+
+    /** Locks or unlocks an account. The last owner that can log in can't be locked. */
+    public synchronized void setLocked(String name, boolean locked) throws IOException {
+        Admin a = require(name);
+        if (locked && a.level() == Level.OWNER && admins.values().stream().filter(x -> x.level() == Level.OWNER && !x.locked()).count() <= 1) {
+            throw new IllegalArgumentException("The last OWNER can't be locked");
+        }
+        if (a.locked() == locked) return;
+        admins.put(key(name), new Admin(a.name(), a.level(), a.hash(), a.mustChange(), a.defaultPassword(), a.totp(), locked));
         save();
     }
 
@@ -192,7 +205,7 @@ public final class AdminStore {
     /** Turns two-factor on with this secret, or off with null. */
     public synchronized void setTotp(String name, String secret) throws IOException {
         Admin a = require(name);
-        admins.put(key(name), new Admin(a.name(), a.level(), a.hash(), a.mustChange(), a.defaultPassword(), secret));
+        admins.put(key(name), new Admin(a.name(), a.level(), a.hash(), a.mustChange(), a.defaultPassword(), secret, a.locked()));
         save();
     }
 
@@ -204,6 +217,9 @@ public final class AdminStore {
                     .field("mustChange", a.mustChange()).field("defaultPassword", a.defaultPassword());
             if (a.totp() != null) {
                 j.field("totp", a.totp());
+            }
+            if (a.locked()) {
+                j.field("locked", true);
             }
             j.endObject();
         }

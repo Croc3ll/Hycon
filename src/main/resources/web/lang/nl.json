@@ -1806,5 +1806,9 @@
  "• {0} on": "• {0} ingeschakeld",
  "↻ Refresh": "↻ Vernieuwen",
  "↻ Settle": "↻ Afhandelen",
- "● Unpin": "● Ontkoppelen"
+ "● Unpin": "● Ontkoppelen",
+ "Lock": "Vergrendelen",
+ "Unlock": "Ontgrendelen",
+ "Locked": "Vergrendeld",
+ "Unlocked": "Ontgrendeld"
 }

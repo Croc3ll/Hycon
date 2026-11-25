@@ -27,7 +27,7 @@ public final class HyconApi {
     public static final int VIEWER = 1, MODERATOR = 2, ADMIN = 3, OWNER = 4;
 
     /** Version of this API; raised when something is added. */
-    public static final int API_VERSION = 16; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts; 14: block sources; 15: risk cleared time; 16: tab icons
+    public static final int API_VERSION = 17; // 2: area charts, outage bands, bars, columns; 3: profile sections, pies; 4: forms, row buttons, actions; 5: player records; 6: risk sources; 7: replays; 8: replay world maps; 9: replay shots; 10: replay terrain; 11: prompts; 12: replay blocks; 13: linked accounts; 14: block sources; 15: risk cleared time; 16: tab icons; 17: panel accounts (level, lock, changes)
 
     /** Icons a tab may pick with {@link HyconPanel#icon()}. Since API version 16. */
     public static final java.util.Set<String> ICONS = java.util.Set.of("chart", "swords", "shield", "coins", "key", "pickaxe", "gift",
@@ -38,6 +38,79 @@ public final class HyconApi {
     private static final Map<String, HyconProfileSection> SECTIONS = new ConcurrentHashMap<>();
 
     private HyconApi() {
+    }
+
+    /**
+     * Panel accounts by name, for a plugin that keeps its staff in step with them (PrisonCore: helper, mod and admin).
+     * Accounts are names, not players: a plugin links an account to the player of the same name. Set by Hycon itself.
+     * Since API version 17.
+     */
+    public interface Accounts {
+        /** The account's level ({@link #VIEWER} to {@link #OWNER}), or 0 when there is no account by that name. */
+        int level(String name);
+
+        boolean locked(String name);
+
+        /** Sets a non-owner account's level (viewer to admin) and unlocks it. False when it's missing or an owner. */
+        boolean setLevel(String name, int level, String by);
+
+        /** Locks or unlocks a non-owner account; a locked one can't log in. False when it's missing or an owner. */
+        boolean setLocked(String name, boolean locked, String by);
+    }
+
+    /** Hears an owner changing an account in the panel (level, lock or removal: level 0). Since API version 17. */
+    public interface AccountListener {
+        void changed(String name, int level, boolean locked, String by);
+    }
+
+    private static volatile Accounts accounts;
+    private static final List<AccountListener> ACCOUNT_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Set by Hycon itself. */
+    public static void setAccounts(Accounts a) {
+        accounts = a;
+    }
+
+    /** The panel account's level, or 0 when there is none or Hycon isn't running. Since API version 17. */
+    public static int accountLevel(String name) {
+        Accounts a = accounts;
+        return a == null || name == null ? 0 : a.level(name);
+    }
+
+    public static boolean accountLocked(String name) {
+        Accounts a = accounts;
+        return a != null && name != null && a.locked(name);
+    }
+
+    /** See {@link Accounts#setLevel}; false when Hycon isn't running. Doesn't call the listeners. */
+    public static boolean setAccountLevel(String name, int level, String by) {
+        Accounts a = accounts;
+        return a != null && name != null && a.setLevel(name, level, by);
+    }
+
+    /** See {@link Accounts#setLocked}; false when Hycon isn't running. Doesn't call the listeners. */
+    public static boolean setAccountLocked(String name, boolean locked, String by) {
+        Accounts a = accounts;
+        return a != null && name != null && a.setLocked(name, locked, by);
+    }
+
+    public static void addAccountListener(AccountListener l) {
+        ACCOUNT_LISTENERS.add(l);
+    }
+
+    public static void removeAccountListener(AccountListener l) {
+        ACCOUNT_LISTENERS.remove(l);
+    }
+
+    /** Called by Hycon after an owner changed an account in the panel. A listener that fails doesn't stop the rest. */
+    public static void accountChanged(String name, int level, boolean locked, String by) {
+        for (AccountListener l : ACCOUNT_LISTENERS) {
+            try {
+                l.changed(name, level, locked, by);
+            } catch (RuntimeException e) {
+                // a broken plugin listener must not break the panel's own change
+            }
+        }
     }
 
     /** Writes an entry to a player's record (their profile's history, beside warnings and bans). */
@@ -197,6 +270,8 @@ public final class HyconApi {
         SECTIONS.clear();
         recorder = null;
         links = null;
+        accounts = null;
+        ACCOUNT_LISTENERS.clear();
         clearedAt = null;
         BLOCKS.clear();
         RISK.clear();

@@ -184,6 +184,19 @@ A replay with many blocks makes a big page, rebuilt on every refresh. Instead, r
 drops tiles once they are out of reach. So the ground under a player only loads when they go down there.
 `tile(key, x0, z0, size, yMin, yMax, out)` runs on a web thread: read thread-safe data only. Unregister on shutdown.
 
+## Panel accounts (API 17)
+
+For a plugin that keeps its staff in step with Hycon's accounts. Accounts are names, not players, so link an account to
+the player of the same name.
+
+- `HyconApi.accountLevel(name)`: `VIEWER` to `OWNER`, or 0 when there's no account by that name (or Hycon isn't running).
+- `HyconApi.accountLocked(name)`.
+- `HyconApi.setAccountLevel(name, level, by)`: viewer to admin, and unlocks it. `setAccountLocked(name, locked, by)`.
+  Both leave OWNER accounts alone and return false then, or when there's no such account. They never create or remove
+  an account or touch a password, and write the audit log with `by`. They don't call the listeners below.
+- `HyconApi.addAccountListener((name, level, locked, by) -> ...)`: an owner changed an account in the panel (its level,
+  a lock or unlock, or its removal: level 0). Remove it with `removeAccountListener` in `shutdown()`.
+
 ## Linked accounts (API 13)
 
 `HyconApi.linkedAccounts(uuid)` gives the other accounts that have played from one of this player's connections (the profile's "Shares a connection"): likely alts. Empty when there are none. Hycon - AntiCheat uses it to alert staff when a banned player's alt joins, and (if the owner turns it on) to ban alts too.

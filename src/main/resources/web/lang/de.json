@@ -1835,5 +1835,9 @@
  "↻ Refresh": "↻ Aktualisieren",
  "↻ Settle": "↻ Abrechnen",
  "● Unpin": "● Entpinnen",
- "⛶ Fit": "⛶ Passend"
+ "⛶ Fit": "⛶ Passend",
+ "Lock": "Sperren",
+ "Unlock": "Entsperren",
+ "Locked": "Gesperrt",
+ "Unlocked": "Entsperrt"
 }

@@ -244,8 +244,9 @@ public final class WebServer {
         }
         if (r.session.admin != null) {
             r.admin = admins.get(r.session.admin);
-            if (r.admin == null) {
-                sessions.remove(r.session); // account was deleted while logged in
+            if (r.admin == null || r.admin.locked()) {
+                r.admin = null;
+                sessions.remove(r.session); // account was deleted or locked while logged in
                 r.error(401, "Not logged in");
                 return;
             }

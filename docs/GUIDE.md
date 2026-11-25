@@ -343,6 +343,17 @@ with the new level.
 **Remove**: **Remove** deletes the account and ends its sessions. The last OWNER can't be removed
 or demoted, so you can't lock everyone out by accident.
 
+**Lock**: **Lock** keeps the account and its level but stops it logging in (and logs it out) until
+an owner clicks **Unlock**. Use it for staff who step down or are away. The last OWNER that can log
+in can't be locked.
+
+**Kept in step with in-game staff** (with a PrisonCore that has its plan 024): name a staff member's account
+exactly like their player. Their in-game staff group then sets the level: helper = VIEWER, mod =
+MODERATOR, admin = ADMIN. Removed from every staff group in game, the account is locked. Changing a
+level, locking or removing an account here changes their in-game group too. OWNER accounts are never
+changed by the sync, and it never makes an account or touches a password. Each change is in the
+audit log as `PrisonCore` with `plugin` as the address.
+
 **Locked out completely?** In the server console (not in game):
 
 ```

@@ -1,5 +1,6 @@
 package com.hycon.web;
 
+import com.hycon.api.HyconApi;
 import com.hycon.audit.AuditLog;
 import com.hycon.auth.AdminStore;
 import com.hycon.auth.Level;
@@ -47,6 +48,7 @@ public final class AuthRoutes {
         web.post("/api/accounts/level", Level.OWNER, this::level);
         web.post("/api/accounts/reset", Level.OWNER, this::reset);
         web.post("/api/accounts/delete", Level.OWNER, this::delete);
+        web.post("/api/accounts/lock", Level.OWNER, this::lock);
         web.post("/api/accounts/2fa-reset", Level.OWNER, this::resetTwoFactor);
         web.post("/api/2fa/start", Level.VIEWER, this::startTwoFactor);
         web.post("/api/2fa/enable", Level.VIEWER, this::enableTwoFactor);
@@ -86,6 +88,12 @@ public final class AuthRoutes {
             limiter.fail(r.ip, name);
             audit.record(name, r.ip, "login", null, "wrong name or password", false);
             r.error(401, "Wrong name or password");
+            return;
+        }
+        if (a.locked()) {
+            // Checked after the password, so a wrong guess can't tell whether an account is locked.
+            audit.record(a.name(), r.ip, "login", null, "account locked", false);
+            r.error(403, "This account is locked. Ask an owner to unlock it.");
             return;
         }
         if (a.defaultPassword() && !r.local) {
@@ -160,7 +168,7 @@ public final class AuthRoutes {
         Json j = new Json().beginObject().name("accounts").beginArray();
         for (AdminStore.Admin a : admins.all()) {
             j.beginObject().field("name", a.name()).field("level", a.level().name()).field("mustChange", a.mustChange())
-                    .field("twoFactor", a.totp() != null).endObject();
+                    .field("twoFactor", a.totp() != null).field("locked", a.locked()).endObject();
         }
         r.ok(j.endArray().endObject());
     }
@@ -193,6 +201,7 @@ public final class AuthRoutes {
             admins.setLevel(name, level);
             sessions.removeAdmin(name); // their open pages were built for the old level
             audit.record(r.who(), r.ip, "account.level", name, level.name(), true);
+            HyconApi.accountChanged(name, level.rank, admins.get(name).locked(), r.who());
             r.ok(new Json().beginObject().field("ok", true).endObject());
         } catch (IllegalArgumentException e) {
             r.error(400, e.getMessage());
@@ -217,6 +226,22 @@ public final class AuthRoutes {
             admins.delete(name);
             sessions.removeAdmin(name);
             audit.record(r.who(), r.ip, "account.delete", name, null, true);
+            HyconApi.accountChanged(name, 0, false, r.who());
+            r.ok(new Json().beginObject().field("ok", true).endObject());
+        } catch (IllegalArgumentException e) {
+            r.error(400, e.getMessage());
+        }
+    }
+
+    /** Locks or unlocks an account: a locked one stays, with its level, but can't log in. */
+    private void lock(Req r) throws IOException {
+        String name = r.str("name");
+        boolean locked = "1".equals(r.str("locked")) || "true".equals(r.str("locked"));
+        try {
+            admins.setLocked(name, locked);
+            if (locked) sessions.removeAdmin(name);
+            audit.record(r.who(), r.ip, "account.lock", name, locked ? "locked" : "unlocked", true);
+            HyconApi.accountChanged(name, admins.get(name).level().rank, locked, r.who());
             r.ok(new Json().beginObject().field("ok", true).endObject());
         } catch (IllegalArgumentException e) {
             r.error(400, e.getMessage());

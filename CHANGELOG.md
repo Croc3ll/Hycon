@@ -3,6 +3,13 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.2.3 (2026-11-25)
+- **Lock an account**: Accounts → **Lock** keeps an account and its level but stops it logging in (and logs it out)
+  until an owner clicks **Unlock**. The last owner that can log in can't be locked.
+- **In-game staff in step** (API 17): a plugin can read and set an account's level and lock it, and hears when an
+  owner changes one. PrisonCore uses it to keep staff accounts in step with its helper, mod and admin groups (an
+  account named after the player); see the guide's "Staff accounts". Owner accounts are never changed by a plugin.
+
 ## 0.2.2 (2026-11-21)
 - **Account labels**: profiles show **2FA app** (the player uses an authenticator app for two-factor login on their
   Hytale account) and **Chapter 1 boss** (a cosmetic) as small labels beside the edition, instead of

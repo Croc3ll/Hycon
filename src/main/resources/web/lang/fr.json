@@ -1839,5 +1839,9 @@
  "↻ Refresh": "↻ Actualiser",
  "↻ Settle": "↻ Régler",
  "● Unpin": "● Déépingler",
- "⛶ Fit": "⛶ Adapté"
+ "⛶ Fit": "⛶ Adapté",
+ "Lock": "Verrouiller",
+ "Unlock": "Déverrouiller",
+ "Locked": "Verrouillé",
+ "Unlocked": "Déverrouillé"
 }

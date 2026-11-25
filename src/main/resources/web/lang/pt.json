@@ -1847,5 +1847,9 @@
  "↻ Refresh": "↻ Atualizar",
  "↻ Settle": "↻ Confirmar",
  "● Unpin": "● Desfixar",
- "⛶ Fit": "⛶ Adequado"
+ "⛶ Fit": "⛶ Adequado",
+ "Lock": "Bloquear",
+ "Unlock": "Desbloquear",
+ "Locked": "Bloqueada",
+ "Unlocked": "Desbloqueada"
 }

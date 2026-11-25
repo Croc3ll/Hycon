@@ -1874,5 +1874,9 @@
  "↻ Refresh": "↻ Yenile",
  "↻ Settle": "↻ Çöz",
  "● Unpin": "● Sabitlemeyi kaldır",
- "⛶ Fit": "⛶ Uygun"
+ "⛶ Fit": "⛶ Uygun",
+ "Lock": "Kilitle",
+ "Unlock": "Kilidi aç",
+ "Locked": "Kilitli",
+ "Unlocked": "Kilit açıldı"
 }
