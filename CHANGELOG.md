@@ -3,6 +3,9 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.2.4 (2026-11-26)
+- **Fix**: the panel stuck on "Loading..." in 0.2.3. Two texts on the Accounts page broke the page script.
+
 ## 0.2.3 (2026-11-25)
 - **Lock an account**: Accounts → **Lock** keeps an account and its level but stops it logging in (and logs it out)
   until an owner clicks **Unlock**. The last owner that can log in can't be locked.

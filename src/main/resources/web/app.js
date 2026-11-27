@@ -1277,7 +1277,7 @@ function accounts(view) {
     el('div', { class: 'row' }, name, lvl, el('button', { class: 'primary', on: { click: async () => {
       try { const r = await api('POST', '/api/accounts/create', { name: name.value.trim(), level: lvl.value }); showSecret(name.value.trim(), r.password); name.value = ''; load(); } catch (e) { toast(e.message, true); }
     } } }, 'Create')), secret,
-    el('p', { class: 'muted' }, 'VIEWER sees players, bans and dashboards. MODERATOR also kicks, bans and reads the console. ADMIN also runs console commands and reads the audit log. OWNER also manages accounts. A locked account keeps its level but can't log in. A plugin can keep these in step with in-game staff (PrisonCore: an account named after the player).')));
+    el('p', { class: 'muted' }, "VIEWER sees players, bans and dashboards. MODERATOR also kicks, bans and reads the console. ADMIN also runs console commands and reads the audit log. OWNER also manages accounts. A locked account keeps its level but can't log in. A plugin can keep these in step with in-game staff (PrisonCore: an account named after the player).")));
   async function load() {
     const d = await api('GET', '/api/accounts');
     body.replaceChildren(...d.accounts.map((a) => el('tr', {}, el('td', {}, a.name), el('td', {}, levelSelect(a)),
@@ -1289,7 +1289,7 @@ function accounts(view) {
           try { toast((await api('POST', '/api/accounts/2fa-reset', { name: a.name })).message); load(); } catch (e) { toast(e.message, true); }
         } } }, 'Remove two-factor') : null,
         el('button', { on: { click: async () => {
-          if (!a.locked && !confirm('Lock ' + a.name + '? They are logged out and can't log in until it is unlocked.')) return;
+          if (!a.locked && !confirm('Lock ' + a.name + "? They are logged out and can't log in until it is unlocked.")) return;
           try { await api('POST', '/api/accounts/lock', { name: a.name, locked: a.locked ? '0' : '1' }); toast(a.locked ? 'Unlocked' : 'Locked'); load(); } catch (e) { toast(e.message, true); }
         } } }, a.locked ? 'Unlock' : 'Lock'),
         el('button', { on: { click: async () => {
