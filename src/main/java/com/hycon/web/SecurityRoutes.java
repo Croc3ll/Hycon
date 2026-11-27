@@ -8,6 +8,8 @@ import com.hycon.sync.ShareServer;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Supplier;
 
 /**
@@ -27,13 +29,16 @@ public final class SecurityRoutes {
     private final AdminStore admins;
     private final ShareServer share;
     private final Supplier<String> updateNotice;
+    private final Supplier<Set<String>> refusedPlugins;
 
-    public SecurityRoutes(WebServer web, Supplier<HyconConfig> config, AdminStore admins, ShareServer share, Supplier<String> updateNotice) {
+    public SecurityRoutes(WebServer web, Supplier<HyconConfig> config, AdminStore admins, ShareServer share, Supplier<String> updateNotice,
+                          Supplier<Set<String>> refusedPlugins) {
         this.web = web;
         this.config = config;
         this.admins = admins;
         this.share = share;
         this.updateNotice = updateNotice;
+        this.refusedPlugins = refusedPlugins;
     }
 
     public void register() {
@@ -79,6 +84,17 @@ public final class SecurityRoutes {
         if (share != null && share.running()) {
             out.add(new Check("info", "The ban sharing port is open (" + share.port() + ")",
                     "Other servers fetch your bans there. It only answers requests signed with one of your share keys."));
+        }
+        Set<String> refused = new TreeSet<>(refusedPlugins.get());
+        refused.removeAll(c.accountPlugins());
+        if (!refused.isEmpty()) {
+            out.add(new Check("warn", "A plugin was refused account changes",
+                    "Refused: " + String.join(", ", refused) + ". If you trust it, add it to AccountPlugins in hycon.json."));
+        }
+        if (!c.accountPlugins().isEmpty()) {
+            out.add(new Check("info", "Plugins can change panel accounts",
+                    "Allowed in AccountPlugins: " + String.join(", ", new TreeSet<>(c.accountPlugins()))
+                            + ". They can set levels and lock accounts, never an owner's."));
         }
         String update = updateNotice.get();
         if (update != null) {

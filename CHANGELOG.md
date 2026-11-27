@@ -5,11 +5,18 @@ Every Hycon release, newest first. Downloads are on the [releases page](https://
 
 ## 0.2.4 (2026-11-26)
 - **Fix**: the panel stuck on "Loading..." in 0.2.3. Two texts on the Accounts page broke the page script.
-- **Plugins can't take over the panel**: other plugins can no longer swap out Hycon's own parts, reset an owner's
-  password, wipe the panel's tabs or replace another plugin's tab.
-- **Account changes need your OK**: a plugin can only set panel account levels or lock accounts once you add it to
-  the new `AccountPlugins` in `hycon.json`. **Action needed for PrisonCore's staff sync**: add
-  `"AccountPlugins": ["PrisonCore:PrisonCore"]`. Until then Hycon refuses it, and the server log says what to add.
+- **Harder for plugins to take over the panel**: Hycon's API now refuses other plugins that try to swap out its own
+  parts (the account store, the staff watch, the debug dump), wipe the panel's tabs or replace another plugin's tab.
+  Naming a class loader after another plugin no longer fools it. It is not a sandbox: install only plugins you trust.
+- **Account changes need your OK**: a plugin can only set panel account levels or lock accounts once you add its
+  exact id to the new `AccountPlugins` in `hycon.json`. The Security tab shows plugins that were refused.
+  **Action needed for PrisonCore's staff sync**: add `"AccountPlugins": ["PrisonCore:PrisonCore"]`. Until then
+  in-game staff changes don't reach the panel (your changes in the panel still reach the game), and the server log
+  says what to add.
+- **For plugin developers**: a tab, profile section, risk source or block source id belongs to the plugin that
+  registered it first. Another plugin's `register` is ignored with a warning in the server log (nothing is thrown),
+  and its `unregister` does nothing.
+  `setAccountLevel` and `setAccountLocked` also return false while the owner hasn't allowed your plugin.
 
 ## 0.2.3 (2026-11-25)
 - **Lock an account**: Accounts → **Lock** keeps an account and its level but stops it logging in (and logs it out)

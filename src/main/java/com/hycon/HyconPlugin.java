@@ -92,6 +92,7 @@ public final class HyconPlugin extends JavaPlugin {
     private ScheduledFuture<?> sampler;
     private PingLog pingLog;
     private StaffWatch staffWatch;
+    private com.hycon.auth.PluginAccounts pluginAccounts;
     private KillLog killLog;
     private ChatLog chatLog;
     private PlayerActivity activity;
@@ -132,6 +133,7 @@ public final class HyconPlugin extends JavaPlugin {
     protected void setup() {
         // In setup, not start: the limits are read once, before any plugin opens a web server.
         WebServer.limitSlowClients();
+        HyconApi.setWarnings(message -> getLogger().at(Level.WARNING).log("%s", message));
         Path dir = getDataDirectory();
         try {
             liveConfig = new LiveConfig(dir);
@@ -262,7 +264,8 @@ public final class HyconPlugin extends JavaPlugin {
             shareServer = new ShareServer(sharing, banSync, audit, new LoginLimiter(config.loginAttempts(), config.loginWindowMs()),
                     config.shareBindAddress(), config.sharePort());
             new SyncRoutes(web, sharing, banSync, shareServer, audit).register();
-            new com.hycon.web.SecurityRoutes(web, liveConfig, admins, shareServer, () -> updates == null ? null : updates.notice()).register();
+            new com.hycon.web.SecurityRoutes(web, liveConfig, admins, shareServer, () -> updates == null ? null : updates.notice(),
+                    () -> pluginAccounts == null ? Set.of() : pluginAccounts.refused()).register();
             web.start();
         } catch (IOException e) {
             ((HytaleLogger.Api) log.at(Level.SEVERE).withCause(e)).log("Hycon could not start the panel on %s:%d (see hycon.json)",
@@ -279,7 +282,8 @@ public final class HyconPlugin extends JavaPlugin {
         });
         HyconApi.setRecorder((player, type, by, reason, detail) -> records.record(player,
                 "WARN".equalsIgnoreCase(type) ? PlayerRecords.Type.WARN : PlayerRecords.Type.NOTE, by, reason, detail));
-        HyconApi.setAccounts(new com.hycon.auth.PluginAccounts(admins, sessions, audit, liveConfig, getLogger()));
+        pluginAccounts = new com.hycon.auth.PluginAccounts(admins, sessions, audit, liveConfig, getLogger());
+        HyconApi.setAccounts(pluginAccounts);
         HyconApi.register(new AnalyticsPanel(samples, known, positions));
         if (perf != null) {
             HyconApi.register(new PerformancePanel(perf));
@@ -500,6 +504,9 @@ public final class HyconPlugin extends JavaPlugin {
         task(out, "configWatch", configWatch);
         task(out, "geoRefresh", geoRefresh);
         out.append(perf == null ? "Profiler: off in hycon.json\n" : perf.debugSummary());
+        out.append("AccountPlugins: ").append(liveConfig == null ? "-" : liveConfig.get().accountPlugins()).append('\n');
+        out.append("Plugins refused account changes: ").append(pluginAccounts == null ? "-" : pluginAccounts.refused()).append('\n');
+        out.append("Registered ids by plugin: ").append(HyconApi.owners()).append('\n');
         String[] services = {"admins", "audit", "known", "records", "samples", "sharing", "pingLog", "staffWatch",
                 "killLog", "chatLog", "activity", "positions", "reports", "bugs", "ties", "geo", "updates"};
         Object[] values = {admins, audit, known, records, samples, sharing, pingLog, staffWatch,

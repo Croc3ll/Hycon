@@ -95,6 +95,14 @@ orada kaldırıldıklarında kaldırır. Yerel yasaklara asla dokunulmaz, kodlar
 - Oturumlar HttpOnly ve SameSite=Strict çerezleri kullanır, her POST bir CSRF jetonu ister ve başarısız girişler sınırlanır.
 - Her giriş, atma, yasak, komut ve hesap değişikliği `audit.log` dosyasına yazılır.
 - `hycon.json` içindeki `BlockedCommands`, panelin ADMIN için bile reddettiği komutları listeler.
+- Hycon'un API'si kendi parçaları için diğer eklentileri reddeder (hesap deposunu değiştirme, sekmeleri silme, hata
+  ayıklama dökümü) ve bir sekme ya da profil bölümü onu ekleyen eklentiye aittir.
+- `hycon.json` içindeki `AccountPlugins`, panel hesaplarını değiştirmesine izin verilen eklentileri sunucu günlüğündeki
+  tam `Group:Name` ile listeler, örn. PrisonCore'un yetkili eşitlemesi için `["PrisonCore:PrisonCore"]`. Diğerleri
+  reddedilir ve OWNER hesapları asla değiştirilmez.
+- Bu bir korumalı alan (sandbox) değildir. Eklentiler sunucunun içinde çalışır, bu yüzden kötü amaçlı bir eklenti yine
+  de bunu aşabilir (`/hycon resetpassword` gibi konsol komutları çalıştırabilir veya Hycon'un dosyalarını okuyabilir).
+  Yalnızca güvendiğin eklentileri kur.
 
 Yasaklar Hytale'in kendi listesini (`bans.json`, `/ban` ile aynı) kullanır, yani sunucu onları uygular.
 

@@ -42,25 +42,56 @@ public final class HyconApi {
     private HyconApi() {
     }
 
+    private static final String HYCON = "Hycon:Hycon";
+    /** Where clash warnings go (Hycon's log), and the ones already given, so a plugin retrying doesn't flood it. */
+    private static volatile java.util.function.Consumer<String> warnings = message -> { };
+    private static final Set<String> WARNED = ConcurrentHashMap.newKeySet();
+
+    /** Set by Hycon itself. */
+    public static void setWarnings(java.util.function.Consumer<String> w) {
+        Callers.requireHycon();
+        warnings = w;
+    }
+
     /**
-     * Claims {@code kind/id} for {@code plugin}, so another plugin can't replace or remove what it registered. A
-     * reload keeps its claim: the plugin id stays the same.
+     * Puts {@code value} under {@code id} for {@code plugin}, unless another plugin registered that id first. A clash
+     * is ignored with a warning, never thrown, so it can't stop a plugin (or the server) starting. Hycon's own ids
+     * always go to Hycon. A reload keeps its claim: the plugin id stays the same.
      */
-    private static void claim(String kind, String id, String plugin) {
-        String owner = OWNERS.putIfAbsent(kind + "/" + id, plugin);
-        if (owner != null && !owner.equals(plugin)) {
-            throw new SecurityException("The " + kind + " \"" + id + "\" belongs to " + owner);
+    private static <T> void put(Map<String, T> map, String kind, String id, T value, String plugin) {
+        String key = kind + "/" + id;
+        synchronized (OWNERS) {
+            String owner = OWNERS.get(key);
+            if (owner != null && !owner.equals(plugin) && !plugin.equals(HYCON)) {
+                String message = "Hycon ignored " + plugin + " registering the " + kind + " \"" + id + "\": it belongs to "
+                        + owner + ". Pick another id.";
+                if (WARNED.add(message)) {
+                    warnings.accept(message);
+                }
+                return;
+            }
+            OWNERS.put(key, plugin);
+            map.put(id, value);
         }
     }
 
-    /** True when {@code plugin} may remove {@code kind/id}: it registered it, or nobody did. */
-    private static boolean release(String kind, String id, String plugin) {
-        String owner = OWNERS.get(kind + "/" + id);
-        if (owner != null && !owner.equals(plugin)) {
-            return false;
+    /** Removes {@code id} when {@code plugin} registered it (or nobody did); another plugin's id stays. */
+    private static <T> void remove(Map<String, T> map, String kind, String id, String plugin) {
+        String key = kind + "/" + id;
+        synchronized (OWNERS) {
+            String owner = OWNERS.get(key);
+            if (owner != null && !owner.equals(plugin)) {
+                return;
+            }
+            OWNERS.remove(key);
+            map.remove(id);
         }
-        OWNERS.remove(kind + "/" + id);
-        return true;
+    }
+
+    /** Which plugin owns each tab, section and source id ("tab/prison" to "PrisonCore:PrisonCore"), for /hycon debug. */
+    public static Map<String, String> owners() {
+        Callers.requireHycon();
+        return new java.util.TreeMap<>(OWNERS);
     }
 
     /**
@@ -153,17 +184,16 @@ public final class HyconApi {
 
     private static final Map<String, HyconRisk> RISK = new ConcurrentHashMap<>();
 
-    /** Adds (or replaces, by id) reasons for the profile's risk score. Since API version 6. */
+    /** Adds (or replaces your own, by id) reasons for the profile's risk score. Since API version 6. */
     public static void registerRiskSource(String id, HyconRisk source) {
         if (id != null && source != null) {
-            claim("risk source", id, Callers.plugin());
-            RISK.put(id, source);
+            put(RISK, "risk source", id, source, Callers.plugin());
         }
     }
 
     public static void unregisterRiskSource(String id) {
-        if (id != null && release("risk source", id, Callers.plugin())) {
-            RISK.remove(id);
+        if (id != null) {
+            remove(RISK, "risk source", id, Callers.plugin());
         }
     }
 
@@ -180,18 +210,17 @@ public final class HyconApi {
 
     private static final Map<String, HyconBlocks> BLOCKS = new ConcurrentHashMap<>();
 
-    /** Adds (or replaces, by id) a source of replay blocks fetched a tile at a time. Since API version 14. */
+    /** Adds (or replaces your own, by id) a source of replay blocks fetched a tile at a time. Since API version 14. */
     public static void registerBlockSource(String id, HyconBlocks source) {
         if (id == null || !ID.matcher(id).matches() || source == null) {
             throw new IllegalArgumentException("Block source id must be 1-40 letters, digits, - _ or .");
         }
-        claim("block source", id, Callers.plugin());
-        BLOCKS.put(id, source);
+        put(BLOCKS, "block source", id, source, Callers.plugin());
     }
 
     public static void unregisterBlockSource(String id) {
-        if (id != null && release("block source", id, Callers.plugin())) {
-            BLOCKS.remove(id);
+        if (id != null) {
+            remove(BLOCKS, "block source", id, Callers.plugin());
         }
     }
 
@@ -253,18 +282,17 @@ public final class HyconApi {
         }
     }
 
-    /** Adds (or replaces, by id) a dashboard tab. Throws when another plugin registered that id. */
+    /** Adds (or replaces your own, by id) a dashboard tab. Another plugin's id is left alone, with a warning in the log. */
     public static void register(HyconPanel panel) {
         if (panel == null || panel.id() == null || !ID.matcher(panel.id()).matches()) {
             throw new IllegalArgumentException("Panel id must be 1-40 letters, digits, - _ or .");
         }
-        claim("tab", panel.id(), Callers.plugin());
-        PANELS.put(panel.id(), panel);
+        put(PANELS, "tab", panel.id(), panel, Callers.plugin());
     }
 
     public static void unregister(String id) {
-        if (id != null && release("tab", id, Callers.plugin())) {
-            PANELS.remove(id);
+        if (id != null) {
+            remove(PANELS, "tab", id, Callers.plugin());
         }
     }
 
@@ -280,18 +308,17 @@ public final class HyconApi {
         return list;
     }
 
-    /** Adds (or replaces, by id) a section on every player's profile. Since API version 3. */
+    /** Adds (or replaces your own, by id) a section on every player's profile. Since API version 3. */
     public static void registerProfileSection(HyconProfileSection section) {
         if (section == null || section.id() == null || !ID.matcher(section.id()).matches()) {
             throw new IllegalArgumentException("Section id must be 1-40 letters, digits, - _ or .");
         }
-        claim("profile section", section.id(), Callers.plugin());
-        SECTIONS.put(section.id(), section);
+        put(SECTIONS, "profile section", section.id(), section, Callers.plugin());
     }
 
     public static void unregisterProfileSection(String id) {
-        if (id != null && release("profile section", id, Callers.plugin())) {
-            SECTIONS.remove(id);
+        if (id != null) {
+            remove(SECTIONS, "profile section", id, Callers.plugin());
         }
     }
 

@@ -97,6 +97,14 @@ als ze daar worden opgeheven. Lokale bans worden nooit aangeraakt en codes gaan 
   worden beperkt.
 - Elke login, kick, ban, elk commando en elke accountwijziging komt in `audit.log`.
 - `BlockedCommands` in `hycon.json` noemt commando's die het paneel zelfs voor ADMIN weigert.
+- De API van Hycon weigert andere plugins voor zijn eigen onderdelen (de accountopslag vervangen, tabbladen wissen,
+  de debugdump), en een tabblad of profielonderdeel hoort bij de plugin die het toevoegde.
+- `AccountPlugins` in `hycon.json` noemt de plugins die paneelaccounts mogen wijzigen, met de exacte `Group:Name` uit
+  het serverlog, bijv. `["PrisonCore:PrisonCore"]` voor de staffsync van PrisonCore. Andere worden geweigerd, en
+  OWNER-accounts worden nooit gewijzigd.
+- Dit is geen sandbox. Plugins draaien binnen je server, dus een kwaadaardige plugin kan er nog steeds omheen (hij kan
+  consolecommando's als `/hycon resetpassword` uitvoeren of de bestanden van Hycon lezen). Installeer alleen plugins
+  die je vertrouwt.
 
 Bans gebruiken de eigen banlijst van Hytale (`bans.json`, net als `/ban`), dus de server handhaaft ze.
 

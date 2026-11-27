@@ -95,6 +95,13 @@ lì vengono revocati. I ban locali non vengono mai toccati e i codici non passan
 - Le sessioni usano cookie HttpOnly e SameSite=Strict, ogni POST richiede un token CSRF e gli accessi falliti sono limitati.
 - Ogni accesso, espulsione, ban, comando e modifica degli account finisce in `audit.log`.
 - `BlockedCommands` in `hycon.json` elenca i comandi che il pannello rifiuta anche agli ADMIN.
+- L'API di Hycon rifiuta gli altri plugin per le sue parti (sostituzione dell'archivio account, cancellazione delle
+  schede, dump di debug), e una scheda o sezione del profilo appartiene al plugin che l'ha aggiunta.
+- `AccountPlugins` in `hycon.json` elenca i plugin che possono modificare gli account del pannello, con il `Group:Name`
+  esatto mostrato nel log del server, ad es. `["PrisonCore:PrisonCore"]` per la sincronizzazione dello staff di
+  PrisonCore. Gli altri vengono rifiutati, e gli account OWNER non vengono mai modificati.
+- Non è una sandbox. I plugin girano dentro il tuo server, quindi un plugin malevolo può comunque aggirarla (può
+  eseguire comandi da console come `/hycon resetpassword` o leggere i file di Hycon). Installa solo plugin di cui ti fidi.
 
 I ban usano la lista di Hytale (`bans.json`, come `/ban`), quindi è il server ad applicarli.
 

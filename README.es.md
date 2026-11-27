@@ -98,6 +98,14 @@ levanta cuando allí se levantan. Los baneos locales nunca se tocan y los códig
   fallidos están limitados.
 - Cada inicio de sesión, expulsión, baneo, comando y cambio de cuenta queda en `audit.log`.
 - `BlockedCommands` en `hycon.json` lista los comandos que el panel rechaza incluso para ADMIN.
+- La API de Hycon rechaza a otros plugins en sus propias partes (reemplazar el almacén de cuentas, borrar pestañas,
+  el volcado de depuración), y una pestaña o sección de perfil pertenece al plugin que la creó.
+- `AccountPlugins` en `hycon.json` lista los plugins que pueden cambiar cuentas del panel, con el `Group:Name` exacto
+  que muestra el registro del servidor, p. ej. `["PrisonCore:PrisonCore"]` para la sincronización del staff de
+  PrisonCore. Los demás se rechazan, y las cuentas OWNER nunca se cambian.
+- Esto no es un entorno aislado. Los plugins se ejecutan dentro de tu servidor, así que un plugin malicioso aún puede
+  saltárselo (puede ejecutar comandos de consola como `/hycon resetpassword` o leer los archivos de Hycon). Instala solo
+  plugins de confianza.
 
 Los baneos usan la lista propia de Hytale (`bans.json`, igual que `/ban`), así que el servidor los aplica.
 

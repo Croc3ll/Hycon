@@ -60,9 +60,9 @@
   "BlockedCommands": [],
 
   // Plugins allowed to change panel accounts (set a level, lock one), by
-  // their id from the server log, e.g. ["PrisonCore:PrisonCore"]. Others
-  // are refused, so a plugin can't make itself staff or lock staff out.
-  // Owner accounts are never changed by any plugin.
+  // their exact id from the server log (case matters), for example
+  // ["PrisonCore:PrisonCore"]. Others are refused, so a plugin can't make
+  // itself staff or lock staff out. Owner accounts are never changed.
   "AccountPlugins": [],
 
   // How many recent log lines the live console keeps in memory.

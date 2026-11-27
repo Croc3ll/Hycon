@@ -187,9 +187,20 @@ drops tiles once they are out of reach. So the ground under a player only loads 
 ## What plugins can't do (0.2.4)
 
 Hycon checks who calls it. Its own hooks (`setAccounts`, `setRecorder`, `setLinks`, `setClearedAt`, `accountChanged`,
-`clear`, and `HyconPlugin`'s password reset and debug dump) throw `SecurityException` for any other plugin. A tab,
-profile section, risk source or block source belongs to the plugin that registered its id first: another plugin can't
-replace or remove it (`register` throws, `unregister` does nothing). Pick ids that are your own, e.g. `myplugin-stats`.
+`clear`, `owners`, `HyconPlugin`'s `status`, password reset and debug dump, and the staff watch) throw
+`SecurityException` for any other plugin. A tab, profile section, risk source or block source belongs to the plugin
+that registered its id first: another plugin can't replace or remove it. Its `register` is ignored (the server log
+says `Hycon ignored <plugin> registering the tab "<id>": it belongs to <owner>`) and its `unregister` does nothing.
+Nothing is thrown, so a clash never stops a plugin starting. Hycon's own ids always stay Hycon's. Pick ids that are
+your own, e.g. `myplugin-stats`.
+
+Your plugin is known by the `Group:Name` in its manifest, checked against the plugin the server really loaded, so
+naming a class loader after another plugin doesn't work. Ids are case-sensitive. Calls Hycon can't tie to a plugin count as
+`unknown`, which is never allowed to change accounts.
+
+This is not a sandbox. A plugin can still use reflection, define a class inside another plugin's class loader
+(`MethodHandles.privateLookupIn`) to act as that plugin, or run `/hycon` commands as the console, so owners should
+only install plugins they trust.
 
 ## Panel accounts (API 17)
 
@@ -202,7 +213,9 @@ the player of the same name.
   Both leave OWNER accounts alone and return false then, or when there's no such account. They never create or remove
   an account or touch a password, and write the audit log with `by` and your plugin's id. They don't call the listeners
   below. They only work once the owner adds your plugin's id (`Group:Name` from your manifest) to `AccountPlugins` in
-  `hycon.json`; until then they return false and the server log says what to add.
+  `hycon.json`; until then they return false and the server log says what to add. From Hycon 0.2.4 (still API 17)
+  false can also mean that, so keep trying on later changes and don't treat false as done. Reading accounts and the
+  listener below work without `AccountPlugins`.
 - `HyconApi.addAccountListener((name, level, locked, by) -> ...)`: an owner changed an account in the panel (its level,
   a lock or unlock, or its removal: level 0). Remove it with `removeAccountListener` in `shutdown()`.
 

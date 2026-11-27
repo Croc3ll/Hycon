@@ -98,6 +98,13 @@ sie auf, wenn sie dort aufgehoben werden. Lokale Banns werden nie angefasst, und
   Logins werden begrenzt.
 - Jeder Login, Kick, Bann, Befehl und jede Account-Änderung landet im `audit.log`.
 - `BlockedCommands` in `hycon.json` listet Befehle, die das Panel auch für ADMIN ablehnt.
+- Hycons API lehnt andere Plugins für Hycons eigene Teile ab (Austausch der Account-Verwaltung, Löschen von Tabs,
+  Debug-Dump), und ein Tab oder Profilbereich gehört dem Plugin, das ihn angelegt hat.
+- `AccountPlugins` in `hycon.json` listet die Plugins, die Panel-Accounts ändern dürfen, mit der genauen `Group:Name`
+  aus dem Server-Log, z. B. `["PrisonCore:PrisonCore"]` für den Team-Abgleich von PrisonCore. Andere werden abgelehnt,
+  OWNER-Accounts werden nie geändert.
+- Das ist keine Sandbox. Plugins laufen auf deinem Server, ein bösartiges Plugin kann sie also trotzdem umgehen (es kann
+  Konsolenbefehle wie `/hycon resetpassword` ausführen oder Hycons Dateien lesen). Installiere nur Plugins, denen du vertraust.
 
 Banns nutzen Hytales eigene Bannliste (`bans.json`, wie `/ban`), also setzt der Server sie durch.
 

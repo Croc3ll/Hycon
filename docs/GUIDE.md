@@ -221,7 +221,9 @@ Locations come from each player's last join address, looked up in the free DB-IP
 and can be wrong. Addresses themselves aren't shown. Set `GeoIp` to `false` to turn it off.
 
 Hycon samples every 30 seconds and keeps 31 days (`samples.log`). Playtime counts from when Hycon
-was installed. Other plugins can add their own tabs next to Analytics.
+was installed. Other plugins can add their own tabs next to Analytics. Through Hycon's API, a plugin can't change or
+remove another plugin's tab or swap out Hycon's own parts (the account store, the list of tabs). This is not a
+sandbox: plugins run inside your server, so install only plugins you trust.
 
 ### Performance (MODERATOR and up) and /lag
 Hycon's profiler is always on and costs well under 1% of the server. It shows which plugins use the
@@ -273,7 +275,8 @@ itself down if that ever costs over 0.5%. Memory use per plugin is not measured 
 
 ### Audit log (ADMIN and up)
 The newest 200 actions: logins (and failed ones), kicks, bans, unbans, commands and account changes,
-with the account and the address they came from. Failed or refused actions are marked ✗.
+with the account and the address they came from. Failed or refused actions are marked ✗. A plugin that isn't in
+`AccountPlugins` shows as refused account changes with its id (e.g. `PrisonCore:PrisonCore`) and the address `plugin`.
 The full history is in `audit.log` ([section 7](#7-files-hycon-keeps)).
 
 ### Schedule (ADMIN and up)
@@ -289,7 +292,8 @@ Restarts are refused while `BlockedCommands` blocks `stop` or `restart`.
 ### Security (OWNER)
 A checklist of how safely the panel is set up, worst first, each with what to change: the default password still in
 use, the panel open to the network without HTTPS, a proxy whose visitor addresses are ignored, admins and owners
-without two-factor, no blocked commands, the ban sharing port being open, and a newer Hycon being out. Problems
+without two-factor, no blocked commands, the ban sharing port being open, a plugin that was refused account changes,
+the plugins `AccountPlugins` allows, and a newer Hycon being out. Problems
 also show in the needs-attention line.
 
 ### Presets (OWNER)
@@ -352,9 +356,10 @@ exactly like their player. Their in-game staff group then sets the level: helper
 MODERATOR, admin = ADMIN. Removed from every staff group in game, the account is locked. Changing a
 level, locking or removing an account here changes their in-game group too. OWNER accounts are never
 changed by the sync, and it never makes an account or touches a password. Each change is in the
-audit log as `PrisonCore:PrisonCore` with `plugin` as the address. Since 0.2.4 the sync only works once
-you allow it: add `"PrisonCore:PrisonCore"` to `AccountPlugins` in `hycon.json`. Until then Hycon refuses
-it, and the server log says what to add.
+audit log as `PrisonCore:PrisonCore` with `plugin` as the address. Since 0.2.4 PrisonCore needs your OK to
+change accounts: put `"PrisonCore:PrisonCore"` in `AccountPlugins` in `hycon.json` (add the line if your file
+doesn't have it; no restart needed). Until then your changes here still reach the game, but in-game staff
+changes don't reach the panel: no level change and no lock. The server log and the Security tab say what to add.
 
 **Locked out completely?** In the server console (not in game):
 
@@ -427,7 +432,7 @@ Most changes apply within 5 seconds of saving the file, no restart needed (the s
 | `LoginAttempts`      | `5`           | Failed logins allowed per address and per account name...                                         |
 | `LoginWindowMinutes` | `10`          | ...within this many minutes. After that, logins wait until the window has passed.                 |
 | `BlockedCommands`    | `[]`          | Commands the panel refuses even for ADMIN, e.g. `["stop", "op"]`. Aliases are blocked too.        |
-| `AccountPlugins`     | `[]`          | Plugins allowed to change panel accounts, by id, e.g. `["PrisonCore:PrisonCore"]`. Others are refused. |
+| `AccountPlugins`     | `[]`          | Plugins allowed to change panel accounts, by the exact `Group:Name` the server log shows (case matters), e.g. `["PrisonCore:PrisonCore"]`. Others are refused. An older `hycon.json` doesn't have this line: add it. |
 | `LogLines`           | `2000`        | How many recent log lines the Console tab keeps.                                                  |
 | `GeoIp`              | `true`        | Look up players' rough location for the globe (downloads the DB-IP database once a month).       |
 | `ServerLocation`     | `""`          | The server's `"lat,lon"`, e.g. `"50.11,8.68"`, so the globe draws lines to it and shows distances. |
@@ -552,6 +557,9 @@ Back up `admins.json` and `audit.log` with the rest of your server.
 | "Log in from the server machine itself..."                  | The default password only works locally. Log in on the server machine (or through an SSH tunnel) first. |
 | "Unknown player" when banning someone offline               | Use their UUID, or the exact name of someone who has been online since Hycon was installed.                 |
 | A command is refused as blocked                             | It's listed in `BlockedCommands` in `hycon.json`.                                                           |
+| Log says `Hycon refused <plugin> changing panel accounts`   | That plugin isn't allowed to change accounts. Trust it? Put its id in `AccountPlugins` in `hycon.json` (add the line if it's missing). No restart needed. |
+| In-game staff changes stopped reaching the panel (0.2.4)    | Put `"PrisonCore:PrisonCore"` in `AccountPlugins` in `hycon.json`. The Security tab lists refused plugins.  |
+| Log says `Hycon ignored <plugin> registering the tab ...`   | Two plugins use the same id. The first one keeps it. Ask the other plugin's author to pick its own id.  |
 | Panel doesn't appear at all                                 | Check the log for `Hycon`. `Enabled` may be `false`, or `admins.json` may be damaged (the log says so).      |
 
 ## 9. Building from source

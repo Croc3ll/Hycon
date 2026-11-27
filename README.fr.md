@@ -100,6 +100,14 @@ jamais par le réseau.
   connexion sont limités.
 - Chaque connexion, expulsion, bannissement, commande et modification de compte est inscrit dans `audit.log`.
 - `BlockedCommands` dans `hycon.json` liste les commandes que le panneau refuse même aux ADMIN.
+- L'API de Hycon refuse les autres plugins pour ses propres parties (remplacement de la gestion des comptes,
+  effacement des onglets, dump de débogage), et un onglet ou une section de profil appartient au plugin qui l'a ajouté.
+- `AccountPlugins` dans `hycon.json` liste les plugins autorisés à modifier les comptes du panneau, avec le
+  `Group:Name` exact du journal du serveur, par ex. `["PrisonCore:PrisonCore"]` pour la synchronisation du staff de
+  PrisonCore. Les autres sont refusés, et les comptes OWNER ne sont jamais modifiés.
+- Ce n'est pas un bac à sable. Les plugins tournent dans votre serveur, un plugin malveillant peut donc quand même le
+  contourner (il peut lancer des commandes console comme `/hycon resetpassword` ou lire les fichiers de Hycon).
+  N'installez que des plugins de confiance.
 
 Les bannissements utilisent la liste de Hytale (`bans.json`, comme `/ban`) : c'est le serveur qui les applique.
 

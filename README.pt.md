@@ -96,6 +96,14 @@ e os remove quando são removidos lá. Banimentos locais nunca são alterados e 
 - As sessões usam cookies HttpOnly e SameSite=Strict, todo POST exige um token CSRF e logins com falha são limitados.
 - Todo login, expulsão, banimento, comando e alteração de conta vai para o `audit.log`.
 - `BlockedCommands` no `hycon.json` lista comandos que o painel recusa até para ADMIN.
+- A API do Hycon recusa outros plugins nas partes do próprio Hycon (trocar o armazenamento de contas, apagar abas,
+  o dump de depuração), e uma aba ou seção de perfil pertence ao plugin que a adicionou.
+- `AccountPlugins` no `hycon.json` lista os plugins que podem mudar contas do painel, pelo `Group:Name` exato que o log
+  do servidor mostra, por ex. `["PrisonCore:PrisonCore"]` para a sincronização da equipe do PrisonCore. Os outros são
+  recusados, e contas OWNER nunca são alteradas.
+- Isso não é uma sandbox. Plugins rodam dentro do seu servidor, então um plugin malicioso ainda pode contorná-la (ele
+  pode rodar comandos do console como `/hycon resetpassword` ou ler os arquivos do Hycon). Instale só plugins em que
+  você confia.
 
 Os banimentos usam a lista do próprio Hytale (`bans.json`, igual ao `/ban`), então o servidor os aplica.
 

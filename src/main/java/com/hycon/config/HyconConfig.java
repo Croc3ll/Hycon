@@ -79,7 +79,7 @@ public record HyconConfig(
                 (int) Math.max(1, num(m, "LoginAttempts", 5)),
                 (long) (Math.max(1, num(m, "LoginWindowMinutes", 10)) * 60_000),
                 lowerSet(m, "BlockedCommands"),
-                lowerSet(m, "AccountPlugins"),
+                exactSet(m, "AccountPlugins"),
                 (int) Math.max(100, Math.min(50_000, num(m, "LogLines", 2000))),
                 (int) num(m, "SharePort", 8097),
                 str(m, "ShareBindAddress", "0.0.0.0"),
@@ -123,6 +123,15 @@ public record HyconConfig(
 
     private static String str(Map<String, Object> m, String k, String def) {
         return m.get(k) instanceof String s && !s.isBlank() ? s.trim() : def;
+    }
+
+    /** Plugin ids are case-sensitive on the server, so they're kept as written. */
+    private static Set<String> exactSet(Map<String, Object> m, String k) {
+        if (!(m.get(k) instanceof List<?> list)) {
+            return Set.of();
+        }
+        return list.stream().filter(String.class::isInstance).map(o -> ((String) o).trim())
+                .filter(s -> !s.isEmpty()).collect(Collectors.toUnmodifiableSet());
     }
 
     private static Set<String> lowerSet(Map<String, Object> m, String k) {

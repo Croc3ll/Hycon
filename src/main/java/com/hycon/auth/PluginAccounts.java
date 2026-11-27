@@ -26,6 +26,8 @@ public final class PluginAccounts implements HyconApi.Accounts {
     private final HytaleLogger log;
     /** Plugins already warned about, so a plugin syncing on every join doesn't fill the log. */
     private final Set<String> warned = ConcurrentHashMap.newKeySet();
+    /** Refusals already in the audit log ("plugin action account"), so a plugin retrying every pass writes one line. */
+    private final Set<String> audited = ConcurrentHashMap.newKeySet();
 
     public PluginAccounts(AdminStore admins, Sessions sessions, AuditLog audit, Supplier<HyconConfig> config, HytaleLogger log) {
         this.admins = admins;
@@ -82,15 +84,28 @@ public final class PluginAccounts implements HyconApi.Accounts {
         return true;
     }
 
-    /** False, with an audit entry and one log warning, when the owner hasn't listed this plugin. */
+    /** False, with one audit entry and one log warning, when the owner hasn't listed this plugin. */
     private boolean trusted(String plugin, String action, String account) {
-        if (config.get().accountPlugins().contains(plugin.toLowerCase(Locale.ROOT))) return true;
-        audit.record(plugin, "plugin", action, account, "refused: not in AccountPlugins", false);
-        if (warned.add(plugin)) {
+        boolean unknown = plugin.equals("unknown");
+        if (!unknown && config.get().accountPlugins().contains(plugin)) return true;
+        if (audited.add(plugin + " " + action + " " + account)) {
+            audit.record(plugin, "plugin", action, account, unknown ? "refused: caller not known" : "refused: not in AccountPlugins", false);
+        }
+        if (unknown) {
+            // Listing "unknown" can never help, so it isn't offered on the Security tab.
+            if (audited.add("unknown")) {
+                log.at(java.util.logging.Level.WARNING).log("Hycon refused an account change from code it couldn't tie to a plugin.");
+            }
+        } else if (warned.add(plugin)) {
             log.at(java.util.logging.Level.WARNING).log(
                     "Hycon refused %s changing panel accounts. To allow it, add \"%s\" to AccountPlugins in hycon.json.", plugin, plugin);
         }
         return false;
+    }
+
+    /** Plugins refused so far (since the server started), for the Security tab and /hycon debug. */
+    public Set<String> refused() {
+        return Set.copyOf(warned);
     }
 
     /** Names the plugin beside "by", so a plugin can't sign a change as a staff member. */

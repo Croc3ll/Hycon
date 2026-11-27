@@ -1277,7 +1277,7 @@ function accounts(view) {
     el('div', { class: 'row' }, name, lvl, el('button', { class: 'primary', on: { click: async () => {
       try { const r = await api('POST', '/api/accounts/create', { name: name.value.trim(), level: lvl.value }); showSecret(name.value.trim(), r.password); name.value = ''; load(); } catch (e) { toast(e.message, true); }
     } } }, 'Create')), secret,
-    el('p', { class: 'muted' }, "VIEWER sees players, bans and dashboards. MODERATOR also kicks, bans and reads the console. ADMIN also runs console commands and reads the audit log. OWNER also manages accounts. A locked account keeps its level but can't log in. A plugin can keep these in step with in-game staff (PrisonCore: an account named after the player).")));
+    el('p', { class: 'muted' }, "VIEWER sees players, bans and dashboards. MODERATOR also kicks, bans and reads the console. ADMIN also runs console commands and reads the audit log. OWNER also manages accounts. A locked account keeps its level but can't log in. A plugin can keep these in step with in-game staff (PrisonCore: an account named after the player) once you add it to AccountPlugins in hycon.json.")));
   async function load() {
     const d = await api('GET', '/api/accounts');
     body.replaceChildren(...d.accounts.map((a) => el('tr', {}, el('td', {}, a.name), el('td', {}, levelSelect(a)),

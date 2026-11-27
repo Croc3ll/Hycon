@@ -9,7 +9,8 @@ Writes `debug/dump-<UTC time>.txt` in Hycon's data folder and prints the path. I
 - Hycon version, JVM uptime, heap and GC counts, thread count
 - worlds and which players are in each
 - Hycon's state: panel address, open panel sessions, ban sharing on/off, the IO executor, each timed
-  task (`STOPPED (threw?)` means a timer died), and any service that never started
+  task (`STOPPED (threw?)` means a timer died), any service that never started, `AccountPlugins` and the
+  plugins refused so far, and which plugin owns each tab, section and source id
 - every thread that is running or blocked, with its stack (parked threads are left out)
 - the last 300 WARN/SEVERE/ERROR lines (and the stack trace lines after them) from the end
   (last 2 MB) of the newest file in the server's `logs/` folder

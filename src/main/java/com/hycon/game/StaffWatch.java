@@ -1,5 +1,6 @@
 package com.hycon.game;
 
+import com.hycon.api.Callers;
 import com.hycon.audit.AuditLog;
 import com.hycon.commands.ReportCommand;
 import com.hycon.web.Json;
@@ -80,6 +81,7 @@ public final class StaffWatch {
     }
 
     public void start() {
+        Callers.requireHycon();
         instance = this;
         loadConfig();
         loadSeen();
@@ -91,6 +93,7 @@ public final class StaffWatch {
     }
 
     public void stop() {
+        Callers.requireHycon();
         if (filter != null) {
             PacketAdapters.deregisterInbound(filter);
             filter = null;
@@ -119,6 +122,7 @@ public final class StaffWatch {
 
     /** A player Hytale let in (their token checked out): keeps their entitlements and alerts if unusual. */
     public void joined(UUID uuid) {
+        Callers.requireHycon();
         Pending p = pending.remove(uuid);
         if (p == null) {
             return;

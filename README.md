@@ -134,6 +134,13 @@ The panel can ban players and run commands, so:
 - Every login, failed login, kick, ban, unban, command and account change goes to `audit.log`
   (append-only, one JSON object per line).
 - `BlockedCommands` in `hycon.json` lists commands the panel refuses even for ADMIN.
+- Hycon's API refuses other plugins for its own parts (swapping out the account store, wiping tabs, the debug dump),
+  and a tab or profile section belongs to the plugin that added it.
+- `AccountPlugins` in `hycon.json` lists the plugins allowed to change panel accounts, by the exact `Group:Name` the
+  server log shows, e.g. `["PrisonCore:PrisonCore"]` for PrisonCore's staff sync. Others are refused, and owner
+  accounts are never changed.
+- This is not a sandbox. Plugins run inside your server, so a plugin made to do harm can still get around it (it can
+  run console commands such as `/hycon resetpassword`, or read Hycon's files). Install only plugins you trust.
 
 Bans use Hytale's own ban list (`bans.json`, same as `/ban`), so the server enforces them and
 temporary bans expire by themselves. "Banned by" shows `Hycon:<account>`.
@@ -154,14 +161,23 @@ public final class MyPanel implements HyconPanel {
 // shutdown(): HyconApi.unregister("myplugin");
 ```
 
-Beyond tabs, the API (`HyconApi.API_VERSION`, currently 6) lets a plugin:
+Beyond tabs, the API (`HyconApi.API_VERSION`, currently 17) lets a plugin:
 
 - add a **section to every player profile** (`registerProfileSection`, version 3);
 - put **forms and row buttons** on its tab and handle them in `action(...)`, with the viewer's
   account level (version 4);
 - write **warnings and notes to a player's record** (`HyconApi.record`, version 5);
 - add **reasons to the risk score** (`registerRiskSource`, version 6), leaving out anything from before
-  `HyconApi.riskClearedAt(player)` (version 15).
+  `HyconApi.riskClearedAt(player)` (version 15);
+- show **replays** of how players moved, with the world's blocks (versions 7 to 10, 12 and 14), and **ask admins a
+  question** as a card or popup (version 11);
+- see a player's **linked accounts** (`linkedAccounts`, version 13) and give its tab an **icon** (version 16);
+- read **panel accounts** and hear changes to them (`accountLevel`, `addAccountListener`, version 17), and change
+  them (`setAccountLevel`, `setAccountLocked`) once the owner adds it to `AccountPlugins`. From Hycon 0.2.4 (still
+  version 17), false can also mean the owner hasn't allowed it yet.
+
+Ids are first come, first served: another plugin can't replace or remove your tab, section or risk source
+(its `register` is ignored, with a warning in the server log), so pick ids of your own (`myplugin-stats`).
 
 Read `API_VERSION` at run time (reflectively, since the constant is compiled in) before using newer calls.
 

@@ -95,6 +95,13 @@ zostaną tam zdjęte. Lokalne bany nigdy nie są ruszane, a kody nigdy nie są w
 - Sesje używają ciasteczek HttpOnly i SameSite=Strict, każdy POST wymaga tokenu CSRF, a nieudane logowania są ograniczane.
 - Każde logowanie, wyrzucenie, ban, polecenie i zmiana konta trafia do `audit.log`.
 - `BlockedCommands` w `hycon.json` to lista poleceń, których panel odmawia nawet ADMIN-om.
+- API Hycona odrzuca inne pluginy przy jego własnych częściach (podmiana magazynu kont, kasowanie zakładek, zrzut
+  debugowania), a zakładka lub sekcja profilu należy do pluginu, który ją dodał.
+- `AccountPlugins` w `hycon.json` to lista pluginów, które mogą zmieniać konta panelu, podanych dokładnie jako
+  `Group:Name` z logu serwera, np. `["PrisonCore:PrisonCore"]` do synchronizacji administracji w PrisonCore. Inne są
+  odrzucane, a konta OWNER nigdy nie są zmieniane.
+- To nie jest piaskownica. Pluginy działają wewnątrz twojego serwera, więc złośliwy plugin nadal może to obejść (może
+  uruchamiać polecenia konsoli, np. `/hycon resetpassword`, albo czytać pliki Hycona). Instaluj tylko pluginy, którym ufasz.
 
 Bany korzystają z własnej listy Hytale (`bans.json`, jak `/ban`), więc egzekwuje je serwer.
 
