@@ -3,6 +3,11 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.2.6 (2026-11-26)
+- **Fix**: on a server with `hycon-api.jar` on its class path (a plugin developer's test server), 0.2.5 refused
+  Hycon's own setup ("Only Hycon itself can do this") and the server stopped. Hycon now knows its own code by the
+  plugin the server loaded as Hycon, as well as by the API's class loader. Servers that only use `mods` weren't hit.
+
 ## 0.2.5 (2026-11-26)
 - **Fix**: in 0.2.4, two plugins registering the same tab, profile section, risk source or block source id could stop
   the server starting. Now the first plugin keeps the id and the other is ignored, with a warning in the server log.

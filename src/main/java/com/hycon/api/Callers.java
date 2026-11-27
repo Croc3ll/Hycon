@@ -21,6 +21,7 @@ public final class Callers {
     /** Frames above the caller we want: {@link #callerOf()}, the check, then the guarded method. */
     private static final int GUARD_FRAMES = 3;
     private static final ClassLoader PLATFORM = ClassLoader.getPlatformClassLoader();
+    private static final PluginIdentifier HYCON = PluginIdentifier.fromString("Hycon:Hycon");
 
     private Callers() {
     }
@@ -45,8 +46,25 @@ public final class Callers {
                 .findFirst().orElse(null));
     }
 
+    /**
+     * Hycon's own classes: loaded with this one, or by the loader of the plugin the server registered as Hycon:Hycon.
+     * The second is for a server with hycon-api.jar on its class path (a plugin developer's test server, so a plugin
+     * run from there can see the API). This class then comes from that class path, and Hycon's own from its plugin
+     * loader. Without it Hycon refused itself and the server stopped (0.2.5 on PrisonCore's test server).
+     */
     private static boolean isHycon(Class<?> c) {
-        return c != null && c.getClassLoader() == Callers.class.getClassLoader();
+        if (c == null) {
+            return false;
+        }
+        ClassLoader loader = c.getClassLoader();
+        return loader == Callers.class.getClassLoader() || loader == hyconLoader();
+    }
+
+    /** The class loader of the plugin the server loaded as Hycon:Hycon, or null before it's loaded. */
+    private static ClassLoader hyconLoader() {
+        PluginManager manager = PluginManager.get();
+        PluginBase hycon = manager == null ? null : manager.getPlugin(HYCON);
+        return hycon == null ? null : hycon.getClass().getClassLoader();
     }
 
     /**
