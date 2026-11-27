@@ -184,6 +184,13 @@ A replay with many blocks makes a big page, rebuilt on every refresh. Instead, r
 drops tiles once they are out of reach. So the ground under a player only loads when they go down there.
 `tile(key, x0, z0, size, yMin, yMax, out)` runs on a web thread: read thread-safe data only. Unregister on shutdown.
 
+## What plugins can't do (0.2.4)
+
+Hycon checks who calls it. Its own hooks (`setAccounts`, `setRecorder`, `setLinks`, `setClearedAt`, `accountChanged`,
+`clear`, and `HyconPlugin`'s password reset and debug dump) throw `SecurityException` for any other plugin. A tab,
+profile section, risk source or block source belongs to the plugin that registered its id first: another plugin can't
+replace or remove it (`register` throws, `unregister` does nothing). Pick ids that are your own, e.g. `myplugin-stats`.
+
 ## Panel accounts (API 17)
 
 For a plugin that keeps its staff in step with Hycon's accounts. Accounts are names, not players, so link an account to
@@ -193,7 +200,9 @@ the player of the same name.
 - `HyconApi.accountLocked(name)`.
 - `HyconApi.setAccountLevel(name, level, by)`: viewer to admin, and unlocks it. `setAccountLocked(name, locked, by)`.
   Both leave OWNER accounts alone and return false then, or when there's no such account. They never create or remove
-  an account or touch a password, and write the audit log with `by`. They don't call the listeners below.
+  an account or touch a password, and write the audit log with `by` and your plugin's id. They don't call the listeners
+  below. They only work once the owner adds your plugin's id (`Group:Name` from your manifest) to `AccountPlugins` in
+  `hycon.json`; until then they return false and the server log says what to add.
 - `HyconApi.addAccountListener((name, level, locked, by) -> ...)`: an owner changed an account in the panel (its level,
   a lock or unlock, or its removal: level 0). Remove it with `removeAccountListener` in `shutdown()`.
 

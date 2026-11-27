@@ -5,6 +5,11 @@ Every Hycon release, newest first. Downloads are on the [releases page](https://
 
 ## 0.2.4 (2026-11-26)
 - **Fix**: the panel stuck on "Loading..." in 0.2.3. Two texts on the Accounts page broke the page script.
+- **Plugins can't take over the panel**: other plugins can no longer swap out Hycon's own parts, reset an owner's
+  password, wipe the panel's tabs or replace another plugin's tab.
+- **Account changes need your OK**: a plugin can only set panel account levels or lock accounts once you add it to
+  the new `AccountPlugins` in `hycon.json`. **Action needed for PrisonCore's staff sync**: add
+  `"AccountPlugins": ["PrisonCore:PrisonCore"]`. Until then Hycon refuses it, and the server log says what to add.
 
 ## 0.2.3 (2026-11-25)
 - **Lock an account**: Accounts → **Lock** keeps an account and its level but stops it logging in (and logs it out)

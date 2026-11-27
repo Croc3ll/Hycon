@@ -36,8 +36,31 @@ public final class HyconApi {
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_.-]{1,40}");
     private static final Map<String, HyconPanel> PANELS = new ConcurrentHashMap<>();
     private static final Map<String, HyconProfileSection> SECTIONS = new ConcurrentHashMap<>();
+    /** The plugin that first registered each tab, section, risk source or block source ("panel/prison"). */
+    private static final Map<String, String> OWNERS = new ConcurrentHashMap<>();
 
     private HyconApi() {
+    }
+
+    /**
+     * Claims {@code kind/id} for {@code plugin}, so another plugin can't replace or remove what it registered. A
+     * reload keeps its claim: the plugin id stays the same.
+     */
+    private static void claim(String kind, String id, String plugin) {
+        String owner = OWNERS.putIfAbsent(kind + "/" + id, plugin);
+        if (owner != null && !owner.equals(plugin)) {
+            throw new SecurityException("The " + kind + " \"" + id + "\" belongs to " + owner);
+        }
+    }
+
+    /** True when {@code plugin} may remove {@code kind/id}: it registered it, or nobody did. */
+    private static boolean release(String kind, String id, String plugin) {
+        String owner = OWNERS.get(kind + "/" + id);
+        if (owner != null && !owner.equals(plugin)) {
+            return false;
+        }
+        OWNERS.remove(kind + "/" + id);
+        return true;
     }
 
     /**
@@ -51,11 +74,14 @@ public final class HyconApi {
 
         boolean locked(String name);
 
-        /** Sets a non-owner account's level (viewer to admin) and unlocks it. False when it's missing or an owner. */
-        boolean setLevel(String name, int level, String by);
+        /**
+         * Sets a non-owner account's level (viewer to admin) and unlocks it, for {@code plugin} ("Group:Name"). False
+         * when it's missing, an owner, or the plugin isn't in AccountPlugins in hycon.json.
+         */
+        boolean setLevel(String name, int level, String by, String plugin);
 
-        /** Locks or unlocks a non-owner account; a locked one can't log in. False when it's missing or an owner. */
-        boolean setLocked(String name, boolean locked, String by);
+        /** Locks or unlocks a non-owner account; a locked one can't log in. False as for {@link #setLevel}. */
+        boolean setLocked(String name, boolean locked, String by, String plugin);
     }
 
     /** Hears an owner changing an account in the panel (level, lock or removal: level 0). Since API version 17. */
@@ -68,6 +94,7 @@ public final class HyconApi {
 
     /** Set by Hycon itself. */
     public static void setAccounts(Accounts a) {
+        Callers.requireHycon();
         accounts = a;
     }
 
@@ -82,16 +109,19 @@ public final class HyconApi {
         return a != null && name != null && a.locked(name);
     }
 
-    /** See {@link Accounts#setLevel}; false when Hycon isn't running. Doesn't call the listeners. */
+    /**
+     * See {@link Accounts#setLevel}; false when Hycon isn't running. Doesn't call the listeners. Only works for a
+     * plugin the owner listed in AccountPlugins in hycon.json.
+     */
     public static boolean setAccountLevel(String name, int level, String by) {
         Accounts a = accounts;
-        return a != null && name != null && a.setLevel(name, level, by);
+        return a != null && name != null && a.setLevel(name, level, by, Callers.plugin());
     }
 
     /** See {@link Accounts#setLocked}; false when Hycon isn't running. Doesn't call the listeners. */
     public static boolean setAccountLocked(String name, boolean locked, String by) {
         Accounts a = accounts;
-        return a != null && name != null && a.setLocked(name, locked, by);
+        return a != null && name != null && a.setLocked(name, locked, by, Callers.plugin());
     }
 
     public static void addAccountListener(AccountListener l) {
@@ -104,6 +134,7 @@ public final class HyconApi {
 
     /** Called by Hycon after an owner changed an account in the panel. A listener that fails doesn't stop the rest. */
     public static void accountChanged(String name, int level, boolean locked, String by) {
+        Callers.requireHycon();
         for (AccountListener l : ACCOUNT_LISTENERS) {
             try {
                 l.changed(name, level, locked, by);
@@ -125,12 +156,13 @@ public final class HyconApi {
     /** Adds (or replaces, by id) reasons for the profile's risk score. Since API version 6. */
     public static void registerRiskSource(String id, HyconRisk source) {
         if (id != null && source != null) {
+            claim("risk source", id, Callers.plugin());
             RISK.put(id, source);
         }
     }
 
     public static void unregisterRiskSource(String id) {
-        if (id != null) {
+        if (id != null && release("risk source", id, Callers.plugin())) {
             RISK.remove(id);
         }
     }
@@ -153,11 +185,12 @@ public final class HyconApi {
         if (id == null || !ID.matcher(id).matches() || source == null) {
             throw new IllegalArgumentException("Block source id must be 1-40 letters, digits, - _ or .");
         }
+        claim("block source", id, Callers.plugin());
         BLOCKS.put(id, source);
     }
 
     public static void unregisterBlockSource(String id) {
-        if (id != null) {
+        if (id != null && release("block source", id, Callers.plugin())) {
             BLOCKS.remove(id);
         }
     }
@@ -175,6 +208,7 @@ public final class HyconApi {
 
     /** Set by Hycon itself. */
     public static void setClearedAt(ClearedAt c) {
+        Callers.requireHycon();
         clearedAt = c;
     }
 
@@ -189,6 +223,7 @@ public final class HyconApi {
 
     /** Set by Hycon itself. */
     public static void setLinks(Links l) {
+        Callers.requireHycon();
         links = l;
     }
 
@@ -203,6 +238,7 @@ public final class HyconApi {
 
     /** Set by Hycon itself. */
     public static void setRecorder(Recorder r) {
+        Callers.requireHycon();
         recorder = r;
     }
 
@@ -217,16 +253,17 @@ public final class HyconApi {
         }
     }
 
-    /** Adds (or replaces, by id) a dashboard tab. */
+    /** Adds (or replaces, by id) a dashboard tab. Throws when another plugin registered that id. */
     public static void register(HyconPanel panel) {
         if (panel == null || panel.id() == null || !ID.matcher(panel.id()).matches()) {
             throw new IllegalArgumentException("Panel id must be 1-40 letters, digits, - _ or .");
         }
+        claim("tab", panel.id(), Callers.plugin());
         PANELS.put(panel.id(), panel);
     }
 
     public static void unregister(String id) {
-        if (id != null) {
+        if (id != null && release("tab", id, Callers.plugin())) {
             PANELS.remove(id);
         }
     }
@@ -248,11 +285,12 @@ public final class HyconApi {
         if (section == null || section.id() == null || !ID.matcher(section.id()).matches()) {
             throw new IllegalArgumentException("Section id must be 1-40 letters, digits, - _ or .");
         }
+        claim("profile section", section.id(), Callers.plugin());
         SECTIONS.put(section.id(), section);
     }
 
     public static void unregisterProfileSection(String id) {
-        if (id != null) {
+        if (id != null && release("profile section", id, Callers.plugin())) {
             SECTIONS.remove(id);
         }
     }
@@ -266,6 +304,8 @@ public final class HyconApi {
 
     /** Drops every tab and section; called when Hycon shuts down. */
     public static void clear() {
+        Callers.requireHycon();
+        OWNERS.clear();
         PANELS.clear();
         SECTIONS.clear();
         recorder = null;

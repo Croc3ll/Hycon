@@ -352,7 +352,9 @@ exactly like their player. Their in-game staff group then sets the level: helper
 MODERATOR, admin = ADMIN. Removed from every staff group in game, the account is locked. Changing a
 level, locking or removing an account here changes their in-game group too. OWNER accounts are never
 changed by the sync, and it never makes an account or touches a password. Each change is in the
-audit log as `PrisonCore` with `plugin` as the address.
+audit log as `PrisonCore:PrisonCore` with `plugin` as the address. Since 0.2.4 the sync only works once
+you allow it: add `"PrisonCore:PrisonCore"` to `AccountPlugins` in `hycon.json`. Until then Hycon refuses
+it, and the server log says what to add.
 
 **Locked out completely?** In the server console (not in game):
 
@@ -425,6 +427,7 @@ Most changes apply within 5 seconds of saving the file, no restart needed (the s
 | `LoginAttempts`      | `5`           | Failed logins allowed per address and per account name...                                         |
 | `LoginWindowMinutes` | `10`          | ...within this many minutes. After that, logins wait until the window has passed.                 |
 | `BlockedCommands`    | `[]`          | Commands the panel refuses even for ADMIN, e.g. `["stop", "op"]`. Aliases are blocked too.        |
+| `AccountPlugins`     | `[]`          | Plugins allowed to change panel accounts, by id, e.g. `["PrisonCore:PrisonCore"]`. Others are refused. |
 | `LogLines`           | `2000`        | How many recent log lines the Console tab keeps.                                                  |
 | `GeoIp`              | `true`        | Look up players' rough location for the globe (downloads the DB-IP database once a month).       |
 | `ServerLocation`     | `""`          | The server's `"lat,lon"`, e.g. `"50.11,8.68"`, so the globe draws lines to it and shows distances. |

@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import com.hycon.api.Callers;
 import com.hycon.api.HyconApi;
 import com.hycon.audit.AuditLog;
 import com.hycon.auth.AdminStore;
@@ -278,7 +279,7 @@ public final class HyconPlugin extends JavaPlugin {
         });
         HyconApi.setRecorder((player, type, by, reason, detail) -> records.record(player,
                 "WARN".equalsIgnoreCase(type) ? PlayerRecords.Type.WARN : PlayerRecords.Type.NOTE, by, reason, detail));
-        HyconApi.setAccounts(new com.hycon.auth.PluginAccounts(admins, sessions, audit));
+        HyconApi.setAccounts(new com.hycon.auth.PluginAccounts(admins, sessions, audit, liveConfig, getLogger()));
         HyconApi.register(new AnalyticsPanel(samples, known, positions));
         if (perf != null) {
             HyconApi.register(new PerformancePanel(perf));
@@ -473,11 +474,13 @@ public final class HyconPlugin extends JavaPlugin {
     }
 
     public String status() {
+        Callers.requireHycon();
         return web == null ? "Hycon panel is not running (see hycon.json and the server log)." : "Hycon panel: " + address();
     }
 
     /** Writes a debug dump off-thread ({@code /hycon debug}); {@code done} gets the file path or the reason. */
     public void debugDump(java.util.function.Consumer<String> done) {
+        Callers.requireHycon();
         DebugDump.run(getDataDirectory(), String.valueOf(getManifest().getVersion()), this::debugState, getLogger(), done);
     }
 
@@ -529,7 +532,9 @@ public final class HyconPlugin extends JavaPlugin {
         HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> HytaleServer.get().shutdownServer(), 1, java.util.concurrent.TimeUnit.SECONDS);
     }
 
+    /** Only Hycon's own console command may call this: a plugin that could would take over any account. */
     public Path resetPasswordToFile(String name) throws IOException {
+        Callers.requireHycon();
         if (web == null) {
             // Accounts may not have been read; saving now could overwrite admins.json with an empty list.
             throw new IOException("the panel is not running");
