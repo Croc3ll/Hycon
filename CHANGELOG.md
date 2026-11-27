@@ -3,20 +3,33 @@
 Every Hycon release, newest first. Downloads are on the [releases page](https://github.com/Croc3ll/Hycon/releases).
 "API" is the plugin API in `hycon-api.jar`, only for developers whose plugins add tabs to Hycon.
 
+## 0.2.5 (2026-11-26)
+- **Fix**: in 0.2.4, two plugins registering the same tab, profile section, risk source or block source id could stop
+  the server starting. Now the first plugin keeps the id and the other is ignored, with a warning in the server log.
+  Hycon's own ids always stay Hycon's.
+- **Plugin names can't be faked**: naming a class loader after another plugin no longer fools Hycon. `AccountPlugins`
+  ids now match exactly, as the server log prints them (case matters). The staff watch only takes orders from Hycon.
+- **Security tab**: shows plugins that were refused account changes, and the plugins `AccountPlugins` allows.
+  `/hycon debug` shows them too, with the plugin that owns each tab and section id.
+- **Quieter audit log**: a refused plugin is written to the audit log once per account, not on every retry.
+- **Translations**: the Accounts help text and the new panel lines are in every panel language, and the README in
+  every language says what plugins can and can't do.
+- **For plugin developers**: `register` with another plugin's id no longer throws `SecurityException`. It is ignored
+  with a warning, so a clash never stops your plugin starting.
+
 ## 0.2.4 (2026-11-26)
 - **Fix**: the panel stuck on "Loading..." in 0.2.3. Two texts on the Accounts page broke the page script.
 - **Harder for plugins to take over the panel**: Hycon's API now refuses other plugins that try to swap out its own
-  parts (the account store, the staff watch, the debug dump), wipe the panel's tabs or replace another plugin's tab.
-  Naming a class loader after another plugin no longer fools it. It is not a sandbox: install only plugins you trust.
-- **Account changes need your OK**: a plugin can only set panel account levels or lock accounts once you add its
-  exact id to the new `AccountPlugins` in `hycon.json`. The Security tab shows plugins that were refused.
-  **Action needed for PrisonCore's staff sync**: add `"AccountPlugins": ["PrisonCore:PrisonCore"]`. Until then
-  in-game staff changes don't reach the panel (your changes in the panel still reach the game), and the server log
-  says what to add.
+  parts (the account store, the debug dump), wipe the panel's tabs or replace another plugin's tab. It is not a
+  sandbox: install only plugins you trust.
+- **Account changes need your OK**: a plugin can only set panel account levels or lock accounts once you add it to
+  the new `AccountPlugins` in `hycon.json`. **Action needed for PrisonCore's staff sync**: add
+  `"AccountPlugins": ["PrisonCore:PrisonCore"]`. Until then in-game staff changes don't reach the panel (your
+  changes in the panel still reach the game), and the server log says what to add.
 - **For plugin developers**: a tab, profile section, risk source or block source id belongs to the plugin that
-  registered it first. Another plugin's `register` is ignored with a warning in the server log (nothing is thrown),
-  and its `unregister` does nothing.
-  `setAccountLevel` and `setAccountLocked` also return false while the owner hasn't allowed your plugin.
+  registered it first. Another plugin's `register` throws `SecurityException` (0.2.5 ignores it instead) and its
+  `unregister` does nothing. `setAccountLevel` and `setAccountLocked` also return false while the owner hasn't
+  allowed your plugin.
 
 ## 0.2.3 (2026-11-25)
 - **Lock an account**: Accounts → **Lock** keeps an account and its level but stops it logging in (and logs it out)

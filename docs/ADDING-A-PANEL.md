@@ -184,14 +184,14 @@ A replay with many blocks makes a big page, rebuilt on every refresh. Instead, r
 drops tiles once they are out of reach. So the ground under a player only loads when they go down there.
 `tile(key, x0, z0, size, yMin, yMax, out)` runs on a web thread: read thread-safe data only. Unregister on shutdown.
 
-## What plugins can't do (0.2.4)
+## What plugins can't do (0.2.4 and up)
 
 Hycon checks who calls it. Its own hooks (`setAccounts`, `setRecorder`, `setLinks`, `setClearedAt`, `accountChanged`,
 `clear`, `owners`, `HyconPlugin`'s `status`, password reset and debug dump, and the staff watch) throw
 `SecurityException` for any other plugin. A tab, profile section, risk source or block source belongs to the plugin
 that registered its id first: another plugin can't replace or remove it. Its `register` is ignored (the server log
 says `Hycon ignored <plugin> registering the tab "<id>": it belongs to <owner>`) and its `unregister` does nothing.
-Nothing is thrown, so a clash never stops a plugin starting. Hycon's own ids always stay Hycon's. Pick ids that are
+Since 0.2.5 nothing is thrown (0.2.4 threw `SecurityException`), so a clash never stops a plugin starting. Hycon's own ids always stay Hycon's. Pick ids that are
 your own, e.g. `myplugin-stats`.
 
 Your plugin is known by the `Group:Name` in its manifest, checked against the plugin the server really loaded, so
