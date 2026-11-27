@@ -47,17 +47,18 @@ public final class Callers {
     }
 
     /**
-     * Hycon's own classes: loaded with this one, or by the loader of the plugin the server registered as Hycon:Hycon.
-     * The second is for a server with hycon-api.jar on its class path (a plugin developer's test server, so a plugin
-     * run from there can see the API). This class then comes from that class path, and Hycon's own from its plugin
-     * loader. Without it Hycon refused itself and the server stopped (0.2.5 on PrisonCore's test server).
+     * Hycon's own classes: those loaded by the plugin the server registered as Hycon:Hycon, or before it's registered,
+     * those loaded with this one. A server with hycon-api.jar on its class path (a plugin developer's test server, so a
+     * plugin run from there can see the API) is why. This class then comes from that class path and Hycon's own from
+     * its plugin loader: 0.2.5 refused Hycon itself and the server stopped. Trusting the class path's loader as well
+     * (0.2.6) let every plugin run from the class path pass as Hycon.
      */
     private static boolean isHycon(Class<?> c) {
         if (c == null) {
             return false;
         }
-        ClassLoader loader = c.getClassLoader();
-        return loader == Callers.class.getClassLoader() || loader == hyconLoader();
+        ClassLoader hycon = hyconLoader();
+        return c.getClassLoader() == (hycon != null ? hycon : Callers.class.getClassLoader());
     }
 
     /** The class loader of the plugin the server loaded as Hycon:Hycon, or null before it's loaded. */
@@ -77,21 +78,36 @@ public final class Callers {
             return "Hycon:Hycon";
         }
         ClassLoader loader = c == null ? null : c.getClassLoader();
-        String name = loader == null ? null : loader.getName();
+        PluginManager manager = PluginManager.get();
+        if (loader == null || manager == null) {
+            return "unknown";
+        }
+        String name = loader.getName();
         int open = name == null ? -1 : name.indexOf('('), close = name == null ? -1 : name.lastIndexOf(')');
         if (open < 0 || close <= open) {
-            return "unknown";
+            return classPathPlugin(c, manager);
         }
         String id = name.substring(open + 1, close);
-        PluginManager manager = PluginManager.get();
-        if (manager == null) {
-            return "unknown";
-        }
         try {
             PluginBase plugin = manager.getPlugin(PluginIdentifier.fromString(id));
             return plugin != null && plugin.getClass().getClassLoader() == loader ? id : "unknown";
         } catch (IllegalArgumentException e) {
             return "unknown"; // not Group:Name
         }
+    }
+
+    /**
+     * A plugin run from the server's class path (a developer's test server). Its loader has no plugin name and every
+     * class-path plugin shares it, so it's the plugin loaded by that loader whose main class's package holds the
+     * caller. Only a plugin the server really loaded counts, as for named loaders. "unknown" when none matches.
+     */
+    private static String classPathPlugin(Class<?> c, PluginManager manager) {
+        for (PluginBase plugin : manager.getPlugins()) {
+            Class<?> main = plugin.getClass();
+            if (main.getClassLoader() == c.getClassLoader() && c.getName().startsWith(main.getPackageName() + ".")) {
+                return plugin.getIdentifier().toString();
+            }
+        }
+        return "unknown";
     }
 }
